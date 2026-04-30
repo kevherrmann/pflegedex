@@ -62,6 +62,19 @@ Frontend läuft im `node` Service über Vite. Der Vite-Port ist standardmäßig:
 http://localhost:5173
 ```
 
+Wenn der Browser eine weiße Seite zeigt und in der Konsole Assets von `http://0.0.0.0:5173/...` blockiert werden, setze in deiner lokalen `.env`:
+
+```env
+VITE_HMR_HOST=localhost
+VITE_PORT=5173
+```
+
+Danach den Node-Service neu starten:
+
+```bash
+docker compose up -d node
+```
+
 ## Lokale Konfiguration
 
 Wichtige Variablen aus `.env.example`:
