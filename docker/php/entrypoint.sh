@@ -7,18 +7,44 @@ if [ ! -f .env ] && [ -f .env.example ]; then
     cp .env.example .env
 fi
 
-if [ -f composer.lock ]; then
+composer_install_needed() {
+    [ -f composer.lock ] || return 1
+    [ -f vendor/autoload.php ] || return 0
+    [ -f vendor/.composer-lock.sha256 ] || return 0
+
+    local current_hash
+    local installed_hash
     current_hash="$(sha256sum composer.lock | awk '{print $1}')"
-    installed_hash=""
+    installed_hash="$(cat vendor/.composer-lock.sha256)"
 
-    if [ -f vendor/.composer-lock.sha256 ]; then
-        installed_hash="$(cat vendor/.composer-lock.sha256)"
-    fi
+    [ "$current_hash" != "$installed_hash" ]
+}
 
-    if [ ! -d vendor ] || [ "$current_hash" != "$installed_hash" ]; then
+if composer_install_needed; then
+    mkdir -p vendor
+    lock_dir="vendor/.composer-install.lock"
+
+    while ! mkdir "$lock_dir" 2>/dev/null; do
+        if ! composer_install_needed; then
+            break
+        fi
+
+        echo "Waiting for another Pflegedex container to finish composer install..."
+        sleep 2
+    done
+
+    if [ -d "$lock_dir" ] && composer_install_needed; then
+        cleanup_lock() {
+            rmdir "$lock_dir" 2>/dev/null || true
+        }
+        trap cleanup_lock EXIT
+
+        rm -f vendor/composer/tmp-* 2>/dev/null || true
         composer install --no-interaction --prefer-dist
-        mkdir -p vendor
-        printf '%s' "$current_hash" > vendor/.composer-lock.sha256
+        sha256sum composer.lock | awk '{print $1}' > vendor/.composer-lock.sha256
+
+        cleanup_lock
+        trap - EXIT
     fi
 fi
 

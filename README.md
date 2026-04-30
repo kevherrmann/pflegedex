@@ -62,6 +62,16 @@ Wenn eine frühere lokale Migration bereits halb fehlgeschlagen ist, setze die l
 docker compose exec app php artisan migrate:fresh --seed
 ```
 
+Wenn ein Composer-Download in `vendor/composer/tmp-...zip` durch einen abgebrochenen Containerstart beschädigt wurde, entferne einmalig den lokalen Vendor-Ordner und baue neu:
+
+```bash
+rm -rf vendor
+docker compose down
+docker compose up --build
+```
+
+Der Docker-Entrypoint schützt Composer-Installationen mit einem Lock, damit `app` und `queue` nicht gleichzeitig in denselben gemounteten `vendor/`-Ordner schreiben.
+
 Frontend läuft im `node` Service über Vite. Der Vite-Port ist standardmäßig:
 
 ```text
