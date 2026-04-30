@@ -53,7 +53,13 @@ http://localhost:8080
 In einem zweiten Terminal, falls Migrationen nötig sind:
 
 ```bash
-docker compose exec app php artisan migrate
+docker compose exec app php artisan migrate --seed
+```
+
+Wenn eine frühere lokale Migration bereits halb fehlgeschlagen ist, setze die lokale Entwicklungsdatenbank zurück:
+
+```bash
+docker compose exec app php artisan migrate:fresh --seed
 ```
 
 Frontend läuft im `node` Service über Vite. Der Vite-Port ist standardmäßig:
