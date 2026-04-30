@@ -32,6 +32,13 @@ cp .env.example .env
 docker compose up --build
 ```
 
+Falls PostgreSQL beim allerersten Start mit `Operation not permitted` auf dem Datenverzeichnis abbricht, entferne den leeren, fehlerhaft initialisierten Entwicklungs-Volume einmalig und starte neu:
+
+```bash
+docker compose down -v
+docker compose up --build
+```
+
 Dann öffnen:
 
 ```text
