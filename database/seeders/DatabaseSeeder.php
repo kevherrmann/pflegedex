@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Location;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
@@ -24,11 +25,15 @@ class DatabaseSeeder extends Seeder
             ],
         );
 
-        $admin = User::factory()->create([
-            'location_id' => $location->id,
-            'name' => 'Pflegedex Admin',
-            'email' => 'admin@pflegedex.local',
-        ]);
+        $admin = User::updateOrCreate(
+            ['email' => 'admin@pflegedex.local'],
+            [
+                'location_id' => $location->id,
+                'name' => 'Pflegedex Admin',
+                'password' => Hash::make('password'),
+                'email_verified_at' => now(),
+            ],
+        );
 
         $admin->assignRole('Admin');
     }

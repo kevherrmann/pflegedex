@@ -50,17 +50,13 @@ Dann öffnen:
 http://localhost:8080
 ```
 
-In einem zweiten Terminal, falls Migrationen nötig sind:
-
-```bash
-docker compose exec app php artisan migrate --seed
-```
-
-Wenn eine frühere lokale Migration bereits halb fehlgeschlagen ist, setze die lokale Entwicklungsdatenbank zurück:
+In einem zweiten Terminal, falls du Migrationen manuell neu ausführen möchtest:
 
 ```bash
 docker compose exec app php artisan migrate:fresh --seed
 ```
+
+Im lokalen Docker-Setup führt der `app`-Container Migrationen und Seeder standardmäßig automatisch aus (`PFLEGEDEX_AUTO_MIGRATE=true`). Dadurch ist die tmpfs-Entwicklungsdatenbank nach einem frischen Containerstart direkt nutzbar.
 
 Wenn ein Composer-Download in `vendor/composer/tmp-...zip` durch einen abgebrochenen Containerstart beschädigt wurde, entferne einmalig den lokalen Vendor-Ordner und baue neu:
 

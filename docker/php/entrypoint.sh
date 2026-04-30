@@ -52,4 +52,10 @@ if [ -f artisan ] && ! grep -q '^APP_KEY=base64:' .env 2>/dev/null; then
     php artisan key:generate --force
 fi
 
+if [ "${PFLEGEDEX_AUTO_MIGRATE:-false}" = "true" ]; then
+    echo "Running Pflegedex local migrations and seeders..."
+    php artisan migrate --force
+    php artisan db:seed --force
+fi
+
 exec "$@"

@@ -11,6 +11,7 @@ services:
       - .:/var/www/html
     environment:
       APP_ENV: local
+      PFLEGEDEX_AUTO_MIGRATE: ${PFLEGEDEX_AUTO_MIGRATE:-true}
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
     depends_on:
       postgres:
