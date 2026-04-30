@@ -2,8 +2,11 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head } from '@inertiajs/react';
 
 const cards = [
+    ['Wohnbereiche', '1', 'Ein erster Beispiel-Wohnbereich wird beim Seed angelegt.'],
+    ['Rollen', '3', 'Admin, PDL und Pflegekraft sind als Grundrollen vorbereitet.'],
     ['Bewohner', '0', 'Patientendokumentation wird in Phase 1 aufgebaut.'],
     ['SIS', '0', 'Strukturierte Informationssammlung mit Risikomatrix.'],
+    ['Pflegeberichte', '0', 'Berichtserfassung und Signatur folgen nach dem Fundament.'],
     ['KI-Entwürfe', '0', 'Lokale Ollama-Generierung folgt in Phase 2.'],
 ];
 
@@ -33,11 +36,11 @@ export default function Dashboard() {
                             Willkommen im Pflegedex-Arbeitsbereich
                         </h1>
                         <p className="mt-4 max-w-3xl leading-7 text-[#54595F]">
-                            Dieses Dashboard ist die Startfläche für die kommenden Module: Bewohnerdokumentation, SIS, Pflegeberichte, lokale KI-Entwürfe und Dienstplanung.
+                            Das technische Fundament steht: Anmeldung, Rollen und Wohnbereiche sind vorbereitet. Die nächsten Schritte füllen diese Grundlage mit Bewohnerdokumentation, SIS und Pflegeberichten.
                         </p>
                     </div>
 
-                    <div className="grid gap-6 md:grid-cols-3">
+                    <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
                         {cards.map(([title, value, description]) => (
                             <article key={title} className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-[#E5E7EB]">
                                 <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#9B1C3B]">

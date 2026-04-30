@@ -142,7 +142,7 @@ export default function Welcome({
                                     </p>
                                     <div className="mt-8 grid gap-4">
                                         {[
-                                            ['Wohnbereiche', 'location_id getrennt'],
+                                            ['Wohnbereiche', 'getrennte Bereiche'],
                                             ['SIS', '6 Themenfelder + Risiken'],
                                             ['KI', 'Ollama lokal angebunden'],
                                             ['Berichte', 'Entwurf → Prüfung → Signatur'],

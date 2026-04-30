@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
+use App\Models\Location;
 use App\Models\User;
-// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
@@ -13,11 +13,23 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        $this->call(RoleSeeder::class);
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+        $location = Location::firstOrCreate(
+            ['name' => 'Wohnbereich A'],
+            [
+                'short_name' => 'A',
+                'description' => 'Erster Beispiel-Wohnbereich für die lokale Entwicklung.',
+                'active' => true,
+            ],
+        );
+
+        $admin = User::factory()->create([
+            'location_id' => $location->id,
+            'name' => 'Pflegedex Admin',
+            'email' => 'admin@pflegedex.local',
         ]);
+
+        $admin->assignRole('Admin');
     }
 }
