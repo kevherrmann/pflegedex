@@ -57,15 +57,16 @@ services:
         condition: service_started
 
   postgres:
-    image: bitnami/postgresql:16
+    image: postgres:16-alpine
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     environment:
-      POSTGRESQL_DATABASE: ${DB_DATABASE:-pflegedex}
-      POSTGRESQL_USERNAME: ${DB_USERNAME:-pflegedex}
-      POSTGRESQL_PASSWORD: ${DB_PASSWORD:-pflegedex}
-    volumes:
-      - postgres-data:/bitnami/postgresql
+      POSTGRES_DB: ${DB_DATABASE:-pflegedex}
+      POSTGRES_USER: ${DB_USERNAME:-pflegedex}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-pflegedex}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    tmpfs:
+      - /var/lib/postgresql/data:rw,noexec,nosuid,size=1024m
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-pflegedex} -d ${DB_DATABASE:-pflegedex}"]
       interval: 5s
@@ -80,5 +81,4 @@ services:
       - redis-data:/data
 
 volumes:
-  postgres-data:
   redis-data:

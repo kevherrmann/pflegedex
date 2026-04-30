@@ -40,7 +40,9 @@ docker compose down -v
 docker compose up --build
 ```
 
-Das Compose-Setup nutzt dafür bewusst `bitnami/postgresql:16`, weil dieses Image auf Fedora/Nobara-, SELinux- und rootless-nahen Setups weniger anfällig für `chmod`-Fehler auf Docker-Volumes ist.
+Das Compose-Setup nutzt für PostgreSQL im lokalen Entwicklungsmodus bewusst ein `tmpfs`-Datenverzeichnis. Das umgeht auf Nobara/Fedora/rootless/SELinux-nahen Setups die beobachteten `chmod: Operation not permitted`-Fehler beim Initialisieren des offiziellen PostgreSQL-Images.
+
+Wichtig: Die lokale Entwicklungsdatenbank ist damit nicht dauerhaft persistent. Nach `docker compose down` oder Container-Neuanlage müssen die Migrationen erneut laufen. Für Phase 0 ist das gewollt, damit der lokale Start zuverlässig funktioniert. Persistente PostgreSQL-Volumes härten wir später gezielt passend zu deinem Docker/Podman-Setup.
 
 Dann öffnen:
 
