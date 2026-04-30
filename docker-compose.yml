@@ -1,0 +1,84 @@
+services:
+  app:
+    build:
+      context: .
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - .:/var/www/html
+    environment:
+      APP_ENV: local
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  web:
+    image: caddy:2.8-alpine
+    ports:
+      - "${APP_PORT:-8080}:80"
+    volumes:
+      - .:/var/www/html:ro
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      - app
+
+  node:
+    image: node:20-alpine
+    working_dir: /var/www/html
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "${VITE_PORT:-5173}:5173"
+    volumes:
+      - .:/var/www/html
+    environment:
+      VITE_APP_NAME: Pflegedex
+
+  queue:
+    build:
+      context: .
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    command: php artisan queue:work --tries=3 --backoff=5
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - .:/var/www/html
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-pflegedex}
+      POSTGRES_USER: ${DB_USERNAME:-pflegedex}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-pflegedex}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-pflegedex} -d ${DB_DATABASE:-pflegedex}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+
+volumes:
+  postgres-data:
+  redis-data:

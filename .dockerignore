@@ -1,0 +1,13 @@
+/.git
+/.github
+/vendor
+/node_modules
+/public/build
+/storage/*.key
+/storage/logs/*
+/bootstrap/cache/*.php
+.env
+.env.*
+!.env.example
+npm-debug.log
+.DS_Store
