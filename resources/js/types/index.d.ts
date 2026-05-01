@@ -13,6 +13,7 @@ export type PageProps<
         permissions: {
             manageLocations: boolean;
             manageResidents: boolean;
+            manageStaff: boolean;
             managePdlAccounts: boolean;
         };
     };

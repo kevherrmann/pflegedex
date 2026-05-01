@@ -3,6 +3,7 @@
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ResidentController;
+use App\Http\Controllers\StaffController;
 use App\Http\Controllers\UserController;
 use App\Models\Resident;
 use App\Support\BrandPalette;
@@ -42,6 +43,11 @@ Route::get('/dashboard', function () {
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
+    Route::get('/staff', [StaffController::class, 'index'])->name('staff.index');
+    Route::post('/staff', [StaffController::class, 'store'])->name('staff.store');
+    Route::get('/staff/{staff}/edit', [StaffController::class, 'edit'])->name('staff.edit');
+    Route::patch('/staff/{staff}', [StaffController::class, 'update'])->name('staff.update');
+
     Route::get('/users', [UserController::class, 'index'])->name('users.index');
     Route::post('/users/pdl', [UserController::class, 'storePdl'])->name('users.pdl.store');
     Route::get('/users/{user}/edit', [UserController::class, 'edit'])->name('users.edit');

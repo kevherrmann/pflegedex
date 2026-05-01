@@ -13,6 +13,7 @@ export default function Authenticated({
     const user = auth.user;
     const canManageLocations = auth.permissions.manageLocations;
     const canManageResidents = auth.permissions.manageResidents;
+    const canManageStaff = auth.permissions.manageStaff;
     const canManagePdlAccounts = auth.permissions.managePdlAccounts;
 
     const [showingNavigationDropdown, setShowingNavigationDropdown] =
@@ -59,6 +60,14 @@ export default function Authenticated({
                                         active={route().current('residents.index')}
                                     >
                                         Bewohner
+                                    </NavLink>
+                                )}
+                                {canManageStaff && (
+                                    <NavLink
+                                        href={route('staff.index')}
+                                        active={route().current('staff.index')}
+                                    >
+                                        Mitarbeiter
                                     </NavLink>
                                 )}
                             </div>
@@ -187,6 +196,14 @@ export default function Authenticated({
                                 active={route().current('residents.index')}
                             >
                                 Bewohner
+                            </ResponsiveNavLink>
+                        )}
+                        {canManageStaff && (
+                            <ResponsiveNavLink
+                                href={route('staff.index')}
+                                active={route().current('staff.index')}
+                            >
+                                Mitarbeiter
                             </ResponsiveNavLink>
                         )}
                     </div>
