@@ -3,7 +3,7 @@ import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { FormEventHandler } from 'react';
+import { FormEventHandler, useState } from 'react';
 
 type ResidentOption = {
     id: number;
@@ -33,6 +33,7 @@ type CareReport = {
 type CareReportsIndexProps = {
     residents: ResidentOption[];
     selectedResident: ResidentOption | null;
+    selectedDate: string;
     categories: string[];
     categoryTabs: CategoryTab[];
     reportsByCategory: Record<string, CareReport[]>;
@@ -41,12 +42,14 @@ type CareReportsIndexProps = {
 export default function Index({
     residents,
     selectedResident,
+    selectedDate,
     categories,
     categoryTabs,
     reportsByCategory,
 }: CareReportsIndexProps) {
     const now = new Date();
-    const defaultOccurredAt = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const [dateFilter, setDateFilter] = useState(selectedDate);
+    const defaultOccurredAt = `${selectedDate}T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
     const { data, setData, post, processing, errors, reset } = useForm({
         resident_id: selectedResident ? String(selectedResident.id) : '',
@@ -97,7 +100,7 @@ export default function Index({
                                     return (
                                         <Link
                                             key={resident.id}
-                                            href={route('care-reports.index', { resident_id: resident.id })}
+                                            href={route('care-reports.index', { resident_id: resident.id, date: selectedDate })}
                                             className={`block px-5 py-4 transition ${selected ? 'bg-[#F7E8ED]' : 'hover:bg-[#F8F8F8]'}`}
                                         >
                                             <div className="flex items-start justify-between gap-3">
@@ -142,9 +145,33 @@ export default function Index({
                             </h1>
                             {selectedResident && (
                                 <p className="mt-3 text-[#54595F]">
-                                    {selectedResident.locationName} · {selectedResident.completedCategoryCount}/{categories.length} Kategorien dokumentiert
+                                    {selectedResident.locationName} · {selectedResident.completedCategoryCount}/{categories.length} Kategorien am {selectedDate} dokumentiert
                                 </p>
                             )}
+                        </div>
+
+                        <div className="border-b border-[#E5E7EB] px-6 py-4">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                                <div>
+                                    <InputLabel htmlFor="date_filter" value="Dokumentationstag" />
+                                    <input
+                                        id="date_filter"
+                                        type="date"
+                                        value={dateFilter}
+                                        onChange={(event) => setDateFilter(event.target.value)}
+                                        className="mt-1 block rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]"
+                                    />
+                                </div>
+                                <Link
+                                    href={route('care-reports.index', {
+                                        date: dateFilter,
+                                        ...(selectedResident ? { resident_id: selectedResident.id } : {}),
+                                    })}
+                                    className="inline-flex items-center justify-center rounded-md bg-[#9B1C3B] px-4 py-2 text-sm font-semibold text-white hover:bg-[#7F1730]"
+                                >
+                                    Tag anzeigen
+                                </Link>
+                            </div>
                         </div>
 
                         {selectedResident ? (

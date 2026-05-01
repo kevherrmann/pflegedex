@@ -30,7 +30,7 @@ it('stores a care report for an assigned resident as Pflegekraft', function () {
             'category' => 'Grundpflege',
             'body' => 'Bewohnerin wurde bei der Morgenpflege unterstützt.',
         ])
-        ->assertRedirect('/care-reports');
+        ->assertRedirect('/care-reports?resident_id='.$resident->id.'&date=2026-05-01');
 
     $report = CareReport::query()->first();
 
@@ -174,7 +174,7 @@ it('allows PDL users to see and create reports for their accessible Wohnbereiche
             'category' => 'Übergabe',
             'body' => 'PDL ergänzt Hinweis für die Übergabe.',
         ])
-        ->assertRedirect('/care-reports');
+        ->assertRedirect('/care-reports?resident_id='.$resident->id.'&date=2026-05-01');
 
     $this->actingAs($pdl)
         ->get('/care-reports')

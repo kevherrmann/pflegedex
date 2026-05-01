@@ -7,6 +7,7 @@ use App\Models\Location;
 use App\Models\Resident;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -19,6 +20,7 @@ class CareReportController extends Controller
         $this->authorizeCareReports($request);
         $locations = $this->careReportLocations($request);
         $locationIds = $locations->pluck('id');
+        $selectedDate = $this->selectedDate($request);
 
         $residents = $locationIds->isNotEmpty()
             ? Resident::query()
@@ -32,6 +34,7 @@ class CareReportController extends Controller
         $reportModels = $locationIds->isNotEmpty()
             ? CareReport::query()
                 ->whereIn('location_id', $locationIds)
+                ->whereDate('occurred_at', $selectedDate)
                 ->with(['resident', 'location', 'author'])
                 ->latest('occurred_at')
                 ->latest('id')
@@ -63,6 +66,7 @@ class CareReportController extends Controller
                 'completed' => $selectedReports->where('category', $category)->isNotEmpty(),
             ])->values(),
             'selectedResident' => $selectedResident ? $this->residentPayload($selectedResident, $reportModels, $categories) : null,
+            'selectedDate' => $selectedDate,
             'residents' => $residents->map(fn (Resident $resident): array => $this->residentPayload($resident, $reportModels, $categories))->values(),
             'locations' => $locations->map(fn (Location $location): array => [
                 'id' => $location->id,
@@ -104,12 +108,30 @@ class CareReportController extends Controller
             'body' => $validated['body'],
         ]);
 
-        return to_route('care-reports.index');
+        return to_route('care-reports.index', [
+            'resident_id' => $resident->id,
+            'date' => Carbon::parse($validated['occurred_at'])->toDateString(),
+        ]);
     }
 
     private function authorizeCareReports(Request $request): void
     {
         abort_unless($request->user()?->hasAnyRole(['PDL', 'Pflegekraft']), 403);
+    }
+
+    private function selectedDate(Request $request): string
+    {
+        $date = $request->string('date')->toString();
+
+        if ($date === '') {
+            return today()->toDateString();
+        }
+
+        try {
+            return Carbon::parse($date)->toDateString();
+        } catch (\Throwable) {
+            return today()->toDateString();
+        }
     }
 
     /**
