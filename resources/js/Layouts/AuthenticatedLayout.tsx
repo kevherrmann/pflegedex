@@ -33,6 +33,12 @@ export default function Authenticated({
                                 >
                                     Dashboard
                                 </NavLink>
+                                <NavLink
+                                    href={route('residents.index')}
+                                    active={route().current('residents.index')}
+                                >
+                                    Bewohner
+                                </NavLink>
                             </div>
                         </div>
 
@@ -136,6 +142,12 @@ export default function Authenticated({
                             active={route().current('dashboard')}
                         >
                             Dashboard
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            href={route('residents.index')}
+                            active={route().current('residents.index')}
+                        >
+                            Bewohner
                         </ResponsiveNavLink>
                     </div>
 
