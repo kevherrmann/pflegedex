@@ -13,6 +13,8 @@ class LocationController extends Controller
 {
     public function index(Request $request): Response
     {
+        $this->authorizePdl($request);
+
         $user = $request->user();
 
         return Inertia::render('Locations/Index', [
@@ -33,6 +35,8 @@ class LocationController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorizePdl($request);
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255', Rule::unique('locations', 'name')],
             'short_name' => ['nullable', 'string', 'max:50'],
@@ -51,5 +55,10 @@ class LocationController extends Controller
         }
 
         return to_route('locations.index');
+    }
+
+    private function authorizePdl(Request $request): void
+    {
+        abort_unless($request->user()?->hasRole('PDL'), 403);
     }
 }

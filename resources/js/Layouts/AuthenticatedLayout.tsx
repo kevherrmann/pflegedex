@@ -9,7 +9,9 @@ export default function Authenticated({
     header,
     children,
 }: PropsWithChildren<{ header?: ReactNode }>) {
-    const user = usePage().props.auth.user;
+    const { auth } = usePage().props;
+    const user = auth.user;
+    const canManageLocations = auth.permissions.manageLocations;
 
     const [showingNavigationDropdown, setShowingNavigationDropdown] =
         useState(false);
@@ -33,12 +35,14 @@ export default function Authenticated({
                                 >
                                     Dashboard
                                 </NavLink>
-                                <NavLink
-                                    href={route('locations.index')}
-                                    active={route().current('locations.index')}
-                                >
-                                    Wohnbereiche
-                                </NavLink>
+                                {canManageLocations && (
+                                    <NavLink
+                                        href={route('locations.index')}
+                                        active={route().current('locations.index')}
+                                    >
+                                        Wohnbereiche
+                                    </NavLink>
+                                )}
                                 <NavLink
                                     href={route('residents.index')}
                                     active={route().current('residents.index')}
@@ -149,12 +153,14 @@ export default function Authenticated({
                         >
                             Dashboard
                         </ResponsiveNavLink>
-                        <ResponsiveNavLink
-                            href={route('locations.index')}
-                            active={route().current('locations.index')}
-                        >
-                            Wohnbereiche
-                        </ResponsiveNavLink>
+                        {canManageLocations && (
+                            <ResponsiveNavLink
+                                href={route('locations.index')}
+                                active={route().current('locations.index')}
+                            >
+                                Wohnbereiche
+                            </ResponsiveNavLink>
+                        )}
                         <ResponsiveNavLink
                             href={route('residents.index')}
                             active={route().current('residents.index')}

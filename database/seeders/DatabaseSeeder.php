@@ -36,5 +36,17 @@ class DatabaseSeeder extends Seeder
         );
 
         $admin->assignRole('Admin');
+
+        $pdl = User::updateOrCreate(
+            ['email' => 'pdl@pflegedex.local'],
+            [
+                'location_id' => $location->id,
+                'name' => 'Pflegedex PDL',
+                'password' => Hash::make('password'),
+                'email_verified_at' => now(),
+            ],
+        );
+
+        $pdl->assignRole('PDL');
     }
 }

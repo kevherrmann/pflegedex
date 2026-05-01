@@ -4,8 +4,15 @@ use App\Models\Location;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
+use Spatie\Permission\Models\Role;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    foreach (['Admin', 'PDL', 'Pflegekraft', 'Putzkraft', 'Hausmeister'] as $role) {
+        Role::findOrCreate($role, 'web');
+    }
+});
 
 it('requires authentication before showing locations', function () {
     $this->get('/locations')->assertRedirect('/login');
@@ -16,6 +23,7 @@ it('shows active locations and whether the authenticated user has access', funct
     $secondary = Location::factory()->create(['name' => 'Wohnbereich B', 'short_name' => 'B']);
     Location::factory()->create(['name' => 'Archiv', 'active' => false]);
     $user = User::factory()->for($primary)->create();
+    $user->assignRole('PDL');
     $user->locations()->attach($secondary);
 
     $this->actingAs($user)
@@ -35,6 +43,7 @@ it('shows active locations and whether the authenticated user has access', funct
 it('stores a new active location and assigns it to the current user', function () {
     $primary = Location::factory()->create();
     $user = User::factory()->for($primary)->create();
+    $user->assignRole('PDL');
 
     $this->actingAs($user)
         ->post('/locations', [
@@ -53,6 +62,7 @@ it('stores a new active location and assigns it to the current user', function (
 
 it('uses the first created location as primary location if the user has none yet', function () {
     $user = User::factory()->create(['location_id' => null]);
+    $user->assignRole('PDL');
 
     $this->actingAs($user)
         ->post('/locations', [
@@ -69,6 +79,7 @@ it('uses the first created location as primary location if the user has none yet
 it('validates location data before storing', function () {
     $existing = Location::factory()->create(['name' => 'Wohnbereich A']);
     $user = User::factory()->for($existing)->create();
+    $user->assignRole('PDL');
 
     $this->actingAs($user)
         ->post('/locations', [
