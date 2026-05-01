@@ -16,12 +16,12 @@ it('creates the default Pflegedex roles', function () {
 it('assigns a user to one location and one care role', function () {
     $this->seed();
 
-    $location = Location::factory()->create(['name' => 'Wohnbereich B']);
+    $location = Location::factory()->create(['name' => 'Wohnbereich C']);
     $user = User::factory()->for($location)->create();
     $user->assignRole('Pflegekraft');
 
     expect($user->location)->toBeInstanceOf(Location::class)
-        ->and($user->location->name)->toBe('Wohnbereich B')
+        ->and($user->location->name)->toBe('Wohnbereich C')
         ->and($user->hasRole('Pflegekraft'))->toBeTrue();
 });
 

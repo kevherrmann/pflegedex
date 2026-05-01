@@ -38,6 +38,29 @@ it('lets Pflegekraft users view residents from assigned Wohnbereiche', function 
         );
 });
 
+it('uses only explicit Wohnbereich assignments for Pflegekraft resident visibility', function () {
+    $assigned = Location::factory()->create(['name' => 'Zugewiesen']);
+    $primaryButNotAssigned = Location::factory()->create(['name' => 'Nicht zugewiesen']);
+
+    $pflegekraft = User::factory()->for($primaryButNotAssigned)->create();
+    $pflegekraft->assignRole('Pflegekraft');
+    $pflegekraft->locations()->attach($assigned->id);
+
+    Resident::factory()->for($assigned)->create(['first_name' => 'Sichtbar', 'last_name' => 'Bewohner']);
+    Resident::factory()->for($primaryButNotAssigned)->create(['first_name' => 'Versteckt', 'last_name' => 'Bewohner']);
+
+    $this->actingAs($pflegekraft)
+        ->get('/residents')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Residents/Index')
+            ->has('locations', 1)
+            ->where('locations.0.name', 'Zugewiesen')
+            ->has('residents', 1)
+            ->where('residents.0.fullName', 'Sichtbar Bewohner')
+        );
+});
+
 it('keeps resident creation and editing PDL-only', function () {
     $location = Location::factory()->create();
     $pflegekraft = User::factory()->for($location)->create();

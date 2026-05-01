@@ -18,8 +18,7 @@ class ResidentController extends Controller
     {
         $this->authorizeResidentViewing($request);
 
-        $user = $request->user();
-        $locations = $user?->accessibleLocations() ?? collect();
+        $locations = $this->residentViewLocations($request);
         $location = $this->selectedLocation($request, $locations)
             ?? ($locations->count() === 1 ? $locations->first() : null);
 
@@ -163,6 +162,24 @@ class ResidentController extends Controller
     private function authorizeResidentViewing(Request $request): void
     {
         abort_unless($request->user()?->hasAnyRole(['PDL', 'Pflegekraft']), 403);
+    }
+
+    /**
+     * @return Collection<int, Location>
+     */
+    private function residentViewLocations(Request $request): Collection
+    {
+        $user = $request->user();
+
+        if (! $user) {
+            return collect();
+        }
+
+        if ($user->hasRole('Pflegekraft')) {
+            return $user->locations()->orderBy('name')->get();
+        }
+
+        return $user->accessibleLocations();
     }
 
     /**
