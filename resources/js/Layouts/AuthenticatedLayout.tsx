@@ -34,6 +34,12 @@ export default function Authenticated({
                                     Dashboard
                                 </NavLink>
                                 <NavLink
+                                    href={route('locations.index')}
+                                    active={route().current('locations.index')}
+                                >
+                                    Wohnbereiche
+                                </NavLink>
+                                <NavLink
                                     href={route('residents.index')}
                                     active={route().current('residents.index')}
                                 >
@@ -142,6 +148,12 @@ export default function Authenticated({
                             active={route().current('dashboard')}
                         >
                             Dashboard
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            href={route('locations.index')}
+                            active={route().current('locations.index')}
+                        >
+                            Wohnbereiche
                         </ResponsiveNavLink>
                         <ResponsiveNavLink
                             href={route('residents.index')}

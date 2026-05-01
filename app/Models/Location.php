@@ -20,6 +20,16 @@ class Location extends Model
     ];
 
     /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'active' => 'boolean',
+        ];
+    }
+
+    /**
      * @return HasMany<User>
      */
     public function users(): HasMany
