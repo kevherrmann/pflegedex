@@ -5,8 +5,13 @@ use App\Models\Resident;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
+use Spatie\Permission\Models\Role;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    Role::findOrCreate('PDL', 'web');
+});
 
 it('requires authentication before showing the residents list', function () {
     $this->get('/residents')->assertRedirect('/login');
@@ -16,6 +21,7 @@ it('shows only active residents from the authenticated users location', function
     $north = Location::factory()->create(['name' => 'Wohnbereich Nord']);
     $south = Location::factory()->create(['name' => 'Wohnbereich Süd']);
     $user = User::factory()->for($north)->create();
+    $user->assignRole('PDL');
 
     Resident::factory()->for($north)->create([
         'first_name' => 'Erika',
@@ -60,6 +66,7 @@ it('shows only active residents from the authenticated users location', function
 
 it('shows an empty residents list if the user has no location yet', function () {
     $user = User::factory()->create(['location_id' => null]);
+    $user->assignRole('PDL');
 
     $this->actingAs($user)
         ->get('/residents')

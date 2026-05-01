@@ -5,14 +5,20 @@ use App\Models\Resident;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
+use Spatie\Permission\Models\Role;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    Role::findOrCreate('PDL', 'web');
+});
 
 it('lets a user access multiple assigned locations while keeping a primary location', function () {
     $primary = Location::factory()->create(['name' => 'Wohnbereich A']);
     $secondary = Location::factory()->create(['name' => 'Wohnbereich B']);
     $unassigned = Location::factory()->create(['name' => 'Wohnbereich C']);
     $user = User::factory()->for($primary)->create();
+    $user->assignRole('PDL');
 
     $user->locations()->attach($secondary);
 
@@ -28,6 +34,7 @@ it('lists active residents from every location the user may access', function ()
     $secondary = Location::factory()->create(['name' => 'Wohnbereich B']);
     $unassigned = Location::factory()->create(['name' => 'Wohnbereich C']);
     $user = User::factory()->for($primary)->create();
+    $user->assignRole('PDL');
     $user->locations()->attach($secondary);
 
     Resident::factory()->for($primary)->create(['first_name' => 'Anna', 'last_name' => 'Areal', 'active' => true]);
@@ -53,6 +60,7 @@ it('can filter the residents list to one accessible location', function () {
     $primary = Location::factory()->create(['name' => 'Wohnbereich A']);
     $secondary = Location::factory()->create(['name' => 'Wohnbereich B']);
     $user = User::factory()->for($primary)->create();
+    $user->assignRole('PDL');
     $user->locations()->attach($secondary);
 
     Resident::factory()->for($primary)->create(['first_name' => 'Anna', 'last_name' => 'Areal', 'active' => true]);
@@ -74,6 +82,7 @@ it('does not allow creating residents in an unassigned location', function () {
     $secondary = Location::factory()->create();
     $unassigned = Location::factory()->create();
     $user = User::factory()->for($primary)->create();
+    $user->assignRole('PDL');
     $user->locations()->attach($secondary);
 
     $this->actingAs($user)
@@ -92,6 +101,7 @@ it('counts active residents from every accessible location on the dashboard', fu
     $secondary = Location::factory()->create(['name' => 'Wohnbereich B']);
     $unassigned = Location::factory()->create();
     $user = User::factory()->for($primary)->create();
+    $user->assignRole('PDL');
     $user->locations()->attach($secondary);
 
     Resident::factory()->for($primary)->create(['active' => true]);
@@ -111,6 +121,7 @@ it('stores a new resident in the selected accessible location', function () {
     $primary = Location::factory()->create();
     $secondary = Location::factory()->create();
     $user = User::factory()->for($primary)->create();
+    $user->assignRole('PDL');
     $user->locations()->attach($secondary);
 
     $this->actingAs($user)

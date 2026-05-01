@@ -12,6 +12,8 @@ export default function Authenticated({
     const { auth } = usePage().props;
     const user = auth.user;
     const canManageLocations = auth.permissions.manageLocations;
+    const canManageResidents = auth.permissions.manageResidents;
+    const canManagePdlAccounts = auth.permissions.managePdlAccounts;
 
     const [showingNavigationDropdown, setShowingNavigationDropdown] =
         useState(false);
@@ -43,12 +45,22 @@ export default function Authenticated({
                                         Wohnbereiche
                                     </NavLink>
                                 )}
-                                <NavLink
-                                    href={route('residents.index')}
-                                    active={route().current('residents.index')}
-                                >
-                                    Bewohner
-                                </NavLink>
+                                {canManagePdlAccounts && (
+                                    <NavLink
+                                        href={route('users.index')}
+                                        active={route().current('users.index')}
+                                    >
+                                        PDL-Konten
+                                    </NavLink>
+                                )}
+                                {canManageResidents && (
+                                    <NavLink
+                                        href={route('residents.index')}
+                                        active={route().current('residents.index')}
+                                    >
+                                        Bewohner
+                                    </NavLink>
+                                )}
                             </div>
                         </div>
 
@@ -161,12 +173,22 @@ export default function Authenticated({
                                 Wohnbereiche
                             </ResponsiveNavLink>
                         )}
-                        <ResponsiveNavLink
-                            href={route('residents.index')}
-                            active={route().current('residents.index')}
-                        >
-                            Bewohner
-                        </ResponsiveNavLink>
+                        {canManagePdlAccounts && (
+                            <ResponsiveNavLink
+                                href={route('users.index')}
+                                active={route().current('users.index')}
+                            >
+                                PDL-Konten
+                            </ResponsiveNavLink>
+                        )}
+                        {canManageResidents && (
+                            <ResponsiveNavLink
+                                href={route('residents.index')}
+                                active={route().current('residents.index')}
+                            >
+                                Bewohner
+                            </ResponsiveNavLink>
+                        )}
                     </div>
 
                     <div className="border-t border-gray-200 pb-1 pt-4">

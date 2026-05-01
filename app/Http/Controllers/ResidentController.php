@@ -16,6 +16,8 @@ class ResidentController extends Controller
 {
     public function index(Request $request): Response
     {
+        $this->authorizeResidentManagement($request);
+
         $user = $request->user();
         $locations = $user?->accessibleLocations() ?? collect();
         $location = $this->selectedLocation($request, $locations)
@@ -48,6 +50,8 @@ class ResidentController extends Controller
 
     public function create(Request $request): Response
     {
+        $this->authorizeResidentManagement($request);
+
         $locations = $request->user()?->accessibleLocations() ?? collect();
         $location = $this->selectedLocation($request, $locations) ?? $locations->first();
 
@@ -59,6 +63,8 @@ class ResidentController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorizeResidentManagement($request);
+
         $user = $request->user();
         $locations = $user?->accessibleLocations() ?? collect();
 
@@ -68,7 +74,7 @@ class ResidentController extends Controller
         }
 
         $validated = $request->validate([
-            'location_id' => ['nullable', 'integer'],
+            'location_id' => [$locations->count() > 1 ? 'required' : 'nullable', 'integer'],
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
             'birth_date' => ['nullable', 'date', 'before_or_equal:today'],
@@ -94,6 +100,11 @@ class ResidentController extends Controller
         ]);
 
         return to_route('residents.index', ['location_id' => $locationId]);
+    }
+
+    private function authorizeResidentManagement(Request $request): void
+    {
+        abort_unless($request->user()?->hasRole('PDL'), 403);
     }
 
     /**

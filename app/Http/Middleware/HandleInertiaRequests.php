@@ -35,6 +35,8 @@ class HandleInertiaRequests extends Middleware
                 'user' => $request->user(),
                 'permissions' => [
                     'manageLocations' => $request->user()?->hasRole('PDL') ?? false,
+                    'manageResidents' => $request->user()?->hasRole('PDL') ?? false,
+                    'managePdlAccounts' => $request->user()?->hasRole('Admin') ?? false,
                 ],
             ],
         ];

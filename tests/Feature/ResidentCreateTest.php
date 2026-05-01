@@ -5,8 +5,13 @@ use App\Models\Resident;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
+use Spatie\Permission\Models\Role;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    Role::findOrCreate('PDL', 'web');
+});
 
 it('requires authentication before showing the resident create form', function () {
     $this->get('/residents/create')->assertRedirect('/login');
@@ -15,6 +20,7 @@ it('requires authentication before showing the resident create form', function (
 it('shows a resident create form for the authenticated users location', function () {
     $location = Location::factory()->create(['name' => 'Wohnbereich Nord']);
     $user = User::factory()->for($location)->create();
+    $user->assignRole('PDL');
 
     $this->actingAs($user)
         ->get('/residents/create')
@@ -29,6 +35,7 @@ it('stores a resident in the authenticated users location', function () {
     $location = Location::factory()->create();
     $otherLocation = Location::factory()->create();
     $user = User::factory()->for($location)->create();
+    $user->assignRole('PDL');
 
     $this->actingAs($user)
         ->post('/residents', [
@@ -55,6 +62,7 @@ it('stores a resident in the authenticated users location', function () {
 
 it('requires a location before storing a resident', function () {
     $user = User::factory()->create(['location_id' => null]);
+    $user->assignRole('PDL');
 
     $this->actingAs($user)
         ->post('/residents', [
@@ -70,6 +78,7 @@ it('requires a location before storing a resident', function () {
 it('validates resident master data before storing', function () {
     $location = Location::factory()->create();
     $user = User::factory()->for($location)->create();
+    $user->assignRole('PDL');
 
     $this->actingAs($user)
         ->post('/residents', [

@@ -3,6 +3,7 @@
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ResidentController;
+use App\Http\Controllers\UserController;
 use App\Models\Resident;
 use App\Support\BrandPalette;
 use Illuminate\Foundation\Application;
@@ -13,7 +14,7 @@ Route::get('/', function () {
     return Inertia::render('Welcome', [
         'branding' => BrandPalette::inertiaPayload(),
         'canLogin' => Route::has('login'),
-        'canRegister' => Route::has('register'),
+        'canRegister' => false,
         'laravelVersion' => Application::VERSION,
         'phpVersion' => PHP_VERSION,
     ]);
@@ -41,6 +42,9 @@ Route::get('/dashboard', function () {
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
+    Route::get('/users', [UserController::class, 'index'])->name('users.index');
+    Route::post('/users/pdl', [UserController::class, 'storePdl'])->name('users.pdl.store');
+
     Route::get('/locations', [LocationController::class, 'index'])->name('locations.index');
     Route::post('/locations', [LocationController::class, 'store'])->name('locations.store');
 
