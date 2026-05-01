@@ -11,6 +11,7 @@ export type PageProps<
     auth: {
         user: User;
         permissions: {
+            viewResidents: boolean;
             manageLocations: boolean;
             manageResidents: boolean;
             manageStaff: boolean;

@@ -1,5 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 
 type Location = {
     id: number;
@@ -25,6 +25,8 @@ export default function Index({
     locations,
     residents,
 }: ResidentsIndexProps) {
+    const canManageResidents = usePage().props.auth.permissions.manageResidents;
+
     return (
         <AuthenticatedLayout
             header={
@@ -56,12 +58,14 @@ export default function Index({
                                 </p>
                             </div>
 
-                            <Link
-                                href={route('residents.create', location ? { location_id: location.id } : {})}
-                                className="inline-flex items-center justify-center rounded-md border border-transparent bg-[#9B1C3B] px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white transition duration-150 ease-in-out hover:bg-[#7F1730] focus:bg-[#7F1730] focus:outline-none focus:ring-2 focus:ring-[#9B1C3B] focus:ring-offset-2 active:bg-[#7F1730]"
-                            >
-                                Bewohner anlegen
-                            </Link>
+                            {canManageResidents && (
+                                <Link
+                                    href={route('residents.create', location ? { location_id: location.id } : {})}
+                                    className="inline-flex items-center justify-center rounded-md border border-transparent bg-[#9B1C3B] px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white transition duration-150 ease-in-out hover:bg-[#7F1730] focus:bg-[#7F1730] focus:outline-none focus:ring-2 focus:ring-[#9B1C3B] focus:ring-offset-2 active:bg-[#7F1730]"
+                                >
+                                    Bewohner anlegen
+                                </Link>
+                            )}
                         </div>
                     </section>
 
@@ -129,9 +133,11 @@ export default function Index({
                                             <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-[#7F1730]">
                                                 Pflegegrad
                                             </th>
-                                            <th className="px-6 py-3 text-right text-xs font-bold uppercase tracking-wider text-[#7F1730]">
-                                                Aktion
-                                            </th>
+                                            {canManageResidents && (
+                                                <th className="px-6 py-3 text-right text-xs font-bold uppercase tracking-wider text-[#7F1730]">
+                                                    Aktion
+                                                </th>
+                                            )}
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-[#E5E7EB] bg-white">
@@ -151,14 +157,16 @@ export default function Index({
                                                 <td className="whitespace-nowrap px-6 py-4 text-[#54595F]">
                                                     {resident.careLevel ?? '—'}
                                                 </td>
-                                                <td className="whitespace-nowrap px-6 py-4 text-right">
-                                                    <Link
-                                                        href={route('residents.edit', resident.id)}
-                                                        className="text-sm font-semibold text-[#9B1C3B] hover:underline"
-                                                    >
-                                                        Bearbeiten
-                                                    </Link>
-                                                </td>
+                                                {canManageResidents && (
+                                                    <td className="whitespace-nowrap px-6 py-4 text-right">
+                                                        <Link
+                                                            href={route('residents.edit', resident.id)}
+                                                            className="text-sm font-semibold text-[#9B1C3B] hover:underline"
+                                                        >
+                                                            Bearbeiten
+                                                        </Link>
+                                                    </td>
+                                                )}
                                             </tr>
                                         ))}
                                     </tbody>

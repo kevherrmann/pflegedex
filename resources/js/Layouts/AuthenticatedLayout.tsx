@@ -12,7 +12,7 @@ export default function Authenticated({
     const { auth } = usePage().props;
     const user = auth.user;
     const canManageLocations = auth.permissions.manageLocations;
-    const canManageResidents = auth.permissions.manageResidents;
+    const canViewResidents = auth.permissions.viewResidents;
     const canManageStaff = auth.permissions.manageStaff;
     const canManagePdlAccounts = auth.permissions.managePdlAccounts;
 
@@ -54,7 +54,7 @@ export default function Authenticated({
                                         PDL-Konten
                                     </NavLink>
                                 )}
-                                {canManageResidents && (
+                                {canViewResidents && (
                                     <NavLink
                                         href={route('residents.index')}
                                         active={route().current('residents.index')}
@@ -190,7 +190,7 @@ export default function Authenticated({
                                 PDL-Konten
                             </ResponsiveNavLink>
                         )}
-                        {canManageResidents && (
+                        {canViewResidents && (
                             <ResponsiveNavLink
                                 href={route('residents.index')}
                                 active={route().current('residents.index')}

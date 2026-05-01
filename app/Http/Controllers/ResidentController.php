@@ -16,7 +16,7 @@ class ResidentController extends Controller
 {
     public function index(Request $request): Response
     {
-        $this->authorizeResidentManagement($request);
+        $this->authorizeResidentViewing($request);
 
         $user = $request->user();
         $locations = $user?->accessibleLocations() ?? collect();
@@ -158,6 +158,11 @@ class ResidentController extends Controller
     private function authorizeResidentManagement(Request $request): void
     {
         abort_unless($request->user()?->hasRole('PDL'), 403);
+    }
+
+    private function authorizeResidentViewing(Request $request): void
+    {
+        abort_unless($request->user()?->hasAnyRole(['PDL', 'Pflegekraft']), 403);
     }
 
     /**
