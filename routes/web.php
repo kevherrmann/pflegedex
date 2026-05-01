@@ -20,16 +20,21 @@ Route::get('/', function () {
 
 Route::get('/dashboard', function () {
     $user = request()->user();
-    $location = $user?->location;
+    $locations = $user?->accessibleLocations() ?? collect();
+    $locationName = match ($locations->count()) {
+        0 => 'kein Wohnbereich zugeordnet',
+        1 => $locations->first()->name,
+        default => $locations->count().' Wohnbereiche',
+    };
 
     return Inertia::render('Dashboard', [
         'stats' => [
-            'locationName' => $location?->name ?? 'kein Wohnbereich zugeordnet',
-            'residentsActive' => $location
-                ? Resident::query()->forLocation($location)->active()->count()
+            'locationName' => $locationName,
+            'residentsActive' => $locations->isNotEmpty()
+                ? Resident::query()->whereIn('location_id', $locations->pluck('id'))->active()->count()
                 : 0,
             'rolesPrepared' => 3,
-            'locationsPrepared' => 1,
+            'locationsPrepared' => $locations->count(),
         ],
     ]);
 })->middleware(['auth', 'verified'])->name('dashboard');

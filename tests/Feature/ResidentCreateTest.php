@@ -39,7 +39,7 @@ it('stores a resident in the authenticated users location', function () {
             'care_level' => 3,
             'location_id' => $otherLocation->id,
         ])
-        ->assertRedirect('/residents');
+        ->assertRedirect('/residents?location_id='.$location->id);
 
     $this->assertDatabaseHas('residents', [
         'location_id' => $location->id,

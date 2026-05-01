@@ -11,14 +11,20 @@ type Resident = {
     fullName: string;
     roomNumber: string | null;
     careLevel: number | null;
+    locationName: string | null;
 };
 
 type ResidentsIndexProps = {
     location: Location | null;
+    locations: Location[];
     residents: Resident[];
 };
 
-export default function Index({ location, residents }: ResidentsIndexProps) {
+export default function Index({
+    location,
+    locations,
+    residents,
+}: ResidentsIndexProps) {
     return (
         <AuthenticatedLayout
             header={
@@ -40,7 +46,7 @@ export default function Index({ location, residents }: ResidentsIndexProps) {
                         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                             <div>
                                 <p className="text-sm font-bold uppercase tracking-[0.22em] text-[#9B1C3B]">
-                                    {location?.name ?? 'Noch kein Wohnbereich'}
+                                    {location?.name ?? 'Alle zugeordneten Wohnbereiche'}
                                 </p>
                                 <h1 className="mt-3 text-3xl font-semibold text-[#333333]">
                                     Aktive Bewohner
@@ -51,13 +57,48 @@ export default function Index({ location, residents }: ResidentsIndexProps) {
                             </div>
 
                             <Link
-                                href={route('residents.create')}
+                                href={route('residents.create', location ? { location_id: location.id } : {})}
                                 className="inline-flex items-center justify-center rounded-md border border-transparent bg-[#9B1C3B] px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white transition duration-150 ease-in-out hover:bg-[#7F1730] focus:bg-[#7F1730] focus:outline-none focus:ring-2 focus:ring-[#9B1C3B] focus:ring-offset-2 active:bg-[#7F1730]"
                             >
                                 Bewohner anlegen
                             </Link>
                         </div>
                     </section>
+
+                    {locations.length > 1 && (
+                        <section className="mb-8 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-[#E5E7EB]">
+                            <p className="mb-3 text-sm font-semibold text-[#333333]">
+                                Wohnbereich filtern
+                            </p>
+                            <div className="flex flex-wrap gap-3">
+                                <Link
+                                    href={route('residents.index')}
+                                    className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                                        !location
+                                            ? 'bg-[#9B1C3B] text-white'
+                                            : 'bg-[#F7E8ED] text-[#7F1730]'
+                                    }`}
+                                >
+                                    Alle Wohnbereiche
+                                </Link>
+                                {locations.map((item) => (
+                                    <Link
+                                        key={item.id}
+                                        href={route('residents.index', {
+                                            location_id: item.id,
+                                        })}
+                                        className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                                            location?.id === item.id
+                                                ? 'bg-[#9B1C3B] text-white'
+                                                : 'bg-[#F7E8ED] text-[#7F1730]'
+                                        }`}
+                                    >
+                                        {item.name}
+                                    </Link>
+                                ))}
+                            </div>
+                        </section>
+                    )}
 
                     <section className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-[#E5E7EB]">
                         <div className="border-b border-[#E5E7EB] px-6 py-5">
@@ -77,6 +118,11 @@ export default function Index({ location, residents }: ResidentsIndexProps) {
                                             <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-[#7F1730]">
                                                 Name
                                             </th>
+                                            {locations.length > 1 && (
+                                                <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-[#7F1730]">
+                                                    Wohnbereich
+                                                </th>
+                                            )}
                                             <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-[#7F1730]">
                                                 Zimmer
                                             </th>
@@ -91,6 +137,11 @@ export default function Index({ location, residents }: ResidentsIndexProps) {
                                                 <td className="whitespace-nowrap px-6 py-4 font-medium text-[#333333]">
                                                     {resident.fullName}
                                                 </td>
+                                                {locations.length > 1 && (
+                                                    <td className="whitespace-nowrap px-6 py-4 text-[#54595F]">
+                                                        {resident.locationName ?? '—'}
+                                                    </td>
+                                                )}
                                                 <td className="whitespace-nowrap px-6 py-4 text-[#54595F]">
                                                     {resident.roomNumber ?? '—'}
                                                 </td>

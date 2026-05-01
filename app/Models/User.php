@@ -5,8 +5,10 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
@@ -58,6 +60,36 @@ class User extends Authenticatable
     public function location(): BelongsTo
     {
         return $this->belongsTo(Location::class);
+    }
+
+    /**
+     * @return BelongsToMany<Location, User>
+     */
+    public function locations(): BelongsToMany
+    {
+        return $this->belongsToMany(Location::class)->withTimestamps();
+    }
+
+    /**
+     * @return Collection<int, Location>
+     */
+    public function accessibleLocations(): Collection
+    {
+        $locations = $this->locations()->orderBy('name')->get();
+
+        if ($this->location && ! $locations->contains('id', $this->location->id)) {
+            $locations->push($this->location);
+        }
+
+        return $locations->sortBy('name')->values();
+    }
+
+    public function canAccessLocation(Location|int $location): bool
+    {
+        $locationId = $location instanceof Location ? $location->id : $location;
+
+        return $this->location_id === $locationId
+            || $this->locations()->whereKey($locationId)->exists();
     }
 
     /**

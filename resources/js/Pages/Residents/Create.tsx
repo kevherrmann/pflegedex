@@ -13,10 +13,12 @@ type Location = {
 
 type ResidentCreateProps = {
     location: Location | null;
+    locations: Location[];
 };
 
-export default function Create({ location }: ResidentCreateProps) {
+export default function Create({ location, locations }: ResidentCreateProps) {
     const { data, setData, post, processing, errors } = useForm({
+        location_id: location?.id ? String(location.id) : '',
         first_name: '',
         last_name: '',
         birth_date: '',
@@ -68,6 +70,35 @@ export default function Create({ location }: ResidentCreateProps) {
                         onSubmit={submit}
                         className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-[#E5E7EB]"
                     >
+                        {locations.length > 1 && (
+                            <div className="mb-6">
+                                <InputLabel
+                                    htmlFor="location_id"
+                                    value="Wohnbereich"
+                                />
+                                <select
+                                    id="location_id"
+                                    name="location_id"
+                                    value={data.location_id}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]"
+                                    onChange={(event) =>
+                                        setData('location_id', event.target.value)
+                                    }
+                                    required
+                                >
+                                    {locations.map((item) => (
+                                        <option key={item.id} value={item.id}>
+                                            {item.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <InputError
+                                    message={errors.location_id}
+                                    className="mt-2"
+                                />
+                            </div>
+                        )}
+
                         <div className="grid gap-6 sm:grid-cols-2">
                             <div>
                                 <InputLabel htmlFor="first_name" value="Vorname" />
