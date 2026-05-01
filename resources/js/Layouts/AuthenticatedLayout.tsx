@@ -13,6 +13,7 @@ export default function Authenticated({
     const user = auth.user;
     const canManageLocations = auth.permissions.manageLocations;
     const canViewResidents = auth.permissions.viewResidents;
+    const canManageCareReports = auth.permissions.manageCareReports;
     const canManageStaff = auth.permissions.manageStaff;
     const canManagePdlAccounts = auth.permissions.managePdlAccounts;
 
@@ -60,6 +61,14 @@ export default function Authenticated({
                                         active={route().current('residents.index')}
                                     >
                                         Bewohner
+                                    </NavLink>
+                                )}
+                                {canManageCareReports && (
+                                    <NavLink
+                                        href={route('care-reports.index')}
+                                        active={route().current('care-reports.index')}
+                                    >
+                                        Pflegeberichte
                                     </NavLink>
                                 )}
                                 {canManageStaff && (
@@ -196,6 +205,14 @@ export default function Authenticated({
                                 active={route().current('residents.index')}
                             >
                                 Bewohner
+                            </ResponsiveNavLink>
+                        )}
+                        {canManageCareReports && (
+                            <ResponsiveNavLink
+                                href={route('care-reports.index')}
+                                active={route().current('care-reports.index')}
+                            >
+                                Pflegeberichte
                             </ResponsiveNavLink>
                         )}
                         {canManageStaff && (

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CareReportController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ResidentController;
@@ -43,6 +44,9 @@ Route::get('/dashboard', function () {
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
+    Route::get('/care-reports', [CareReportController::class, 'index'])->name('care-reports.index');
+    Route::post('/care-reports', [CareReportController::class, 'store'])->name('care-reports.store');
+
     Route::get('/staff', [StaffController::class, 'index'])->name('staff.index');
     Route::post('/staff', [StaffController::class, 'store'])->name('staff.store');
     Route::get('/staff/{staff}/edit', [StaffController::class, 'edit'])->name('staff.edit');

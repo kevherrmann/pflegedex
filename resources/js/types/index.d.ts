@@ -12,6 +12,7 @@ export type PageProps<
         user: User;
         permissions: {
             viewResidents: boolean;
+            manageCareReports: boolean;
             manageLocations: boolean;
             manageResidents: boolean;
             manageStaff: boolean;
