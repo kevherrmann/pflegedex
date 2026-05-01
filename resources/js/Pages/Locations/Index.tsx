@@ -3,7 +3,7 @@ import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
 import { FormEventHandler } from 'react';
 
 type Location = {
@@ -84,17 +84,25 @@ export default function Index({ locations }: LocationsIndexProps) {
                                                 </p>
                                             )}
                                         </div>
-                                        <span
-                                            className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold ${
-                                                location.userHasAccess
-                                                    ? 'bg-[#F7E8ED] text-[#7F1730]'
-                                                    : 'bg-gray-100 text-gray-600'
-                                            }`}
-                                        >
-                                            {location.userHasAccess
-                                                ? 'Dir zugeordnet'
-                                                : 'Nicht zugeordnet'}
-                                        </span>
+                                        <div className="flex flex-col items-start gap-2">
+                                            <span
+                                                className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold ${
+                                                    location.userHasAccess
+                                                        ? 'bg-[#F7E8ED] text-[#7F1730]'
+                                                        : 'bg-gray-100 text-gray-600'
+                                                }`}
+                                            >
+                                                {location.userHasAccess
+                                                    ? 'Dir zugeordnet'
+                                                    : 'Nicht zugeordnet'}
+                                            </span>
+                                            <Link
+                                                href={route('locations.edit', location.id)}
+                                                className="text-sm font-semibold text-[#9B1C3B] hover:underline"
+                                            >
+                                                Bearbeiten
+                                            </Link>
+                                        </div>
                                     </article>
                                 ))}
                             </div>

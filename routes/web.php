@@ -44,13 +44,19 @@ Route::get('/dashboard', function () {
 Route::middleware('auth')->group(function () {
     Route::get('/users', [UserController::class, 'index'])->name('users.index');
     Route::post('/users/pdl', [UserController::class, 'storePdl'])->name('users.pdl.store');
+    Route::get('/users/{user}/edit', [UserController::class, 'edit'])->name('users.edit');
+    Route::patch('/users/{user}', [UserController::class, 'update'])->name('users.update');
 
     Route::get('/locations', [LocationController::class, 'index'])->name('locations.index');
     Route::post('/locations', [LocationController::class, 'store'])->name('locations.store');
+    Route::get('/locations/{location}/edit', [LocationController::class, 'edit'])->name('locations.edit');
+    Route::patch('/locations/{location}', [LocationController::class, 'update'])->name('locations.update');
 
     Route::get('/residents', [ResidentController::class, 'index'])->name('residents.index');
     Route::get('/residents/create', [ResidentController::class, 'create'])->name('residents.create');
     Route::post('/residents', [ResidentController::class, 'store'])->name('residents.store');
+    Route::get('/residents/{resident}/edit', [ResidentController::class, 'edit'])->name('residents.edit');
+    Route::patch('/residents/{resident}', [ResidentController::class, 'update'])->name('residents.update');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

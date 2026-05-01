@@ -129,6 +129,9 @@ export default function Index({
                                             <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-[#7F1730]">
                                                 Pflegegrad
                                             </th>
+                                            <th className="px-6 py-3 text-right text-xs font-bold uppercase tracking-wider text-[#7F1730]">
+                                                Aktion
+                                            </th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-[#E5E7EB] bg-white">
@@ -147,6 +150,14 @@ export default function Index({
                                                 </td>
                                                 <td className="whitespace-nowrap px-6 py-4 text-[#54595F]">
                                                     {resident.careLevel ?? '—'}
+                                                </td>
+                                                <td className="whitespace-nowrap px-6 py-4 text-right">
+                                                    <Link
+                                                        href={route('residents.edit', resident.id)}
+                                                        className="text-sm font-semibold text-[#9B1C3B] hover:underline"
+                                                    >
+                                                        Bearbeiten
+                                                    </Link>
                                                 </td>
                                             </tr>
                                         ))}

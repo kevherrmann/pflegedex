@@ -57,6 +57,35 @@ class LocationController extends Controller
         return to_route('locations.index');
     }
 
+    public function edit(Request $request, Location $location): Response
+    {
+        $this->authorizePdl($request);
+
+        return Inertia::render('Locations/Edit', [
+            'location' => [
+                'id' => $location->id,
+                'name' => $location->name,
+                'shortName' => $location->short_name,
+                'description' => $location->description,
+            ],
+        ]);
+    }
+
+    public function update(Request $request, Location $location): RedirectResponse
+    {
+        $this->authorizePdl($request);
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255', Rule::unique('locations', 'name')->ignore($location)],
+            'short_name' => ['nullable', 'string', 'max:50'],
+            'description' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $location->update($validated);
+
+        return to_route('locations.index');
+    }
+
     private function authorizePdl(Request $request): void
     {
         abort_unless($request->user()?->hasRole('PDL'), 403);
