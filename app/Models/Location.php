@@ -26,4 +26,12 @@ class Location extends Model
     {
         return $this->hasMany(User::class);
     }
+
+    /**
+     * @return HasMany<Resident>
+     */
+    public function residents(): HasMany
+    {
+        return $this->hasMany(Resident::class);
+    }
 }

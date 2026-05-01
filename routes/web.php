@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ProfileController;
+use App\Models\Resident;
 use App\Support\BrandPalette;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -17,7 +18,19 @@ Route::get('/', function () {
 });
 
 Route::get('/dashboard', function () {
-    return Inertia::render('Dashboard');
+    $user = request()->user();
+    $location = $user?->location;
+
+    return Inertia::render('Dashboard', [
+        'stats' => [
+            'locationName' => $location?->name ?? 'kein Wohnbereich zugeordnet',
+            'residentsActive' => $location
+                ? Resident::query()->forLocation($location)->active()->count()
+                : 0,
+            'rolesPrepared' => 3,
+            'locationsPrepared' => 1,
+        ],
+    ]);
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {

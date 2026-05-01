@@ -1,16 +1,27 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head } from '@inertiajs/react';
 
-const cards = [
-    ['Wohnbereiche', '1', 'Ein erster Beispiel-Wohnbereich wird beim Seed angelegt.'],
-    ['Rollen', '3', 'Admin, PDL und Pflegekraft sind als Grundrollen vorbereitet.'],
-    ['Bewohner', '0', 'Patientendokumentation wird in Phase 1 aufgebaut.'],
-    ['SIS', '0', 'Strukturierte Informationssammlung mit Risikomatrix.'],
-    ['Pflegeberichte', '0', 'Berichtserfassung und Signatur folgen nach dem Fundament.'],
-    ['KI-Entwürfe', '0', 'Lokale Ollama-Generierung folgt in Phase 2.'],
-];
+type DashboardStats = {
+    locationName: string;
+    residentsActive: number;
+    rolesPrepared: number;
+    locationsPrepared: number;
+};
 
-export default function Dashboard() {
+type DashboardProps = {
+    stats: DashboardStats;
+};
+
+export default function Dashboard({ stats }: DashboardProps) {
+    const cards = [
+        ['Wohnbereich', stats.locationsPrepared, stats.locationName],
+        ['Rollen', stats.rolesPrepared, 'Admin, PDL und Pflegekraft sind als Grundrollen vorbereitet.'],
+        ['Aktive Bewohner', stats.residentsActive, 'Bewohnerstammdaten werden je Wohnbereich getrennt gezählt.'],
+        ['SIS', 0, 'Strukturierte Informationssammlung mit Risikomatrix.'],
+        ['Pflegeberichte', 0, 'Berichtserfassung und Signatur folgen nach dem Fundament.'],
+        ['KI-Entwürfe', 0, 'Lokale Ollama-Generierung folgt in Phase 2.'],
+    ];
+
     return (
         <AuthenticatedLayout
             header={
@@ -36,7 +47,7 @@ export default function Dashboard() {
                             Willkommen im Pflegedex-Arbeitsbereich
                         </h1>
                         <p className="mt-4 max-w-3xl leading-7 text-[#54595F]">
-                            Das technische Fundament steht: Anmeldung, Rollen und Wohnbereiche sind vorbereitet. Die nächsten Schritte füllen diese Grundlage mit Bewohnerdokumentation, SIS und Pflegeberichten.
+                            Das technische Fundament steht: Anmeldung, Rollen und Wohnbereiche sind vorbereitet. Als nächstes wächst die Bewohnerdokumentation aus den Wohnbereichsdaten heraus.
                         </p>
                     </div>
 
