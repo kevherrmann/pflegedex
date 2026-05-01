@@ -73,6 +73,72 @@ it('lists care reports only from accessible residents', function () {
         );
 });
 
+it('groups reports by selected resident and category', function () {
+    $location = Location::factory()->create(['name' => 'Wohnbereich A']);
+    $erika = Resident::factory()->for($location)->create(['first_name' => 'Erika', 'last_name' => 'Mustermann']);
+    $karl = Resident::factory()->for($location)->create(['first_name' => 'Karl', 'last_name' => 'Zbeispiel']);
+    $nurse = User::factory()->for($location)->create();
+    $nurse->assignRole('Pflegekraft');
+    $nurse->locations()->attach($location->id);
+
+    CareReport::factory()->for($erika)->for($location, 'location')->for($nurse, 'author')->create([
+        'category' => 'Grundpflege',
+        'body' => 'Erika Grundpflege Bericht',
+        'occurred_at' => '2026-05-01 10:15',
+    ]);
+    CareReport::factory()->for($erika)->for($location, 'location')->for($nurse, 'author')->create([
+        'category' => 'Mobilität',
+        'body' => 'Erika Mobilität Bericht',
+        'occurred_at' => '2026-05-01 11:15',
+    ]);
+    CareReport::factory()->for($karl)->for($location, 'location')->for($nurse, 'author')->create([
+        'category' => 'Grundpflege',
+        'body' => 'Karl darf nicht in Erikas Detail stehen',
+        'occurred_at' => '2026-05-01 12:15',
+    ]);
+
+    $this->actingAs($nurse)
+        ->get('/care-reports?resident_id='.$erika->id)
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('CareReports/Index')
+            ->where('selectedResident.id', $erika->id)
+            ->where('selectedResident.fullName', 'Erika Mustermann')
+            ->has('residents', 2)
+            ->where('residents.0.reportCount', 2)
+            ->where('residents.0.completedCategoryCount', 2)
+            ->where('residents.0.missingCategoryCount', 4)
+            ->has('categoryTabs', 6)
+            ->where('categoryTabs.0.name', 'Grundpflege')
+            ->where('categoryTabs.0.completed', true)
+            ->where('categoryTabs.0.reportCount', 1)
+            ->where('categoryTabs.1.name', 'Beobachtung')
+            ->where('categoryTabs.1.completed', false)
+            ->has('reportsByCategory.Grundpflege', 1)
+            ->where('reportsByCategory.Grundpflege.0.body', 'Erika Grundpflege Bericht')
+            ->has('reportsByCategory.Mobilität', 1)
+            ->where('reportsByCategory.Mobilität.0.body', 'Erika Mobilität Bericht')
+            ->has('reportsByCategory.Beobachtung', 0)
+        );
+});
+
+it('selects the first accessible resident by default for organized report view', function () {
+    $location = Location::factory()->create(['name' => 'Wohnbereich A']);
+    $resident = Resident::factory()->for($location)->create(['first_name' => 'Erika', 'last_name' => 'Mustermann']);
+    $nurse = User::factory()->for($location)->create();
+    $nurse->assignRole('Pflegekraft');
+    $nurse->locations()->attach($location->id);
+
+    $this->actingAs($nurse)
+        ->get('/care-reports')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('CareReports/Index')
+            ->where('selectedResident.id', $resident->id)
+            ->where('selectedResident.fullName', 'Erika Mustermann')
+        );
+});
+
 it('prevents Pflegekraft from reporting on unassigned residents', function () {
     $own = Location::factory()->create();
     $foreign = Location::factory()->create();

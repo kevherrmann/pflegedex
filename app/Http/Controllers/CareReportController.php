@@ -29,7 +29,7 @@ class CareReportController extends Controller
                 ->get()
             : collect();
 
-        $reports = $locationIds->isNotEmpty()
+        $reportModels = $locationIds->isNotEmpty()
             ? CareReport::query()
                 ->whereIn('location_id', $locationIds)
                 ->with(['resident', 'location', 'author'])
@@ -37,22 +37,38 @@ class CareReportController extends Controller
                 ->latest('id')
                 ->limit(100)
                 ->get()
-                ->map(fn (CareReport $report): array => $this->reportPayload($report))
-                ->values()
             : collect();
 
+        $selectedResident = $this->selectedResident($request, $residents);
+        $categories = $this->categories();
+        $selectedReports = $selectedResident
+            ? $reportModels->where('resident_id', $selectedResident->id)
+            : collect();
+
+        $reportsByCategory = collect($categories)
+            ->mapWithKeys(fn (string $category): array => [
+                $category => $selectedReports
+                    ->where('category', $category)
+                    ->values()
+                    ->map(fn (CareReport $report): array => $this->reportPayload($report))
+                    ->values(),
+            ]);
+
         return Inertia::render('CareReports/Index', [
-            'reports' => $reports,
-            'residents' => $residents->map(fn (Resident $resident): array => [
-                'id' => $resident->id,
-                'fullName' => $resident->full_name,
-                'locationName' => $resident->location?->name,
+            'reports' => $reportModels->map(fn (CareReport $report): array => $this->reportPayload($report))->values(),
+            'reportsByCategory' => $reportsByCategory,
+            'categoryTabs' => collect($categories)->map(fn (string $category): array => [
+                'name' => $category,
+                'reportCount' => $selectedReports->where('category', $category)->count(),
+                'completed' => $selectedReports->where('category', $category)->isNotEmpty(),
             ])->values(),
+            'selectedResident' => $selectedResident ? $this->residentPayload($selectedResident, $reportModels, $categories) : null,
+            'residents' => $residents->map(fn (Resident $resident): array => $this->residentPayload($resident, $reportModels, $categories))->values(),
             'locations' => $locations->map(fn (Location $location): array => [
                 'id' => $location->id,
                 'name' => $location->name,
             ])->values(),
-            'categories' => $this->categories(),
+            'categories' => $categories,
         ]);
     }
 
@@ -112,6 +128,48 @@ class CareReportController extends Controller
         }
 
         return $user->accessibleLocations();
+    }
+
+    /**
+     * @param  Collection<int, Resident>  $residents
+     */
+    private function selectedResident(Request $request, Collection $residents): ?Resident
+    {
+        if ($residents->isEmpty()) {
+            return null;
+        }
+
+        $requestedResidentId = $request->integer('resident_id');
+
+        if ($requestedResidentId) {
+            return $residents->firstWhere('id', $requestedResidentId) ?? $residents->first();
+        }
+
+        return $residents->first();
+    }
+
+    /**
+     * @param  Collection<int, CareReport>  $reports
+     * @param  list<string>  $categories
+     * @return array<string, mixed>
+     */
+    private function residentPayload(Resident $resident, Collection $reports, array $categories): array
+    {
+        $residentReports = $reports->where('resident_id', $resident->id);
+        $completedCategoryCount = $residentReports
+            ->pluck('category')
+            ->intersect($categories)
+            ->unique()
+            ->count();
+
+        return [
+            'id' => $resident->id,
+            'fullName' => $resident->full_name,
+            'locationName' => $resident->location?->name,
+            'reportCount' => $residentReports->count(),
+            'completedCategoryCount' => $completedCategoryCount,
+            'missingCategoryCount' => max(count($categories) - $completedCategoryCount, 0),
+        ];
     }
 
     /** @return list<string> */
