@@ -1,5 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 
 type Location = {
     id: number;
@@ -37,15 +37,26 @@ export default function Index({ location, residents }: ResidentsIndexProps) {
             <div className="bg-[#F8F8F8] py-12">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                     <section className="mb-8 rounded-2xl bg-white p-8 shadow-sm ring-1 ring-[#E5E7EB]">
-                        <p className="text-sm font-bold uppercase tracking-[0.22em] text-[#9B1C3B]">
-                            {location?.name ?? 'Noch kein Wohnbereich'}
-                        </p>
-                        <h1 className="mt-3 text-3xl font-semibold text-[#333333]">
-                            Aktive Bewohner
-                        </h1>
-                        <p className="mt-4 max-w-3xl leading-7 text-[#54595F]">
-                            Diese Liste zeigt aktuell nur aktive Bewohner aus deinem zugeordneten Wohnbereich. Archivierte Bewohner und andere Wohnbereiche bleiben ausgeblendet.
-                        </p>
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                                <p className="text-sm font-bold uppercase tracking-[0.22em] text-[#9B1C3B]">
+                                    {location?.name ?? 'Noch kein Wohnbereich'}
+                                </p>
+                                <h1 className="mt-3 text-3xl font-semibold text-[#333333]">
+                                    Aktive Bewohner
+                                </h1>
+                                <p className="mt-4 max-w-3xl leading-7 text-[#54595F]">
+                                    Diese Liste zeigt aktuell nur aktive Bewohner aus deinem zugeordneten Wohnbereich. Archivierte Bewohner und andere Wohnbereiche bleiben ausgeblendet.
+                                </p>
+                            </div>
+
+                            <Link
+                                href={route('residents.create')}
+                                className="inline-flex items-center justify-center rounded-md border border-transparent bg-[#9B1C3B] px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white transition duration-150 ease-in-out hover:bg-[#7F1730] focus:bg-[#7F1730] focus:outline-none focus:ring-2 focus:ring-[#9B1C3B] focus:ring-offset-2 active:bg-[#7F1730]"
+                            >
+                                Bewohner anlegen
+                            </Link>
+                        </div>
                     </section>
 
                     <section className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-[#E5E7EB]">
