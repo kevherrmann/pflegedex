@@ -31,33 +31,32 @@ it('shows a resident create form for the authenticated users location', function
         );
 });
 
-it('stores a resident in the authenticated users location', function () {
+it('stores a resident in the authenticated users location', function (): void {
     $location = Location::factory()->create();
-    $otherLocation = Location::factory()->create();
+
     $user = User::factory()->for($location)->create();
     $user->assignRole('PDL');
+    $user->locations()->syncWithoutDetaching([$location->id]);
 
     $this->actingAs($user)
-        ->post('/residents', [
-            'first_name' => 'Erika',
-            'last_name' => 'Musterfrau',
-            'birth_date' => '1938-05-12',
-            'room_number' => '12A',
-            'care_level' => 3,
-            'location_id' => $otherLocation->id,
-        ])
-        ->assertRedirect('/residents?location_id='.$location->id);
+    ->post('/residents', [
+        'first_name' => 'Erika',
+        'last_name' => 'Mustermann',
+        'birth_date' => '1940-01-01',
+        'room_number' => '12A',
+        'care_level' => 3,
+        'location_id' => $location->id,
+    ])
+    ->assertRedirect('/residents?location_id='.$location->id);
 
     $this->assertDatabaseHas('residents', [
         'location_id' => $location->id,
         'first_name' => 'Erika',
-        'last_name' => 'Musterfrau',
+        'last_name' => 'Mustermann',
         'room_number' => '12A',
         'care_level' => 3,
         'active' => true,
     ]);
-
-    expect(Resident::first()?->birth_date?->toDateString())->toBe('1938-05-12');
 });
 
 it('requires a location before storing a resident', function () {

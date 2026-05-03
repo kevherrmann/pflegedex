@@ -75,18 +75,16 @@ class ResidentController extends Controller
 
         $validated = $request->validate([
             'location_id' => [$locations->count() > 1 ? 'required' : 'nullable', 'string', 'uuid'],
-            'first_name' => ['required', 'string', 'max:255'],
-            'last_name' => ['required', 'string', 'max:255'],
-            'birth_date' => ['nullable', 'date', 'before_or_equal:today'],
-            'room_number' => ['nullable', 'string', 'max:50'],
-            'care_level' => ['nullable', 'integer', Rule::in([1, 2, 3, 4, 5])],
+                                        'first_name' => ['required', 'string', 'max:255'],
+                                        'last_name' => ['required', 'string', 'max:255'],
+                                        'birth_date' => ['nullable', 'date', 'before_or_equal:today'],
+                                        'room_number' => ['nullable', 'string', 'max:50'],
+                                        'care_level' => ['nullable', 'integer', Rule::in([1, 2, 3, 4, 5])],
         ]);
 
-        $locationId = $locations->count() === 1
-            ? $locations->first()->id
-            : (string) ($validated['location_id'] ?? $locations->first()->id);
+        $locationId = (string) ($validated['location_id'] ?? $locations->first()->id);
 
-        if ($locations->count() > 1 && ! $locations->contains('id', $locationId)) {
+        if (! $locations->contains('id', $locationId)) {
             throw ValidationException::withMessages([
                 'location_id' => 'Du hast keinen Zugriff auf diesen Wohnbereich.',
             ]);
