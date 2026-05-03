@@ -99,18 +99,74 @@ class CareReportController extends Controller
             ]);
         }
 
-        CareReport::query()->create([
+        $report = CareReport::query()->create([
             'resident_id' => $resident->id,
             'location_id' => $resident->location_id,
             'author_id' => $request->user()->id,
+                                              'occurred_at' => $validated['occurred_at'],
+                                              'category' => $validated['category'],
+                                              'body' => $validated['body'],
+        ]);
+
+        $report->appendVersion('created', $request->user());
+
+        return to_route('care-reports.index', [
+            'resident_id' => $resident->id,
+            'date' => Carbon::parse($validated['occurred_at'])->toDateString(),
+        ]);
+    }
+
+    public function update(Request $request, CareReport $careReport): RedirectResponse
+    {
+        $this->authorizeCareReports($request);
+
+        if ($careReport->isSigned()) {
+            abort(403);
+        }
+
+        $locations = $this->careReportLocations($request);
+        $locationIds = $locations->pluck('id')->all();
+
+        if (! in_array($careReport->location_id, $locationIds, true)) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'occurred_at' => ['required', 'date', 'before_or_equal:now'],
+            'category' => ['required', 'string', 'max:80'],
+            'body' => ['required', 'string', 'min:5', 'max:5000'],
+        ]);
+
+        $careReport->update([
             'occurred_at' => $validated['occurred_at'],
             'category' => $validated['category'],
             'body' => $validated['body'],
         ]);
 
+        $careReport->appendVersion('updated', $request->user());
+
         return to_route('care-reports.index', [
-            'resident_id' => $resident->id,
+            'resident_id' => $careReport->resident_id,
             'date' => Carbon::parse($validated['occurred_at'])->toDateString(),
+        ]);
+    }
+
+    public function sign(Request $request, CareReport $careReport): RedirectResponse
+    {
+        $this->authorizeCareReports($request);
+
+        $locations = $this->careReportLocations($request);
+        $locationIds = $locations->pluck('id')->all();
+
+        if (! in_array($careReport->location_id, $locationIds, true)) {
+            abort(403);
+        }
+
+        $careReport->sign($request->user());
+
+        return to_route('care-reports.index', [
+            'resident_id' => $careReport->resident_id,
+            'date' => $careReport->occurred_at->toDateString(),
         ]);
     }
 

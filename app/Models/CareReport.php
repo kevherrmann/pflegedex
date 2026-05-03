@@ -7,6 +7,7 @@ use Database\Factories\CareReportFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CareReport extends Model
 {
@@ -25,6 +26,9 @@ class CareReport extends Model
         'occurred_at',
         'category',
         'body',
+        'signed',
+        'signed_at',
+        'signed_by',
     ];
 
     /**
@@ -34,6 +38,8 @@ class CareReport extends Model
     {
         return [
             'occurred_at' => 'datetime',
+            'signed' => 'boolean',
+            'signed_at' => 'datetime',
         ];
     }
 
@@ -53,5 +59,46 @@ class CareReport extends Model
     public function author(): BelongsTo
     {
         return $this->belongsTo(User::class, 'author_id');
+    }
+
+    /** @return BelongsTo */
+    public function signer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'signed_by');
+    }
+
+    /** @return HasMany */
+    public function versions(): HasMany
+    {
+        return $this->hasMany(ReportVersion::class);
+    }
+
+    public function isSigned(): bool
+    {
+        return $this->signed === true;
+    }
+
+    public function appendVersion(string $reason, ?User $user = null): ReportVersion
+    {
+        return $this->versions()->create([
+            'content_snapshot' => $this->body,
+            'snapshot_reason' => $reason,
+            'created_by' => $user?->id,
+        ]);
+    }
+
+    public function sign(User $user): void
+    {
+        if ($this->isSigned()) {
+            return;
+        }
+
+        $this->forceFill([
+            'signed' => true,
+            'signed_at' => now(),
+                         'signed_by' => $user->id,
+        ])->save();
+
+        $this->appendVersion('signed', $user);
     }
 }

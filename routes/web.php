@@ -46,6 +46,8 @@ Route::get('/dashboard', function () {
 Route::middleware('auth')->group(function () {
     Route::get('/care-reports', [CareReportController::class, 'index'])->name('care-reports.index');
     Route::post('/care-reports', [CareReportController::class, 'store'])->name('care-reports.store');
+    Route::patch('/care-reports/{careReport}', [CareReportController::class, 'update'])->name('care-reports.update');
+    Route::post('/care-reports/{careReport}/sign', [CareReportController::class, 'sign'])->name('care-reports.sign');
 
     Route::get('/staff', [StaffController::class, 'index'])->name('staff.index');
     Route::post('/staff', [StaffController::class, 'store'])->name('staff.store');
