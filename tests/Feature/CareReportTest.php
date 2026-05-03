@@ -5,6 +5,7 @@ use App\Models\Location;
 use App\Models\Resident;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
 
@@ -14,6 +15,15 @@ beforeEach(function () {
     foreach (['Admin', 'PDL', 'Pflegekraft', 'Putzkraft', 'Hausmeister'] as $role) {
         Role::findOrCreate($role, 'web');
     }
+
+    // Tests verwenden hardgecodete occurred_at-Werte vom 2026-05-01.
+    // Damit der Default-Filter "today()" im CareReportController auf
+    // genau dieses Datum faellt, frieren wir die Test-Zeit ein.
+    Carbon::setTestNow('2026-05-01 12:00:00');
+});
+
+afterEach(function () {
+    Carbon::setTestNow();
 });
 
 it('stores a care report for an assigned resident as Pflegekraft', function () {
@@ -24,22 +34,22 @@ it('stores a care report for an assigned resident as Pflegekraft', function () {
     $nurse->locations()->attach($location->id);
 
     $this->actingAs($nurse)
-        ->post('/care-reports', [
-            'resident_id' => $resident->id,
-            'occurred_at' => '2026-05-01 10:15',
-            'category' => 'Grundpflege',
-            'body' => 'Bewohnerin wurde bei der Morgenpflege unterstützt.',
-        ])
-        ->assertRedirect('/care-reports?resident_id='.$resident->id.'&date=2026-05-01');
+    ->post('/care-reports', [
+        'resident_id' => $resident->id,
+        'occurred_at' => '2026-05-01 10:15',
+        'category' => 'Grundpflege',
+        'body' => 'Bewohnerin wurde bei der Morgenpflege unterstützt.',
+    ])
+    ->assertRedirect('/care-reports?resident_id='.$resident->id.'&date=2026-05-01');
 
     $report = CareReport::query()->first();
 
     expect($report)->not->toBeNull()
-        ->and($report->resident_id)->toBe($resident->id)
-        ->and($report->location_id)->toBe($location->id)
-        ->and($report->author_id)->toBe($nurse->id)
-        ->and($report->category)->toBe('Grundpflege')
-        ->and($report->body)->toBe('Bewohnerin wurde bei der Morgenpflege unterstützt.');
+    ->and($report->resident_id)->toBe($resident->id)
+    ->and($report->location_id)->toBe($location->id)
+    ->and($report->author_id)->toBe($nurse->id)
+    ->and($report->category)->toBe('Grundpflege')
+    ->and($report->body)->toBe('Bewohnerin wurde bei der Morgenpflege unterstützt.');
 });
 
 it('lists care reports only from accessible residents', function () {
@@ -61,16 +71,16 @@ it('lists care reports only from accessible residents', function () {
     ]);
 
     $this->actingAs($nurse)
-        ->get('/care-reports')
-        ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page
-            ->component('CareReports/Index')
-            ->has('reports', 1)
-            ->where('reports.0.body', 'Sichtbarer Bericht')
-            ->where('reports.0.residentName', 'Erika Mustermann')
-            ->has('residents', 1)
-            ->where('residents.0.fullName', 'Erika Mustermann')
-        );
+    ->get('/care-reports')
+    ->assertOk()
+    ->assertInertia(fn (Assert $page) => $page
+    ->component('CareReports/Index')
+    ->has('reports', 1)
+    ->where('reports.0.body', 'Sichtbarer Bericht')
+    ->where('reports.0.residentName', 'Erika Mustermann')
+    ->has('residents', 1)
+    ->where('residents.0.fullName', 'Erika Mustermann')
+    );
 });
 
 it('groups reports by selected resident and category', function () {
@@ -98,28 +108,28 @@ it('groups reports by selected resident and category', function () {
     ]);
 
     $this->actingAs($nurse)
-        ->get('/care-reports?resident_id='.$erika->id)
-        ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page
-            ->component('CareReports/Index')
-            ->where('selectedResident.id', $erika->id)
-            ->where('selectedResident.fullName', 'Erika Mustermann')
-            ->has('residents', 2)
-            ->where('residents.0.reportCount', 2)
-            ->where('residents.0.completedCategoryCount', 2)
-            ->where('residents.0.missingCategoryCount', 4)
-            ->has('categoryTabs', 6)
-            ->where('categoryTabs.0.name', 'Grundpflege')
-            ->where('categoryTabs.0.completed', true)
-            ->where('categoryTabs.0.reportCount', 1)
-            ->where('categoryTabs.1.name', 'Beobachtung')
-            ->where('categoryTabs.1.completed', false)
-            ->has('reportsByCategory.Grundpflege', 1)
-            ->where('reportsByCategory.Grundpflege.0.body', 'Erika Grundpflege Bericht')
-            ->has('reportsByCategory.Mobilität', 1)
-            ->where('reportsByCategory.Mobilität.0.body', 'Erika Mobilität Bericht')
-            ->has('reportsByCategory.Beobachtung', 0)
-        );
+    ->get('/care-reports?resident_id='.$erika->id)
+    ->assertOk()
+    ->assertInertia(fn (Assert $page) => $page
+    ->component('CareReports/Index')
+    ->where('selectedResident.id', $erika->id)
+    ->where('selectedResident.fullName', 'Erika Mustermann')
+    ->has('residents', 2)
+    ->where('residents.0.reportCount', 2)
+    ->where('residents.0.completedCategoryCount', 2)
+    ->where('residents.0.missingCategoryCount', 4)
+    ->has('categoryTabs', 6)
+    ->where('categoryTabs.0.name', 'Grundpflege')
+    ->where('categoryTabs.0.completed', true)
+    ->where('categoryTabs.0.reportCount', 1)
+    ->where('categoryTabs.1.name', 'Beobachtung')
+    ->where('categoryTabs.1.completed', false)
+    ->has('reportsByCategory.Grundpflege', 1)
+    ->where('reportsByCategory.Grundpflege.0.body', 'Erika Grundpflege Bericht')
+    ->has('reportsByCategory.Mobilität', 1)
+    ->where('reportsByCategory.Mobilität.0.body', 'Erika Mobilität Bericht')
+    ->has('reportsByCategory.Beobachtung', 0)
+    );
 });
 
 it('selects the first accessible resident by default for organized report view', function () {
@@ -130,13 +140,13 @@ it('selects the first accessible resident by default for organized report view',
     $nurse->locations()->attach($location->id);
 
     $this->actingAs($nurse)
-        ->get('/care-reports')
-        ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page
-            ->component('CareReports/Index')
-            ->where('selectedResident.id', $resident->id)
-            ->where('selectedResident.fullName', 'Erika Mustermann')
-        );
+    ->get('/care-reports')
+    ->assertOk()
+    ->assertInertia(fn (Assert $page) => $page
+    ->component('CareReports/Index')
+    ->where('selectedResident.id', $resident->id)
+    ->where('selectedResident.fullName', 'Erika Mustermann')
+    );
 });
 
 it('prevents Pflegekraft from reporting on unassigned residents', function () {
@@ -148,13 +158,13 @@ it('prevents Pflegekraft from reporting on unassigned residents', function () {
     $nurse->locations()->attach($own->id);
 
     $this->actingAs($nurse)
-        ->post('/care-reports', [
-            'resident_id' => $foreignResident->id,
-            'occurred_at' => '2026-05-01 10:15',
-            'category' => 'Beobachtung',
-            'body' => 'Darf nicht gespeichert werden.',
-        ])
-        ->assertSessionHasErrors('resident_id');
+    ->post('/care-reports', [
+        'resident_id' => $foreignResident->id,
+        'occurred_at' => '2026-05-01 10:15',
+        'category' => 'Beobachtung',
+        'body' => 'Darf nicht gespeichert werden.',
+    ])
+    ->assertSessionHasErrors('resident_id');
 
     expect(CareReport::query()->count())->toBe(0);
 });
@@ -168,23 +178,23 @@ it('allows PDL users to see and create reports for their accessible Wohnbereiche
     $pdl->locations()->attach([$first->id, $second->id]);
 
     $this->actingAs($pdl)
-        ->post('/care-reports', [
-            'resident_id' => $resident->id,
-            'occurred_at' => '2026-05-01 09:00',
-            'category' => 'Übergabe',
-            'body' => 'PDL ergänzt Hinweis für die Übergabe.',
-        ])
-        ->assertRedirect('/care-reports?resident_id='.$resident->id.'&date=2026-05-01');
+    ->post('/care-reports', [
+        'resident_id' => $resident->id,
+        'occurred_at' => '2026-05-01 09:00',
+        'category' => 'Übergabe',
+        'body' => 'PDL ergänzt Hinweis für die Übergabe.',
+    ])
+    ->assertRedirect('/care-reports?resident_id='.$resident->id.'&date=2026-05-01');
 
     $this->actingAs($pdl)
-        ->get('/care-reports')
-        ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page
-            ->component('CareReports/Index')
-            ->has('reports', 1)
-            ->where('reports.0.residentName', 'Karl Beispiel')
-            ->has('residents', 1)
-        );
+    ->get('/care-reports')
+    ->assertOk()
+    ->assertInertia(fn (Assert $page) => $page
+    ->component('CareReports/Index')
+    ->has('reports', 1)
+    ->where('reports.0.residentName', 'Karl Beispiel')
+    ->has('residents', 1)
+    );
 });
 
 it('does not allow Admin Putzkraft or Hausmeister to access care reports', function (string $role) {
@@ -196,11 +206,11 @@ it('does not allow Admin Putzkraft or Hausmeister to access care reports', funct
     $this->actingAs($user)->get('/care-reports')->assertForbidden();
 
     $this->actingAs($user)
-        ->post('/care-reports', [
-            'resident_id' => Resident::factory()->for($location)->create()->id,
-            'occurred_at' => '2026-05-01 10:15',
-            'category' => 'Beobachtung',
-            'body' => 'Nicht erlaubt.',
-        ])
-        ->assertForbidden();
+    ->post('/care-reports', [
+        'resident_id' => Resident::factory()->for($location)->create()->id,
+           'occurred_at' => '2026-05-01 10:15',
+           'category' => 'Beobachtung',
+           'body' => 'Nicht erlaubt.',
+    ])
+    ->assertForbidden();
 })->with(['Admin', 'Putzkraft', 'Hausmeister']);

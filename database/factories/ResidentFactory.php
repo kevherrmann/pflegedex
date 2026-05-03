@@ -19,6 +19,9 @@ class ResidentFactory extends Factory
     public function definition(): array
     {
         return [
+            // Eindeutiges Pseudonym fuer Tests; der Generator macht einen
+            // DB-Lookup pro Insert, fuer Tests reicht eine Zufallsziffernfolge.
+            'pseudonym' => 'P-'.now()->format('Y').'-'.fake()->unique()->numerify('####'),
             'location_id' => Location::factory(),
             'first_name' => fake()->firstName(),
             'last_name' => fake()->lastName(),

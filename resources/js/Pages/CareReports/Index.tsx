@@ -6,7 +6,7 @@ import { Head, Link, useForm } from '@inertiajs/react';
 import { FormEventHandler, useState } from 'react';
 
 type ResidentOption = {
-    id: number;
+    id: string;
     fullName: string;
     locationName: string | null;
     reportCount: number;
@@ -21,7 +21,7 @@ type CategoryTab = {
 };
 
 type CareReport = {
-    id: number;
+    id: string;
     residentName: string | null;
     locationName: string | null;
     authorName: string | null;

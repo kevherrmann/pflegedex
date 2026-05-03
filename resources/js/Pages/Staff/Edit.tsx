@@ -6,13 +6,13 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { FormEventHandler } from 'react';
 
-type LocationOption = { id: number; name: string };
+type LocationOption = { id: string; name: string };
 type StaffUser = {
-    id: number;
+    id: string;
     name: string;
     email: string;
     role: string;
-    locationIds: number[];
+    locationIds: string[];
     locations: LocationOption[];
 };
 
@@ -28,7 +28,7 @@ export default function Edit({ staffUser, locations, roles }: StaffEditProps) {
         email: string;
         password: string;
         role: string;
-        location_ids: number[];
+        location_ids: string[];
     }>({
         name: staffUser.name,
         email: staffUser.email,
@@ -37,7 +37,7 @@ export default function Edit({ staffUser, locations, roles }: StaffEditProps) {
         location_ids: staffUser.locationIds,
     });
 
-    const toggleLocation = (locationId: number, checked: boolean) => {
+    const toggleLocation = (locationId: string, checked: boolean) => {
         setData(
             'location_ids',
             checked

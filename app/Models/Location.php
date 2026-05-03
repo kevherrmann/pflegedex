@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Concerns\HasUuidV7;
 use Database\Factories\LocationFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,6 +12,11 @@ class Location extends Model
 {
     /** @use HasFactory<LocationFactory> */
     use HasFactory;
+    use HasUuidV7;
+
+    protected $keyType = 'string';
+
+    public $incrementing = false;
 
     protected $fillable = [
         'name',

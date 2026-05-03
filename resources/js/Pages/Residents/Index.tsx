@@ -2,12 +2,12 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, usePage } from '@inertiajs/react';
 
 type Location = {
-    id: number;
+    id: string;
     name: string;
 };
 
 type Resident = {
-    id: number;
+    id: string;
     fullName: string;
     roomNumber: string | null;
     careLevel: number | null;

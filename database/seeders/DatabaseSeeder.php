@@ -42,6 +42,7 @@ class DatabaseSeeder extends Seeder
                 'last_name' => 'Mustermann',
             ],
             [
+                'pseudonym' => 'P-'.now()->format('Y').'-0001',
                 'birth_date' => '1938-05-12',
                 'room_number' => 'A-101',
                 'care_level' => 3,
@@ -56,6 +57,7 @@ class DatabaseSeeder extends Seeder
                 'last_name' => 'Beispiel',
             ],
             [
+                'pseudonym' => 'P-'.now()->format('Y').'-0002',
                 'birth_date' => '1941-09-24',
                 'room_number' => 'B-201',
                 'care_level' => 2,

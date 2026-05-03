@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Support\Concerns\HasUuidV7;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -16,7 +17,11 @@ use Spatie\Permission\Traits\HasRoles;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, HasRoles, Notifiable;
+    use HasFactory, HasRoles, HasUuidV7, Notifiable;
+
+    protected $keyType = 'string';
+
+    public $incrementing = false;
 
     /**
      * The attributes that are mass assignable.
@@ -48,7 +53,6 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
-            'location_id' => 'integer',
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
@@ -84,7 +88,7 @@ class User extends Authenticatable
         return $locations->sortBy('name')->values();
     }
 
-    public function canAccessLocation(Location|int $location): bool
+    public function canAccessLocation(Location|string $location): bool
     {
         $locationId = $location instanceof Location ? $location->id : $location;
 
@@ -96,7 +100,7 @@ class User extends Authenticatable
      * @param  Builder<User>  $query
      * @return Builder<User>
      */
-    public function scopeForLocation(Builder $query, Location|int $location): Builder
+    public function scopeForLocation(Builder $query, Location|string $location): Builder
     {
         $locationId = $location instanceof Location ? $location->id : $location;
 

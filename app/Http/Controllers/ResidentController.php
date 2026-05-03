@@ -7,6 +7,7 @@ use App\Models\Resident;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -73,7 +74,7 @@ class ResidentController extends Controller
         }
 
         $validated = $request->validate([
-            'location_id' => [$locations->count() > 1 ? 'required' : 'nullable', 'integer'],
+            'location_id' => [$locations->count() > 1 ? 'required' : 'nullable', 'string', 'uuid'],
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
             'birth_date' => ['nullable', 'date', 'before_or_equal:today'],
@@ -83,7 +84,7 @@ class ResidentController extends Controller
 
         $locationId = $locations->count() === 1
             ? $locations->first()->id
-            : (int) ($validated['location_id'] ?? $locations->first()->id);
+            : (string) ($validated['location_id'] ?? $locations->first()->id);
 
         if ($locations->count() > 1 && ! $locations->contains('id', $locationId)) {
             throw ValidationException::withMessages([
@@ -93,10 +94,13 @@ class ResidentController extends Controller
 
         unset($validated['location_id']);
 
-        Resident::query()->create($validated + [
-            'location_id' => $locationId,
-            'active' => true,
-        ]);
+        DB::transaction(function () use ($validated, $locationId): void {
+            Resident::query()->create($validated + [
+                'pseudonym' => Resident::generatePseudonym(),
+                'location_id' => $locationId,
+                'active' => true,
+            ]);
+        });
 
         return to_route('residents.index', ['location_id' => $locationId]);
     }
@@ -129,7 +133,7 @@ class ResidentController extends Controller
         abort_unless($locations->contains('id', $resident->location_id), 403);
 
         $validated = $request->validate([
-            'location_id' => [$locations->count() > 1 ? 'required' : 'nullable', 'integer'],
+            'location_id' => [$locations->count() > 1 ? 'required' : 'nullable', 'string', 'uuid'],
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
             'birth_date' => ['nullable', 'date', 'before_or_equal:today'],
@@ -139,7 +143,7 @@ class ResidentController extends Controller
 
         $locationId = $locations->count() === 1
             ? $locations->first()->id
-            : (int) ($validated['location_id'] ?? $resident->location_id);
+            : (string) ($validated['location_id'] ?? $resident->location_id);
 
         if (! $locations->contains('id', $locationId)) {
             throw ValidationException::withMessages([
@@ -187,9 +191,9 @@ class ResidentController extends Controller
      */
     private function selectedLocation(Request $request, Collection $locations): ?Location
     {
-        $locationId = $request->integer('location_id');
+        $locationId = $request->string('location_id')->toString();
 
-        if (! $locationId) {
+        if ($locationId === '') {
             return null;
         }
 
@@ -197,7 +201,7 @@ class ResidentController extends Controller
     }
 
     /**
-     * @return array{id: int, name: string}
+     * @return array{id: string, name: string}
      */
     private function locationPayload(Location $location): array
     {

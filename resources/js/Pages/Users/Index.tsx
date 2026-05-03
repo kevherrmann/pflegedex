@@ -7,7 +7,7 @@ import { Head, Link, useForm } from '@inertiajs/react';
 import { FormEventHandler } from 'react';
 
 type PdlUser = {
-    id: number;
+    id: string;
     name: string;
     email: string;
 };

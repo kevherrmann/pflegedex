@@ -7,7 +7,7 @@ import { Head, Link, useForm } from '@inertiajs/react';
 import { FormEventHandler } from 'react';
 
 type Location = {
-    id: number;
+    id: string;
     name: string;
     shortName: string | null;
     description: string | null;

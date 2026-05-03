@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Concerns\HasUuidV7;
 use Database\Factories\ResidentFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -14,8 +15,14 @@ class Resident extends Model
 {
     /** @use HasFactory<ResidentFactory> */
     use HasFactory;
+    use HasUuidV7;
+
+    protected $keyType = 'string';
+
+    public $incrementing = false;
 
     protected $fillable = [
+        'pseudonym',
         'location_id',
         'first_name',
         'last_name',
@@ -31,11 +38,34 @@ class Resident extends Model
     protected function casts(): array
     {
         return [
-            'location_id' => 'integer',
             'birth_date' => 'date',
             'care_level' => 'integer',
             'active' => 'boolean',
         ];
+    }
+
+    /**
+     * Erzeugt das naechste Pseudonym im Schema "P-YYYY-####".
+     *
+     * Sollte innerhalb einer Transaktion aufgerufen werden, damit zwei
+     * parallele Anlagevorgaenge nicht dasselbe Pseudonym vergeben.
+     */
+    public static function generatePseudonym(?int $year = null): string
+    {
+        $year ??= (int) now()->format('Y');
+        $prefix = 'P-'.$year.'-';
+
+        $lastNumber = static::query()
+            ->where('pseudonym', 'like', $prefix.'%')
+            ->orderByDesc('pseudonym')
+            ->lockForUpdate()
+            ->value('pseudonym');
+
+        $nextNumber = $lastNumber === null
+            ? 1
+            : ((int) substr((string) $lastNumber, strlen($prefix))) + 1;
+
+        return $prefix.str_pad((string) $nextNumber, 4, '0', STR_PAD_LEFT);
     }
 
     /**
@@ -75,7 +105,7 @@ class Resident extends Model
      * @param  Builder<Resident>  $query
      * @return Builder<Resident>
      */
-    public function scopeForLocation(Builder $query, Location|int $location): Builder
+    public function scopeForLocation(Builder $query, Location|string $location): Builder
     {
         $locationId = $location instanceof Location ? $location->id : $location;
 

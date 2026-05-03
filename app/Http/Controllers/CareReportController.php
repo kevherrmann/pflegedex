@@ -83,7 +83,7 @@ class CareReportController extends Controller
         $locationIds = $locations->pluck('id')->all();
 
         $validated = $request->validate([
-            'resident_id' => ['required', 'integer'],
+            'resident_id' => ['required', 'string', 'uuid'],
             'occurred_at' => ['required', 'date', 'before_or_equal:now'],
             'category' => ['required', 'string', 'max:80'],
             'body' => ['required', 'string', 'min:5', 'max:5000'],
@@ -161,9 +161,9 @@ class CareReportController extends Controller
             return null;
         }
 
-        $requestedResidentId = $request->integer('resident_id');
+        $requestedResidentId = $request->string('resident_id')->toString();
 
-        if ($requestedResidentId) {
+        if ($requestedResidentId !== '') {
             return $residents->firstWhere('id', $requestedResidentId) ?? $residents->first();
         }
 

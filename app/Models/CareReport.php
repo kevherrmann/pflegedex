@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Concerns\HasUuidV7;
 use Database\Factories\CareReportFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,6 +12,11 @@ class CareReport extends Model
 {
     /** @use HasFactory<CareReportFactory> */
     use HasFactory;
+    use HasUuidV7;
+
+    protected $keyType = 'string';
+
+    public $incrementing = false;
 
     protected $fillable = [
         'resident_id',
@@ -27,9 +33,6 @@ class CareReport extends Model
     protected function casts(): array
     {
         return [
-            'resident_id' => 'integer',
-            'location_id' => 'integer',
-            'author_id' => 'integer',
             'occurred_at' => 'datetime',
         ];
     }

@@ -6,7 +6,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { FormEventHandler } from 'react';
 
-type Location = { id: number; name: string; shortName: string | null; description: string | null };
+type Location = { id: string; name: string; shortName: string | null; description: string | null };
 type LocationsEditProps = { location: Location };
 
 export default function Edit({ location }: LocationsEditProps) {

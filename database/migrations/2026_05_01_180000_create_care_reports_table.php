@@ -6,16 +6,13 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('care_reports', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('resident_id')->constrained()->cascadeOnUpdate()->restrictOnDelete();
-            $table->foreignId('location_id')->constrained()->cascadeOnUpdate()->restrictOnDelete();
-            $table->foreignId('author_id')->constrained('users')->cascadeOnUpdate()->restrictOnDelete();
+            $table->uuid('id')->primary();
+            $table->foreignUuid('resident_id')->constrained()->cascadeOnUpdate()->restrictOnDelete();
+            $table->foreignUuid('location_id')->constrained()->cascadeOnUpdate()->restrictOnDelete();
+            $table->foreignUuid('author_id')->constrained('users')->cascadeOnUpdate()->restrictOnDelete();
             $table->dateTime('occurred_at');
             $table->string('category', 80);
             $table->text('body');
@@ -26,9 +23,6 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('care_reports');

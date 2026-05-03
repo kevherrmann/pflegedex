@@ -6,7 +6,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { FormEventHandler } from 'react';
 
-type PdlUser = { id: number; name: string; email: string };
+type PdlUser = { id: string; name: string; email: string };
 
 type UsersEditProps = { pdlUser: PdlUser };
 

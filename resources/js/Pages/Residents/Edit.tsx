@@ -6,10 +6,10 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { FormEventHandler } from 'react';
 
-type Location = { id: number; name: string };
+type Location = { id: string; name: string };
 type Resident = {
-    id: number;
-    locationId: number;
+    id: string;
+    locationId: string;
     firstName: string;
     lastName: string;
     fullName: string;

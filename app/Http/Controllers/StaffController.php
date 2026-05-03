@@ -54,7 +54,7 @@ class StaffController extends Controller
         $validated = $this->validateStaff($request);
 
         DB::transaction(function () use ($validated): void {
-            $locationIds = array_values(array_unique(array_map('intval', $validated['location_ids'])));
+            $locationIds = array_values(array_unique(array_map('strval', $validated['location_ids'])));
 
             $user = User::query()->create([
                 'name' => $validated['name'],
@@ -95,7 +95,7 @@ class StaffController extends Controller
         $validated = $this->validateStaff($request, $staff);
 
         DB::transaction(function () use ($staff, $validated): void {
-            $locationIds = array_values(array_unique(array_map('intval', $validated['location_ids'])));
+            $locationIds = array_values(array_unique(array_map('strval', $validated['location_ids'])));
 
             $staff->forceFill([
                 'name' => $validated['name'],
@@ -127,14 +127,14 @@ class StaffController extends Controller
                 'array',
                 'min:1',
                 function (string $attribute, mixed $value, \Closure $fail) use ($accessibleLocationIds): void {
-                    $submittedIds = is_array($value) ? array_map('intval', $value) : [];
+                    $submittedIds = is_array($value) ? array_map('strval', $value) : [];
 
                     if (! empty(array_diff($submittedIds, $accessibleLocationIds))) {
                         $fail('Bitte wähle nur Wohnbereiche aus, auf die du Zugriff hast.');
                     }
                 },
             ],
-            'location_ids.*' => ['integer'],
+            'location_ids.*' => ['string', 'uuid'],
         ]);
 
         return $validated;

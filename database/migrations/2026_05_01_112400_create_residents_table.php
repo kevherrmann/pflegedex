@@ -6,14 +6,13 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('residents', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('location_id')->constrained()->cascadeOnUpdate()->restrictOnDelete();
+            $table->uuid('id')->primary();
+            // Pseudonym (z.B. "P-2026-0042"), eindeutig fuer menschenlesbare Anzeige.
+            $table->string('pseudonym')->unique();
+            $table->foreignUuid('location_id')->constrained()->cascadeOnUpdate()->restrictOnDelete();
             $table->string('first_name');
             $table->string('last_name');
             $table->date('birth_date')->nullable();
@@ -26,9 +25,6 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('residents');
