@@ -2,7 +2,7 @@ import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import { FormEventHandler, useState } from 'react';
 
 type ResidentOption = {
@@ -28,6 +28,10 @@ type CareReport = {
     occurredAt: string;
     category: string;
     body: string;
+    signed: boolean;
+    signedAt: string | null;
+    signedByName: string | null;
+    versionCount: number;
 };
 
 type CareReportsIndexProps = {
@@ -64,7 +68,15 @@ export default function Index({
             onSuccess: () => reset('body'),
         });
     };
+    const signReport = (report: CareReport): void => {
+        if (report.signed) {
+            return;
+        }
 
+        router.post(route('care-reports.sign', report.id), {}, {
+            preserveScroll: true,
+        });
+    };
     return (
         <AuthenticatedLayout
             header={
@@ -218,17 +230,52 @@ export default function Index({
                                                     <div className="mt-5 space-y-4">
                                                         {reports.map((report) => (
                                                             <article key={report.id} className="rounded-xl border border-[#E5E7EB] bg-[#F8F8F8] p-4">
-                                                                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                                                                    <p className="text-sm font-semibold text-[#7F1730]">
-                                                                        {report.occurredAt}
-                                                                    </p>
-                                                                    <p className="text-sm text-[#54595F]">
-                                                                        Erfasst von {report.authorName ?? 'unbekannt'}
-                                                                    </p>
+                                                                <div className="flex items-start justify-between gap-4">
+                                                                    <div>
+                                                                        <p className="text-xs text-gray-500">{report.occurredAt}</p>
+                                                                        <p className="text-xs text-gray-500">
+                                                                            Erfasst von {report.authorName ?? 'unbekannt'}
+                                                                        </p>
+                                                                    </div>
+
+                                                                    {report.signed ? (
+                                                                        <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-800">
+                                                                            Signiert
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="rounded-full bg-yellow-100 px-3 py-1 text-xs font-semibold text-yellow-800">
+                                                                            Entwurf
+                                                                        </span>
+                                                                    )}
                                                                 </div>
-                                                                <p className="mt-3 whitespace-pre-line leading-7 text-[#333333]">
-                                                                    {report.body}
-                                                                </p>
+
+                                                                <p className="mt-2 text-sm text-gray-700">{report.body}</p>
+
+                                                                <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-3 text-xs text-gray-500">
+                                                                    <span>
+                                                                        Versionen: {report.versionCount}
+                                                                    </span>
+
+                                                                    {report.signed ? (
+                                                                        <span>
+                                                                            Signiert von {report.signedByName ?? 'unbekannt'} am {report.signedAt ?? 'unbekannt'}
+                                                                        </span>
+                                                                    ) : (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => signReport(report)}
+                                                                            className="rounded-md bg-[#7F1730] px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-[#641226]"
+                                                                        >
+                                                                            Signieren
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+
+                                                                {report.signed && (
+                                                                    <p className="mt-2 rounded-md bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                                                                        Signierte Berichte können nicht mehr geändert werden.
+                                                                    </p>
+                                                                )}
                                                             </article>
                                                         ))}
                                                     </div>
