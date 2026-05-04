@@ -43,31 +43,31 @@ class CareReport extends Model
         ];
     }
 
-    /** @return BelongsTo<Resident, CareReport> */
+    /** @return BelongsTo<Resident, $this> */
     public function resident(): BelongsTo
     {
         return $this->belongsTo(Resident::class);
     }
 
-    /** @return BelongsTo<Location, CareReport> */
+    /** @return BelongsTo<Location, $this> */
     public function location(): BelongsTo
     {
         return $this->belongsTo(Location::class);
     }
 
-    /** @return BelongsTo<User, CareReport> */
+    /** @return BelongsTo<User, $this> */
     public function author(): BelongsTo
     {
         return $this->belongsTo(User::class, 'author_id');
     }
 
-    /** @return BelongsTo */
+    /** @return BelongsTo<User, $this> */
     public function signer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'signed_by');
     }
 
-    /** @return HasMany */
+    /** @return HasMany<ReportVersion, $this> */
     public function versions(): HasMany
     {
         return $this->hasMany(ReportVersion::class);
@@ -96,7 +96,7 @@ class CareReport extends Model
         $this->forceFill([
             'signed' => true,
             'signed_at' => now(),
-                         'signed_by' => $user->id,
+            'signed_by' => $user->id,
         ])->save();
 
         $this->appendVersion('signed', $user);

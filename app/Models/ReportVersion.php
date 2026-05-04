@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Support\HasUuidV7;
+use App\Support\Concerns\HasUuidV7;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -20,6 +20,9 @@ final class ReportVersion extends Model
 
     public $incrementing = false;
 
+    /**
+     * @var list<string>
+     */
     protected $fillable = [
         'care_report_id',
         'content_snapshot',
@@ -28,6 +31,9 @@ final class ReportVersion extends Model
         'created_at',
     ];
 
+    /**
+     * @return array<string, string>
+     */
     protected function casts(): array
     {
         return [
