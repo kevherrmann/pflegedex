@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\CareReportCategory;
 use App\Models\CareReport;
 use App\Models\Resident;
 use App\Models\User;
@@ -28,7 +29,7 @@ class CareReportFactory extends Factory
             'location_id' => $resident->location_id,
             'author_id' => User::factory(),
             'occurred_at' => $this->faker->dateTimeBetween('-1 week'),
-            'category' => $this->faker->randomElement(['Grundpflege', 'Beobachtung', 'Mobilität', 'Übergabe']),
+            'category' => $this->faker->randomElement(CareReportCategory::values()),
             'body' => $this->faker->sentence(12),
         ];
     }

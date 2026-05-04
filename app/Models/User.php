@@ -12,16 +12,32 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use OwenIt\Auditing\Auditable as AuditableTrait;
+use OwenIt\Auditing\Contracts\Auditable;
 use Spatie\Permission\Traits\HasRoles;
 
-class User extends Authenticatable
+class User extends Authenticatable implements Auditable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, HasRoles, HasUuidV7, Notifiable;
+    use AuditableTrait;
+    use HasFactory;
+    use HasRoles;
+    use HasUuidV7;
+    use Notifiable;
 
     protected $keyType = 'string';
 
     public $incrementing = false;
+
+    /**
+     * Felder, die NICHT im Audit-Trail erscheinen.
+     *
+     * @var list<string>
+     */
+    protected array $auditExclude = [
+        'password',
+        'remember_token',
+    ];
 
     /**
      * The attributes that are mass assignable.

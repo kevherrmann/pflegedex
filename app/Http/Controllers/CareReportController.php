@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\CareReportCategory;
 use App\Models\CareReport;
 use App\Models\Location;
 use App\Models\Resident;
@@ -9,6 +10,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -86,7 +88,7 @@ class CareReportController extends Controller
         $validated = $request->validate([
             'resident_id' => ['required', 'string', 'uuid'],
             'occurred_at' => ['required', 'date', 'before_or_equal:now'],
-            'category' => ['required', 'string', 'max:80'],
+            'category' => ['required', 'string', Rule::in(CareReportCategory::values())],
             'body' => ['required', 'string', 'min:5', 'max:5000'],
         ]);
 
@@ -134,7 +136,7 @@ class CareReportController extends Controller
 
         $validated = $request->validate([
             'occurred_at' => ['required', 'date', 'before_or_equal:now'],
-            'category' => ['required', 'string', 'max:80'],
+            'category' => ['required', 'string', Rule::in(CareReportCategory::values())],
             'body' => ['required', 'string', 'min:5', 'max:5000'],
         ]);
 
@@ -254,7 +256,7 @@ class CareReportController extends Controller
     /** @return list<string> */
     private function categories(): array
     {
-        return ['Grundpflege', 'Beobachtung', 'Mobilität', 'Medikation', 'Übergabe', 'Sonstiges'];
+        return CareReportCategory::values();
     }
 
     /** @return array<string, mixed> */

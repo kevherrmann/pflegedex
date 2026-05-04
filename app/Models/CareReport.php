@@ -8,10 +8,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use OwenIt\Auditing\Auditable as AuditableTrait;
+use OwenIt\Auditing\Contracts\Auditable;
 
-class CareReport extends Model
+class CareReport extends Model implements Auditable
 {
     /** @use HasFactory<CareReportFactory> */
+    use AuditableTrait;
     use HasFactory;
     use HasUuidV7;
 

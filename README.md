@@ -74,6 +74,14 @@ Frontend läuft im `node` Service über Vite. Der Vite-Port ist standardmäßig:
 http://localhost:5173
 ```
 
+E-Mails werden lokal über [Mailpit](https://mailpit.axllent.org/) abgefangen. Statt echte Mails zu verschicken, sammelt der `mailpit`-Container alles ein und zeigt es im Web-UI:
+
+```text
+http://localhost:8025
+```
+
+Damit lassen sich Password-Reset-Mails, Notifications etc. ohne externen SMTP-Provider testen. Standard-Konfiguration in `.env.example`: `MAIL_MAILER=smtp`, `MAIL_HOST=mailpit`, `MAIL_PORT=1025`.
+
 Wenn der Browser eine weiße Seite zeigt und in der Konsole Assets von `http://0.0.0.0:5173/...` blockiert werden, setze in deiner lokalen `.env`:
 
 ```env

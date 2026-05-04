@@ -29,7 +29,7 @@ it('creates an initial report version when a care report is stored', function ()
         ->post('/care-reports', [
             'resident_id' => $resident->id,
             'occurred_at' => now()->format('Y-m-d H:i:s'),
-            'category' => 'pflege',
+            'category' => 'Grundpflege',
             'body' => 'Bewohnerin war mobil und orientiert.',
         ])
         ->assertRedirect();

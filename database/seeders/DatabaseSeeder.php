@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\CareReport;
 use App\Models\Location;
 use App\Models\Resident;
 use App\Models\User;
@@ -12,8 +13,26 @@ class DatabaseSeeder extends Seeder
 {
     /**
      * Seed the application's database.
+     *
+     * Auditing wird waehrend des Seeders deaktiviert, damit Demo-Daten
+     * keinen Audit-Laerm produzieren. In Tests faellt das ohnehin durch
+     * 'console' => true wieder rein, was wir aber gezielt fuer den
+     * Resident-Update-Pfad brauchen.
      */
     public function run(): void
+    {
+        Location::withoutAuditing(function (): void {
+            Resident::withoutAuditing(function (): void {
+                User::withoutAuditing(function (): void {
+                    CareReport::withoutAuditing(function (): void {
+                        $this->seedAll();
+                    });
+                });
+            });
+        });
+    }
+
+    private function seedAll(): void
     {
         $this->call(RoleSeeder::class);
 
