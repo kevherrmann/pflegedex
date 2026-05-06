@@ -20,4 +20,10 @@ export type PageProps<
             viewAuditLog: boolean;
         };
     };
+    ai: {
+        available: boolean;
+        modelPresent: boolean;
+        model: string | null;
+        reason: string | null;
+    };
 };

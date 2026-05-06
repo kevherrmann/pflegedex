@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\Ai\AiHealthService;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -43,6 +44,26 @@ class HandleInertiaRequests extends Middleware
                     'viewAuditLog' => $request->user()?->hasAnyRole(['PDL', 'Pflegekraft']) ?? false,
                 ],
             ],
+            'ai' => $this->aiStatus($request),
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function aiStatus(Request $request): array
+    {
+        // KI-Status nur fuer Authenticated abfragen, sonst hat das keinen
+        // praktischen Nutzen und der Health-Probe wuerde unnoetig laufen.
+        if ($request->user() === null) {
+            return [
+                'available' => false,
+                'modelPresent' => false,
+                'model' => null,
+                'reason' => null,
+            ];
+        }
+
+        return app(AiHealthService::class)->status();
     }
 }

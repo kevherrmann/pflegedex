@@ -6,6 +6,7 @@ use App\Http\Controllers\LocationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ResidentController;
 use App\Http\Controllers\SisController;
+use App\Http\Controllers\SisGenerationController;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\UserController;
 use App\Models\Resident;
@@ -78,6 +79,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/residents/{resident}/sis/edit', [SisController::class, 'edit'])->name('residents.sis.edit');
     Route::patch('/residents/{resident}/sis', [SisController::class, 'update'])->name('residents.sis.update');
     Route::post('/residents/{resident}/sis/evaluate', [SisController::class, 'evaluate'])->name('residents.sis.evaluate');
+
+    Route::post('/residents/{resident}/sis/generate', [SisGenerationController::class, 'start'])->name('residents.sis.generate.start');
+    Route::get('/residents/{resident}/sis/generate/{generation}', [SisGenerationController::class, 'show'])->name('residents.sis.generate.show');
 
     Route::get('/audit', [AuditController::class, 'index'])->name('audit.index');
 

@@ -11,7 +11,7 @@ services:
       - .:/var/www/html
     environment:
       PFLEGEDEX_AUTO_MIGRATE: ${PFLEGEDEX_AUTO_MIGRATE:-true}
-      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}
     depends_on:
       postgres:
         condition: service_healthy
@@ -53,6 +53,8 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - .:/var/www/html
+    environment:
+      OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}
     depends_on:
       postgres:
         condition: service_healthy
@@ -94,6 +96,45 @@ services:
     volumes:
       - mailpit-data:/data
 
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  # Einmalbefehl: zieht das konfigurierte Modell, sobald ollama healthy ist.
+  # Laeuft beim docker-compose up im Hintergrund, beendet sich dann selbst.
+  # Beim zweiten Start ist das Modell bereits im Volume - der Pull merkt das
+  # und kehrt sofort zurueck (Layer-Cache).
+  ollama-init:
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    volumes:
+      - ollama-data:/root/.ollama
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      AI_MODEL: ${AI_MODEL:-gemma4:e2b}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Pulling Modell ${AI_MODEL:-gemma4:e2b} ..."
+        ollama pull "${AI_MODEL:-gemma4:e2b}" || {
+          echo "WARN: Pull fehlgeschlagen. Pflegedex laeuft trotzdem, KI-Features sind dann deaktiviert."
+          exit 0
+        }
+        echo "Modell ${AI_MODEL:-gemma4:e2b} bereit."
+    restart: "no"
+
 volumes:
   redis-data:
   mailpit-data:
+  ollama-data:

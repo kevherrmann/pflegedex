@@ -28,12 +28,28 @@ class SisController extends Controller
             ->withCount('versions')
             ->first();
 
+        // Aktive oder zuletzt fertiggestellte Generation - Frontend kann pollen
+        // bis status terminal ist und blendet danach den Hinweis aus.
+        $latestGeneration = $sis !== null
+            ? \App\Models\SisGeneration::query()
+                ->where('sis_id', $sis->id)
+                ->orderByDesc('created_at')
+                ->first()
+            : null;
+
         return Inertia::render('Sis/Show', [
             'resident' => $this->residentPayload($resident),
             'sis' => $sis ? $this->sisPayload($sis) : null,
             'canEdit' => $request->user()?->hasRole('PDL') ?? false,
             'topics' => $this->topicCatalog(),
             'risks' => $this->riskCatalog(),
+            'latestGeneration' => $latestGeneration ? [
+                'id' => $latestGeneration->id,
+                'status' => $latestGeneration->status,
+                'progress' => (int) $latestGeneration->progress,
+                'totalSteps' => (int) $latestGeneration->total_steps,
+                'errorMessage' => $latestGeneration->error_message,
+            ] : null,
         ]);
     }
 

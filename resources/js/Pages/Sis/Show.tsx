@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import { useEffect, useState } from 'react';
 
 type Resident = {
     id: string;
@@ -32,15 +33,55 @@ type Sis = {
 type TopicCatalog = { number: number; label: string };
 type RiskCatalog = { kind: string; label: string };
 
+type Generation = {
+    id: string;
+    status: 'pending' | 'running' | 'completed' | 'failed' | string;
+    progress: number;
+    totalSteps: number;
+    errorMessage: string | null;
+};
+
 type Props = {
     resident: Resident;
     sis: Sis | null;
     canEdit: boolean;
     topics: TopicCatalog[];
     risks: RiskCatalog[];
+    latestGeneration: Generation | null;
 };
 
-export default function Show({ resident, sis, canEdit, topics, risks }: Props) {
+export default function Show({ resident, sis, canEdit, topics, risks, latestGeneration }: Props) {
+    const [generation, setGeneration] = useState<Generation | null>(latestGeneration);
+
+    // Polling: solange status='pending' oder 'running' ist, alle 2s den Status holen.
+    // Sobald terminal (completed/failed): ein letztes router.reload(), damit die SIS-Texte
+    // aus der DB neu geladen werden.
+    useEffect(() => {
+        if (generation === null) return;
+        if (generation.status === 'completed' || generation.status === 'failed') return;
+
+        const handle = setInterval(async () => {
+            try {
+                const url = route('residents.sis.generate.show', [resident.id, generation.id]);
+                const res = await fetch(url, { headers: { Accept: 'application/json' } });
+                if (!res.ok) return;
+                const data = (await res.json()) as Generation;
+                setGeneration(data);
+                if (data.status === 'completed' || data.status === 'failed') {
+                    clearInterval(handle);
+                    if (data.status === 'completed') {
+                        router.reload({ only: ['sis', 'latestGeneration'] });
+                    }
+                }
+            } catch {
+                // Netzwerk-Fehler stillschweigend ignorieren - der User sieht den
+                // letzten bekannten Status, naechster Tick holt nach.
+            }
+        }, 2000);
+
+        return () => clearInterval(handle);
+    }, [generation, resident.id]);
+
     const handleEvaluate = () => {
         if (!confirm('SIS-Evaluation jetzt speichern? Der nächste Termin wird auf +8 Wochen gesetzt.')) {
             return;
@@ -48,6 +89,11 @@ export default function Show({ resident, sis, canEdit, topics, risks }: Props) {
         router.post(route('residents.sis.evaluate', resident.id));
     };
 
+    const isRunning = generation !== null && (generation.status === 'pending' || generation.status === 'running');
+    const justFailed = generation !== null && generation.status === 'failed';
+
+    const aiStatus = (usePage().props as { ai?: { available: boolean; modelPresent: boolean; reason: string | null } }).ai;
+    const aiAvailable = (aiStatus?.available ?? false) && (aiStatus?.modelPresent ?? false);
     const topicByNumber = new Map(sis?.topics.map((t) => [t.topicNumber, t]) ?? []);
     const riskByKind = new Map(sis?.risks.map((r) => [r.riskKind, r]) ?? []);
 
@@ -62,6 +108,61 @@ export default function Show({ resident, sis, canEdit, topics, risks }: Props) {
             <Head title={`SIS - ${resident.fullName}`} />
             <div className="bg-[#F8F8F8] py-12">
                 <div className="mx-auto max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
+                    {isRunning && generation !== null && (
+                        <div className="rounded-2xl border border-[#9B1C3B]/30 bg-[#FAE7EC]/40 p-6 shadow-sm">
+                            <div className="flex items-center gap-4">
+                                <div className="h-3 w-3 animate-pulse rounded-full bg-[#9B1C3B]"></div>
+                                <div className="flex-1">
+                                    <p className="text-sm font-bold uppercase tracking-widest text-[#9B1C3B]">
+                                        KI-Ausformulierung läuft
+                                    </p>
+                                    <p className="mt-1 text-xs text-gray-700">
+                                        Schritt {generation.progress} von {generation.totalSteps} ·
+                                        {generation.status === 'pending' ? ' wartet auf Worker …' : ' formuliert …'}
+                                    </p>
+                                    <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-white">
+                                        <div
+                                            className="h-full bg-[#9B1C3B] transition-all"
+                                            style={{
+                                                width: `${
+                                                    generation.totalSteps > 0
+                                                        ? Math.round((generation.progress / generation.totalSteps) * 100)
+                                                        : 0
+                                                }%`,
+                                            }}
+                                        ></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {justFailed && generation !== null && (
+                        <div className="rounded-2xl border border-red-300 bg-red-50 p-6 shadow-sm">
+                            <p className="text-sm font-bold uppercase tracking-widest text-red-800">
+                                KI-Generierung fehlgeschlagen
+                            </p>
+                            <p className="mt-1 text-xs text-red-900">
+                                {generation.errorMessage ?? 'Unbekannter Fehler. Bitte erneut versuchen.'}
+                            </p>
+                            <p className="mt-1 text-xs text-red-900">
+                                Die Stichpunkte sind weiterhin gespeichert — Sie können den
+                                Versuch über „Bearbeiten" wiederholen.
+                            </p>
+                        </div>
+                    )}
+
+                    {canEdit && !aiAvailable && !isRunning && (
+                        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-sm">
+                            <p className="text-xs font-semibold uppercase tracking-widest text-amber-900">
+                                KI-Funktion nicht verfügbar
+                            </p>
+                            <p className="mt-1 text-xs text-amber-900">
+                                {aiStatus?.reason ?? 'Ollama-Service oder Modell ist gerade nicht erreichbar.'}{' '}
+                                Speichern und Bearbeiten funktioniert weiterhin normal.
+                            </p>
+                        </div>
+                    )}
                     {sis === null ? (
                         <div className="rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-[#E5E7EB]">
                             <p className="text-gray-700">Für diesen Bewohner ist noch keine SIS angelegt.</p>

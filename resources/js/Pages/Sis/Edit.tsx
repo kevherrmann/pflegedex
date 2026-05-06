@@ -1,5 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { FormEventHandler } from 'react';
 
 type Resident = {
@@ -48,6 +48,9 @@ type FormShape = {
 };
 
 export default function Edit({ resident, sis, topics, risks }: Props) {
+    const aiStatus = (usePage().props as { ai?: { available: boolean; modelPresent: boolean; reason: string | null } }).ai;
+    const aiAvailable = (aiStatus?.available ?? false) && (aiStatus?.modelPresent ?? false);
+
     const topicByNumber = new Map(sis.topics.map((t) => [t.topicNumber, t]));
     const riskByKind = new Map(sis.risks.map((r) => [r.riskKind, r]));
 
@@ -81,6 +84,18 @@ export default function Edit({ resident, sis, topics, risks }: Props) {
     const submit: FormEventHandler = (event) => {
         event.preventDefault();
         patch(route('residents.sis.update', resident.id));
+    };
+
+    const saveAndGenerate = () => {
+        // Erst speichern, danach KI-Generation starten. Der server-side
+        // Snapshot in sis_versions wird mit reason='updated' geschrieben.
+        // Anschliessend dispatcht der generate-Endpoint den Job; die
+        // Show-Seite pollt dann den Status.
+        patch(route('residents.sis.update', resident.id), {
+            onSuccess: () => {
+                router.post(route('residents.sis.generate.start', resident.id));
+            },
+        });
     };
 
     return (
@@ -185,14 +200,38 @@ export default function Edit({ resident, sis, topics, risks }: Props) {
                             </div>
                         </div>
 
-                        <div className="flex justify-end">
-                            <button
-                                type="submit"
-                                disabled={processing}
-                                className="rounded-md bg-[#9B1C3B] px-6 py-2 text-sm font-semibold uppercase tracking-widest text-white hover:bg-[#7A1430] disabled:opacity-50"
-                            >
-                                Speichern
-                            </button>
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <p className="max-w-xl text-xs text-gray-500">
+                                Tipp: Tragen Sie ruhig Stichpunkte ein. Mit dem Button
+                                <strong> „Speichern &amp; mit KI ausformulieren"</strong> wird
+                                der eingegebene Inhalt nach dem Speichern automatisch in
+                                fachlichen Fließtext übersetzt. Sie können das Ergebnis
+                                anschließend nochmal überarbeiten.
+                                {!aiAvailable && (
+                                    <span className="mt-2 block rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                        <strong>KI-Funktion nicht verfügbar:</strong>{' '}
+                                        {aiStatus?.reason ?? 'Ollama-Service oder Modell ist gerade nicht erreichbar.'}
+                                    </span>
+                                )}
+                            </p>
+                            <div className="flex gap-3">
+                                <button
+                                    type="submit"
+                                    disabled={processing}
+                                    className="rounded-md border border-[#9B1C3B] px-6 py-2 text-sm font-semibold uppercase tracking-widest text-[#9B1C3B] hover:bg-[#FAE7EC] disabled:opacity-50"
+                                >
+                                    Nur speichern
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={saveAndGenerate}
+                                    disabled={processing || !aiAvailable}
+                                    title={!aiAvailable ? (aiStatus?.reason ?? 'KI nicht verfügbar') : undefined}
+                                    className="rounded-md bg-[#9B1C3B] px-6 py-2 text-sm font-semibold uppercase tracking-widest text-white hover:bg-[#7A1430] disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    Speichern &amp; mit KI ausformulieren
+                                </button>
+                            </div>
                         </div>
                     </form>
                 </div>
