@@ -17,6 +17,7 @@ export type PageProps<
             manageResidents: boolean;
             manageStaff: boolean;
             managePdlAccounts: boolean;
+            viewAuditLog: boolean;
         };
     };
 };

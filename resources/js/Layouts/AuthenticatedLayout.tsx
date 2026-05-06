@@ -16,6 +16,7 @@ export default function Authenticated({
     const canManageCareReports = auth.permissions.manageCareReports;
     const canManageStaff = auth.permissions.manageStaff;
     const canManagePdlAccounts = auth.permissions.managePdlAccounts;
+    const canViewAuditLog = auth.permissions.viewAuditLog;
 
     const [showingNavigationDropdown, setShowingNavigationDropdown] =
         useState(false);
@@ -77,6 +78,14 @@ export default function Authenticated({
                                         active={route().current('staff.index')}
                                     >
                                         Mitarbeiter
+                                    </NavLink>
+                                )}
+                                {canViewAuditLog && (
+                                    <NavLink
+                                        href={route('audit.index')}
+                                        active={route().current('audit.index')}
+                                    >
+                                        Audit-Log
                                     </NavLink>
                                 )}
                             </div>
@@ -221,6 +230,14 @@ export default function Authenticated({
                                 active={route().current('staff.index')}
                             >
                                 Mitarbeiter
+                            </ResponsiveNavLink>
+                        )}
+                        {canViewAuditLog && (
+                            <ResponsiveNavLink
+                                href={route('audit.index')}
+                                active={route().current('audit.index')}
+                            >
+                                Audit-Log
                             </ResponsiveNavLink>
                         )}
                     </div>

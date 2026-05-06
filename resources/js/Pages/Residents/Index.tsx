@@ -135,7 +135,12 @@ export default function Index({
                                             </th>
                                             {canManageResidents && (
                                                 <th className="px-6 py-3 text-right text-xs font-bold uppercase tracking-wider text-[#7F1730]">
-                                                    Aktion
+                                                    Aktionen
+                                                </th>
+                                            )}
+                                            {!canManageResidents && (
+                                                <th className="px-6 py-3 text-right text-xs font-bold uppercase tracking-wider text-[#7F1730]">
+                                                    Dokumentation
                                                 </th>
                                             )}
                                         </tr>
@@ -157,16 +162,24 @@ export default function Index({
                                                 <td className="whitespace-nowrap px-6 py-4 text-[#54595F]">
                                                     {resident.careLevel ?? '—'}
                                                 </td>
-                                                {canManageResidents && (
-                                                    <td className="whitespace-nowrap px-6 py-4 text-right">
+                                                <td className="whitespace-nowrap px-6 py-4 text-right">
+                                                    <div className="flex justify-end gap-4">
                                                         <Link
-                                                            href={route('residents.edit', resident.id)}
+                                                            href={route('residents.sis.show', resident.id)}
                                                             className="text-sm font-semibold text-[#9B1C3B] hover:underline"
                                                         >
-                                                            Bearbeiten
+                                                            SIS
                                                         </Link>
-                                                    </td>
-                                                )}
+                                                        {canManageResidents && (
+                                                            <Link
+                                                                href={route('residents.edit', resident.id)}
+                                                                className="text-sm font-semibold text-[#9B1C3B] hover:underline"
+                                                            >
+                                                                Bearbeiten
+                                                            </Link>
+                                                        )}
+                                                    </div>
+                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>

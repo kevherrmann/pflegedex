@@ -2,9 +2,14 @@
 
 namespace Database\Seeders;
 
+use App\Enums\SisRiskKind;
+use App\Enums\SisTopic;
 use App\Models\CareReport;
 use App\Models\Location;
 use App\Models\Resident;
+use App\Models\Sis;
+use App\Models\SisRisk;
+use App\Models\SisTopicEntry;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -25,7 +30,9 @@ class DatabaseSeeder extends Seeder
             Resident::withoutAuditing(function (): void {
                 User::withoutAuditing(function (): void {
                     CareReport::withoutAuditing(function (): void {
-                        $this->seedAll();
+                        Sis::withoutAuditing(function (): void {
+                            $this->seedAll();
+                        });
                     });
                 });
             });
@@ -121,5 +128,70 @@ class DatabaseSeeder extends Seeder
 
         $carl->syncRoles(['Pflegekraft']);
         $carl->locations()->sync([$location->id]);
+
+        $this->seedDemoSis($pdl);
+    }
+
+    private function seedDemoSis(User $author): void
+    {
+        $erika = Resident::query()
+            ->where('first_name', 'Erika')
+            ->where('last_name', 'Mustermann')
+            ->first();
+
+        if ($erika === null || $erika->sis()->exists()) {
+            return;
+        }
+
+        $sis = Sis::query()->create([
+            'resident_id' => $erika->id,
+            'location_id' => $erika->location_id,
+            'opening_question' => 'Möchte gerne mehr Zeit im Garten verbringen und Kontakt zu ihrer Tochter halten.',
+            'started_at' => today()->subDays(10),
+            'completed_at' => today()->subDays(2),
+            'evaluated_at' => null,
+            'next_evaluation_due' => today()->subDays(2)->addWeeks(8),
+            'created_by' => $author->id,
+        ]);
+
+        $topicTexts = [
+            1 => 'Orientierung zeitlich leicht eingeschränkt, kommunikativ aufgeschlossen.',
+            2 => 'Geht mit Rollator selbstständig kurze Strecken, Sturzrisiko erhöht.',
+            3 => 'Diabetes Typ 2, gut eingestellt. Regelmäßige Blutzuckerkontrolle.',
+            4 => 'Benötigt Unterstützung beim Duschen, kleidet sich selbst an.',
+            5 => 'Wöchentlicher Besuch der Tochter, gerne in Gesellschaft.',
+            6 => 'Einzelzimmer mit eigenem Bad, fühlt sich wohl.',
+        ];
+
+        foreach (SisTopic::numbers() as $number) {
+            SisTopicEntry::query()->create([
+                'sis_id' => $sis->id,
+                'topic_number' => $number,
+                'content' => $topicTexts[$number] ?? null,
+            ]);
+        }
+
+        $riskFlags = [
+            'sturz' => ['is_at_risk' => true, 'needs_further_assessment' => true, 'notes' => 'Mobilitätsförderung läuft, Sturzprotokoll alle 8 Wochen.'],
+            'dekubitus' => ['is_at_risk' => false, 'needs_further_assessment' => false, 'notes' => null],
+            'inkontinenz' => ['is_at_risk' => true, 'needs_further_assessment' => false, 'notes' => 'Nachts inkontinent, tagsüber selbstständig.'],
+            'schmerz' => ['is_at_risk' => false, 'needs_further_assessment' => false, 'notes' => 'Keine bekannten Schmerzen.'],
+            'ernaehrung' => ['is_at_risk' => false, 'needs_further_assessment' => false, 'notes' => null],
+            'sonstiges' => ['is_at_risk' => false, 'needs_further_assessment' => false, 'notes' => null],
+        ];
+
+        foreach (SisRiskKind::values() as $kind) {
+            $flags = $riskFlags[$kind];
+            SisRisk::query()->create([
+                'sis_id' => $sis->id,
+                'risk_kind' => $kind,
+                'is_at_risk' => $flags['is_at_risk'],
+                'needs_further_assessment' => $flags['needs_further_assessment'],
+                'notes' => $flags['notes'],
+            ]);
+        }
+
+        $sis->refresh()->load(['topicEntries', 'risks']);
+        $sis->appendVersion('created', $author);
     }
 }

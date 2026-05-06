@@ -1,9 +1,11 @@
 <?php
 
+use App\Http\Controllers\AuditController;
 use App\Http\Controllers\CareReportController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ResidentController;
+use App\Http\Controllers\SisController;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\UserController;
 use App\Models\Resident;
@@ -69,6 +71,15 @@ Route::middleware('auth')->group(function () {
     Route::post('/residents', [ResidentController::class, 'store'])->name('residents.store');
     Route::get('/residents/{resident}/edit', [ResidentController::class, 'edit'])->name('residents.edit');
     Route::patch('/residents/{resident}', [ResidentController::class, 'update'])->name('residents.update');
+
+    Route::get('/residents/{resident}/sis', [SisController::class, 'show'])->name('residents.sis.show');
+    Route::get('/residents/{resident}/sis/create', [SisController::class, 'create'])->name('residents.sis.create');
+    Route::post('/residents/{resident}/sis', [SisController::class, 'store'])->name('residents.sis.store');
+    Route::get('/residents/{resident}/sis/edit', [SisController::class, 'edit'])->name('residents.sis.edit');
+    Route::patch('/residents/{resident}/sis', [SisController::class, 'update'])->name('residents.sis.update');
+    Route::post('/residents/{resident}/sis/evaluate', [SisController::class, 'evaluate'])->name('residents.sis.evaluate');
+
+    Route::get('/audit', [AuditController::class, 'index'])->name('audit.index');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
