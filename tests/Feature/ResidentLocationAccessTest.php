@@ -58,6 +58,7 @@ it('prevents PDL users from creating residents in foreign Wohnbereiche', functio
 
     $this->actingAs($pdl)
     ->post('/residents', [
+        'salutation' => 'frau',
         'location_id' => $foreignLocation->id,
         'first_name' => 'Fremde',
         'last_name' => 'Bewohnerin',

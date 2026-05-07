@@ -73,7 +73,7 @@ class GenerateSisJob implements ShouldQueue
         ])->save();
 
         $sis = Sis::query()
-            ->with(['topicEntries', 'risks'])
+            ->with(['topicEntries', 'risks', 'resident'])
             ->findOrFail($generation->sis_id);
 
         try {
@@ -82,9 +82,10 @@ class GenerateSisJob implements ShouldQueue
 
             $outputs = [];
             $stepIndex = 0;
+            $salutation = $sis->resident->salutation;
 
             foreach ($fields as $field) {
-                $output = $formulator->formulateField($field['label'], $field['content']);
+                $output = $formulator->formulateField($field['label'], $field['content'], $salutation);
                 $outputs[$field['key']] = $output;
                 $stepIndex++;
 

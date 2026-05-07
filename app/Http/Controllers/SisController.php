@@ -6,10 +6,13 @@ namespace App\Http\Controllers;
 
 use App\Enums\SisRiskKind;
 use App\Enums\SisTopic;
+use App\Jobs\GenerateSisJob;
 use App\Models\Resident;
 use App\Models\Sis;
+use App\Models\SisGeneration;
 use App\Models\SisRisk;
 use App\Models\SisTopicEntry;
+use App\Services\Ai\AiHealthService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -68,7 +71,7 @@ class SisController extends Controller
         ]);
     }
 
-    public function store(Request $request, Resident $resident): RedirectResponse
+    public function store(Request $request, Resident $resident, AiHealthService $health): RedirectResponse
     {
         $this->authorizeWrite($request, $resident);
 
@@ -78,7 +81,7 @@ class SisController extends Controller
 
         $validated = $this->validatePayload($request);
 
-        DB::transaction(function () use ($resident, $request, $validated): void {
+        $createdSis = DB::transaction(function () use ($resident, $request, $validated): Sis {
             $user = $request->user();
 
             $sis = Sis::query()->create([
@@ -97,11 +100,53 @@ class SisController extends Controller
 
             $sis->refresh()->load(['topicEntries', 'risks']);
             $sis->appendVersion('created', $user);
+
+            return $sis;
         });
+
+        // Direkt nach dem Anlegen die KI-Ausformulierung anstossen.
+        // Wenn KI nicht verfuegbar ist, bleiben die Stichpunkte stehen
+        // und der PDL bekommt eine entsprechende Meldung.
+        $aiStatus = $health->status();
+        if ($aiStatus['available'] && $aiStatus['modelPresent']) {
+            SisGeneration::query()->create([
+                'sis_id' => $createdSis->id,
+                'triggered_by' => $request->user()->id,
+                'status' => SisGeneration::STATUS_PENDING,
+                'progress' => 0,
+                'total_steps' => 7,
+                'input_snapshot' => json_encode($this->generationSnapshot($createdSis), JSON_UNESCAPED_UNICODE),
+            ]);
+
+            $generation = SisGeneration::query()
+                ->where('sis_id', $createdSis->id)
+                ->latest('created_at')
+                ->firstOrFail();
+
+            GenerateSisJob::dispatch($generation->id);
+
+            return redirect()
+                ->route('residents.sis.show', $resident)
+                ->with('success', 'SIS angelegt. KI-Ausformulierung läuft – das dauert einen Moment.');
+        }
 
         return redirect()
             ->route('residents.sis.show', $resident)
-            ->with('success', 'SIS angelegt.');
+            ->with('success', 'SIS angelegt. Hinweis: '.($aiStatus['reason'] ?? 'KI-Ausformulierung gerade nicht verfügbar.'));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function generationSnapshot(Sis $sis): array
+    {
+        return [
+            'opening_question' => $sis->opening_question,
+            'topics' => $sis->topicEntries->map(fn(SisTopicEntry $t): array => [
+                'topic_number' => $t->topic_number,
+                'content' => $t->content,
+            ])->all(),
+        ];
     }
 
     public function edit(Request $request, Resident $resident): Response

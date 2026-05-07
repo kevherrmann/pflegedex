@@ -65,6 +65,7 @@ it('allows PDL users to create residents in their accessible Wohnbereich', funct
 
     $this->actingAs($pdl)
     ->post('/residents', [
+        'salutation' => 'frau',
         'location_id' => $location->id,
         'first_name' => 'Erika',
         'last_name' => 'Mustermann',

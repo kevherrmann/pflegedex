@@ -40,6 +40,7 @@ it('stores a resident in the authenticated users location', function (): void {
 
     $this->actingAs($user)
     ->post('/residents', [
+        'salutation' => 'frau',
         'first_name' => 'Erika',
         'last_name' => 'Mustermann',
         'birth_date' => '1940-01-01',

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Salutation;
 use App\Support\Concerns\HasUuidV7;
 use Database\Factories\ResidentFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -27,6 +28,7 @@ class Resident extends Model implements Auditable
 
     protected $fillable = [
         'pseudonym',
+        'salutation',
         'location_id',
         'first_name',
         'last_name',
@@ -42,6 +44,7 @@ class Resident extends Model implements Auditable
     protected function casts(): array
     {
         return [
+            'salutation' => Salutation::class,
             'birth_date' => 'date',
             'care_level' => 'integer',
             'active' => 'boolean',
@@ -94,6 +97,16 @@ class Resident extends Model implements Auditable
     protected function fullName(): Attribute
     {
         return Attribute::get(fn (): string => trim($this->first_name.' '.$this->last_name));
+    }
+
+    /**
+     * Formelle Anrede mit Nachnamen, z.B. "Herr Müller" / "Frau Schmidt".
+     *
+     * @return Attribute<string, never>
+     */
+    protected function formalName(): Attribute
+    {
+        return Attribute::get(fn (): string => trim($this->salutation->label().' '.$this->last_name));
     }
 
     /** @return HasOne<Sis, $this> */

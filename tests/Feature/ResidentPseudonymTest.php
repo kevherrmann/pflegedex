@@ -14,6 +14,7 @@ it('vergibt automatisch ein Pseudonym beim Anlegen ueber den Controller', functi
 
     $this->actingAs($pdl)
         ->post('/residents', [
+            'salutation' => 'herr',
             'first_name' => 'Test',
             'last_name' => 'Bewohner',
             'location_id' => $location->id,

@@ -8,11 +8,12 @@ use App\Models\Resident;
 use App\Models\Sis;
 use App\Models\SisGeneration;
 use App\Models\User;
+use App\Services\Ai\AiHealthService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Spatie\Permission\Models\Role;
+use Tests\Support\FakeAiHealthService;
 
 uses(RefreshDatabase::class);
 
@@ -21,40 +22,13 @@ beforeEach(function (): void {
         Role::findOrCreate($role, 'web');
     }
 
-    // Config explizit setzen, weil phpunit.xml OLLAMA_URL/AI_MODEL leer haelt
-    // (defensiver Default fuer alle Tests, die KI nicht brauchen)
     config([
         'ai.ollama.url' => 'http://ollama-test:11434',
         'ai.ollama.model' => 'gemma4:e2b',
-        'ai.ollama.health_cache_ttl' => 0,
     ]);
-
-    // Health-Check-Cache leeren, damit jeder Test frisch startet
-    Cache::forget('ai.ollama.health');
-
-    // Bewusst KEIN Default-Http::fake hier - in Laravel werden mehrfache
-    // Http::fake-Aufrufe gemerged und der erste Match gewinnt (Issue #48596),
-    // d.h. ein Default-Fake liesse sich von Tests nicht zuverlaessig
-    // ueberschreiben. Stattdessen setzt jeder Test, der den Health-Check
-    // braucht, seinen eigenen Fake direkt.
 });
 
-/**
- * Helper: faked /api/tags so, dass der Health-Check "Modell vorhanden" meldet.
- */
-function fakeOllamaHealthy(): void
-{
-    Http::fake([
-        '*/api/tags' => Http::response([
-            'models' => [['name' => config('ai.ollama.model', 'gemma4:e2b')]],
-        ], 200),
-    ]);
-}
-
 it('PDL kann eine Generation starten und der Job wird dispatcht', function (): void {
-    Queue::fake();
-    fakeOllamaHealthy();
-
     $location = Location::factory()->create();
     $resident = Resident::factory()->for($location)->create();
     $sis = Sis::factory()->withTopicsAndRisks()->create([
@@ -80,12 +54,7 @@ it('PDL kann eine Generation starten und der Job wird dispatcht', function (): v
 });
 
 it('blockt den Generation-Start wenn Ollama nicht verfuegbar ist', function (): void {
-    Queue::fake();
-
-    // Health-Check meldet "kein Modell installiert"
-    Http::fake([
-        '*/api/tags' => Http::response(['models' => []], 200),
-    ]);
+    app()->bind(AiHealthService::class, fn() => FakeAiHealthService::unavailable());
 
     $location = Location::factory()->create();
     $resident = Resident::factory()->for($location)->create();
@@ -108,8 +77,6 @@ it('blockt den Generation-Start wenn Ollama nicht verfuegbar ist', function (): 
 });
 
 it('Pflegekraft darf keine Generation starten', function (): void {
-    fakeOllamaHealthy();
-
     $location = Location::factory()->create();
     $resident = Resident::factory()->for($location)->create();
     Sis::factory()->withTopicsAndRisks()->create([
@@ -129,8 +96,6 @@ it('Pflegekraft darf keine Generation starten', function (): void {
 });
 
 it('Pflegekraft darf den Status pollen (read-only)', function (): void {
-    fakeOllamaHealthy();
-
     $location = Location::factory()->create();
     $resident = Resident::factory()->for($location)->create();
     $sis = Sis::factory()->withTopicsAndRisks()->create([
@@ -205,7 +170,6 @@ it('GenerateSisJob ueberschreibt SIS-Felder mit Ollama-Antwort', function (): vo
         ->and($generation->progress)->toBe(7)
         ->and($generation->finished_at)->not->toBeNull();
 
-    // Sis-Version mit reason='ai_generated' wurde geschrieben
     expect($sis->versions()->where('snapshot_reason', 'ai_generated')->exists())->toBeTrue();
 });
 
@@ -246,8 +210,6 @@ it('GenerateSisJob setzt status=failed bei Ollama-Fehler', function (): void {
 });
 
 it('Show-Page liefert latestGeneration wenn vorhanden', function (): void {
-    fakeOllamaHealthy();
-
     $location = Location::factory()->create();
     $resident = Resident::factory()->for($location)->create();
     $sis = Sis::factory()->withTopicsAndRisks()->create([

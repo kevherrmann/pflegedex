@@ -7,8 +7,10 @@ import { Head, Link, useForm } from '@inertiajs/react';
 import { FormEventHandler } from 'react';
 
 type Location = { id: string; name: string };
+type SalutationOption = { value: string; label: string };
 type Resident = {
     id: string;
+    salutation: string;
     locationId: string;
     firstName: string;
     lastName: string;
@@ -18,11 +20,12 @@ type Resident = {
     careLevel: number | null;
 };
 
-type ResidentsEditProps = { resident: Resident; locations: Location[] };
+type ResidentsEditProps = { resident: Resident; locations: Location[]; salutations: SalutationOption[] };
 
-export default function Edit({ resident, locations }: ResidentsEditProps) {
+export default function Edit({ resident, locations, salutations }: ResidentsEditProps) {
     const { data, setData, patch, processing, errors } = useForm({
         location_id: String(resident.locationId),
+        salutation: resident.salutation,
         first_name: resident.firstName,
         last_name: resident.lastName,
         birth_date: resident.birthDate ?? '',
@@ -51,6 +54,25 @@ export default function Edit({ resident, locations }: ResidentsEditProps) {
                                     ))}
                                 </select>
                                 <InputError message={errors.location_id} className="mt-2" />
+                            </div>
+                            <div>
+                                <InputLabel htmlFor="salutation" value="Anrede" />
+                                <select
+                                    id="salutation"
+                                    name="salutation"
+                                    value={data.salutation}
+                                    onChange={(e) => setData('salutation', e.target.value)}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]"
+                                    required
+                                >
+                                    <option value="">Bitte auswählen …</option>
+                                    {salutations.map((option) => (
+                                        <option key={option.value} value={option.value}>
+                                            {option.label}
+                                        </option>
+                                    ))}
+                                </select>
+                                <InputError message={errors.salutation} className="mt-2" />
                             </div>
                             <div>
                                 <InputLabel htmlFor="first_name" value="Vorname" />

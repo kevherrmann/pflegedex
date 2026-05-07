@@ -44,6 +44,7 @@ it('allows PDL users to manage residents after a Wohnbereich exists', function (
 
     $this->actingAs($pdl)
         ->post('/residents', [
+            'salutation' => 'frau',
             'first_name' => 'Erika',
             'last_name' => 'Musterfrau',
             'location_id' => $location->id,

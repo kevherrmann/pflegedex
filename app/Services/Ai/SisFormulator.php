@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Ai;
 
+use App\Enums\Salutation;
 use App\Enums\SisTopic;
 use App\Models\Sis;
 
@@ -12,7 +13,11 @@ use App\Models\Sis;
  *
  * Sequenziell pro Feld: Eingangsfrage zuerst, dann TF1..TF6 in Reihenfolge.
  * Jeder Schritt ruft OllamaClient::generate() einzeln auf - kleinere Prompts
- * = bessere Output-Qualitaet bei kleinen Modellen wie gemma:2b.
+ * = bessere Output-Qualitaet bei kleinen Modellen wie gemma4:e2b.
+ *
+ * Anrede (herr/frau) wird in den Prompt eingebaut, damit das LLM
+ * "der Bewohner" / "die Bewohnerin" konsistent verwendet, statt zu raten
+ * oder neutral "Bewohner/Bewohnerin" zu schreiben.
  *
  * Risiko-Notes werden NICHT umformuliert - die sind bewusst kurz/stichwort-
  * artig (z.B. "Sturzrisiko bei Mobilisation"). Eine Ausformulierung wuerde
@@ -30,14 +35,14 @@ class SisFormulator
      * Liefert null zurueck, wenn $input leer/whitespace - dann gibt es
      * nichts zu formulieren.
      */
-    public function formulateField(string $fieldLabel, ?string $input): ?string
+    public function formulateField(string $fieldLabel, ?string $input, Salutation $salutation): ?string
     {
         $input = trim((string) $input);
         if ($input === '') {
             return null;
         }
 
-        $system = $this->systemPrompt();
+        $system = $this->systemPrompt($salutation);
         $prompt = $this->fieldPrompt($fieldLabel, $input);
 
         return $this->ollama->generate($prompt, $system);
@@ -72,9 +77,13 @@ class SisFormulator
         return $fields;
     }
 
-    private function systemPrompt(): string
+    private function systemPrompt(Salutation $salutation): string
     {
-        return <<<'PROMPT'
+        $term = $salutation->residentTerm();          // "der Bewohner" / "die Bewohnerin"
+        $termCapitalized = ucfirst($term);            // "Der Bewohner" / "Die Bewohnerin"
+        $pronoun = $salutation->pronoun();            // "er" / "sie"
+
+        return <<<PROMPT
             Du bist eine erfahrene Pflegefachkraft (PDL) und schreibst Eintraege fuer eine
             Strukturierte Informationssammlung (SIS) nach Beikirch/Roes-Konzept.
             Aufgabe: Du bekommst Stichpunkte einer Pflegekraft und formulierst daraus
@@ -85,7 +94,10 @@ class SisFormulator
             - Hoechstens 3-4 Saetze pro Themenfeld.
             - Keine Erfindungen. Was nicht in den Stichpunkten steht, wird auch nicht erwaehnt.
             - Keine Diagnosen, keine medizinischen Bewertungen.
-            - Personenbezeichnung: "Die Bewohnerin"/"Der Bewohner" - keine Namen, keine Pseudonyme.
+            - Personenbezeichnung: AUSSCHLIESSLICH "{$termCapitalized}" verwenden.
+              NIEMALS "Der Bewohner / Die Bewohnerin", "Bewohner/in" oder "Bewohner:in" schreiben.
+              Pronomen: "{$pronoun}" verwenden.
+              Keine Namen, keine Pseudonyme.
             - Keine Floskeln wie "Es ist wichtig", "selbstverstaendlich".
             - Keine Anrede, keine Erklaerung. Nur den fertigen Text ausgeben.
             PROMPT;

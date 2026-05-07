@@ -18,12 +18,16 @@ class ResidentFactory extends Factory
      */
     public function definition(): array
     {
+        $salutation = fake()->randomElement(['herr', 'frau']);
+        $firstName = $salutation === 'herr' ? fake()->firstNameMale() : fake()->firstNameFemale();
+
         return [
             // Eindeutiges Pseudonym fuer Tests; der Generator macht einen
             // DB-Lookup pro Insert, fuer Tests reicht eine Zufallsziffernfolge.
             'pseudonym' => 'P-'.now()->format('Y').'-'.fake()->unique()->numerify('####'),
+            'salutation' => $salutation,
             'location_id' => Location::factory(),
-            'first_name' => fake()->firstName(),
+            'first_name' => $firstName,
             'last_name' => fake()->lastName(),
             'birth_date' => fake()->dateTimeBetween('-100 years', '-60 years')->format('Y-m-d'),
             'room_number' => fake()->bothify('##?'),

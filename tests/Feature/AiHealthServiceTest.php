@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Services\Ai\AiHealthService;
+use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
@@ -13,6 +14,11 @@ beforeEach(function (): void {
         'ai.ollama.model' => 'gemma4:e2b',
         'ai.ollama.health_cache_ttl' => 0,
     ]);
+
+    // Globalen Test-Bind aus TestCase aushebeln, damit hier die echte
+    // Implementation getestet wird.
+    app()->forgetInstance(AiHealthService::class);
+    app()->bind(AiHealthService::class, fn() => new AiHealthService(app(HttpFactory::class)));
 });
 
 it('meldet available+modelPresent wenn Ollama das Modell hat', function (): void {

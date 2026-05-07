@@ -87,6 +87,7 @@ it('does not allow creating residents in an unassigned location', function () {
 
     $this->actingAs($user)
         ->post('/residents', [
+            'salutation' => 'frau',
             'first_name' => 'Clara',
             'last_name' => 'Chaos',
             'location_id' => $unassigned->id,
@@ -126,6 +127,7 @@ it('stores a new resident in the selected accessible location', function () {
 
     $this->actingAs($user)
         ->post('/residents', [
+            'salutation' => 'herr',
             'first_name' => 'Bernd',
             'last_name' => 'Bereich',
             'location_id' => $secondary->id,

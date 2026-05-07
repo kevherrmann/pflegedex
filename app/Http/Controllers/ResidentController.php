@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\Salutation;
 use App\Models\Location;
 use App\Models\Resident;
 use Illuminate\Http\RedirectResponse;
@@ -33,7 +34,9 @@ class ResidentController extends Controller
                 ->get()
                 ->map(fn (Resident $resident): array => [
                     'id' => $resident->id,
+                    'salutation' => $resident->salutation->value,
                     'fullName' => $resident->full_name,
+                    'formalName' => $resident->formal_name,
                     'roomNumber' => $resident->room_number,
                     'careLevel' => $resident->care_level,
                     'locationName' => $resident->location?->name,
@@ -58,6 +61,7 @@ class ResidentController extends Controller
         return Inertia::render('Residents/Create', [
             'location' => $location ? $this->locationPayload($location) : null,
             'locations' => $locations->map(fn (Location $location): array => $this->locationPayload($location))->values(),
+            'salutations' => Salutation::options(),
         ]);
     }
 
@@ -75,6 +79,7 @@ class ResidentController extends Controller
 
         $validated = $request->validate([
             'location_id' => [$locations->count() > 1 ? 'required' : 'nullable', 'string', 'uuid'],
+                                        'salutation' => ['required', Rule::enum(Salutation::class)],
                                         'first_name' => ['required', 'string', 'max:255'],
                                         'last_name' => ['required', 'string', 'max:255'],
                                         'birth_date' => ['nullable', 'date', 'before_or_equal:today'],
@@ -112,6 +117,7 @@ class ResidentController extends Controller
         return Inertia::render('Residents/Edit', [
             'resident' => [
                 'id' => $resident->id,
+                'salutation' => $resident->salutation->value,
                 'locationId' => $resident->location_id,
                 'firstName' => $resident->first_name,
                 'lastName' => $resident->last_name,
@@ -121,6 +127,7 @@ class ResidentController extends Controller
                 'careLevel' => $resident->care_level,
             ],
             'locations' => $locations->map(fn (Location $location): array => $this->locationPayload($location))->values(),
+            'salutations' => Salutation::options(),
         ]);
     }
 
@@ -132,6 +139,7 @@ class ResidentController extends Controller
 
         $validated = $request->validate([
             'location_id' => [$locations->count() > 1 ? 'required' : 'nullable', 'string', 'uuid'],
+            'salutation' => ['required', Rule::enum(Salutation::class)],
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
             'birth_date' => ['nullable', 'date', 'before_or_equal:today'],

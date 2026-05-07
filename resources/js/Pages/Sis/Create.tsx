@@ -1,5 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm, usePage } from '@inertiajs/react';
 import { FormEventHandler } from 'react';
 
 type Resident = {
@@ -30,6 +30,9 @@ type FormShape = {
 };
 
 export default function Create({ resident, topics, risks }: Props) {
+    const aiStatus = (usePage().props as { ai?: { available: boolean; modelPresent: boolean; reason: string | null } }).ai;
+    const aiAvailable = (aiStatus?.available ?? false) && (aiStatus?.modelPresent ?? false);
+
     const { data, setData, post, processing, errors } = useForm<FormShape>({
         opening_question: '',
         topics: topics.map((t) => ({ topic_number: t.number, content: '' })),
@@ -72,10 +75,23 @@ export default function Create({ resident, topics, risks }: Props) {
                     <form onSubmit={submit} className="space-y-6">
                         <div className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-[#E5E7EB]">
                             <p className="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-[#9B1C3B]">{resident.pseudonym}</p>
-                            <p className="mb-6 text-sm text-gray-600">
+                            <p className="mb-4 text-sm text-gray-600">
                                 Erste fachliche Einschätzung der für die Pflege und Betreuung relevanten Risiken und Phänomene.
                                 Fertigstellung innerhalb von 14 Tagen nach Aufnahme.
                             </p>
+                            {aiAvailable ? (
+                                <p className="mb-6 rounded-md bg-[#FAE7EC]/40 px-3 py-2 text-xs text-gray-700">
+                                    💡 <strong>Stichpunkte reichen.</strong> Beim Anlegen formuliert die KI
+                                    automatisch fachlichen Fließtext aus Ihren Notizen. Sie können das Ergebnis
+                                    anschließend nochmal überarbeiten.
+                                </p>
+                            ) : (
+                                <p className="mb-6 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                                    <strong>Hinweis:</strong> Die KI-Ausformulierung ist gerade nicht verfügbar
+                                    {aiStatus?.reason ? ` (${aiStatus.reason})` : ''}. Die SIS wird so gespeichert,
+                                    wie Sie sie eingeben — Sie können sie später nochmal mit KI ausformulieren lassen.
+                                </p>
+                            )}
 
                             <label className="block text-sm font-medium text-gray-700" htmlFor="opening_question">
                                 Was bewegt Sie im Augenblick?
@@ -154,7 +170,7 @@ export default function Create({ resident, topics, risks }: Props) {
                                 disabled={processing}
                                 className="rounded-md bg-[#9B1C3B] px-6 py-2 text-sm font-semibold uppercase tracking-widest text-white hover:bg-[#7A1430] disabled:opacity-50"
                             >
-                                SIS anlegen
+                                SIS anlegen{aiAvailable ? ' & mit KI ausformulieren' : ''}
                             </button>
                         </div>
                     </form>

@@ -103,6 +103,7 @@ it('lets PDL users edit residents and move them to another accessible Wohnbereic
 
     $this->actingAs($pdl)
         ->patch('/residents/'.$resident->id, [
+            'salutation' => 'frau',
             'location_id' => $second->id,
             'first_name' => 'Erika',
             'last_name' => 'Neu',

@@ -11,14 +11,21 @@ type Location = {
     name: string;
 };
 
+type SalutationOption = {
+    value: string;
+    label: string;
+};
+
 type ResidentCreateProps = {
     location: Location | null;
     locations: Location[];
+    salutations: SalutationOption[];
 };
 
-export default function Create({ location, locations }: ResidentCreateProps) {
+export default function Create({ location, locations, salutations }: ResidentCreateProps) {
     const { data, setData, post, processing, errors } = useForm({
         location_id: location?.id ? String(location.id) : '',
+        salutation: '',
         first_name: '',
         last_name: '',
         birth_date: '',
@@ -98,6 +105,26 @@ export default function Create({ location, locations }: ResidentCreateProps) {
                                 />
                             </div>
                         )}
+
+                        <div>
+                            <InputLabel htmlFor="salutation" value="Anrede" />
+                            <select
+                                id="salutation"
+                                name="salutation"
+                                value={data.salutation}
+                                onChange={(event) => setData('salutation', event.target.value)}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]"
+                                required
+                            >
+                                <option value="">Bitte auswählen …</option>
+                                {salutations.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                        {option.label}
+                                    </option>
+                                ))}
+                            </select>
+                            <InputError message={errors.salutation} className="mt-2" />
+                        </div>
 
                         <div className="grid gap-6 sm:grid-cols-2">
                             <div>
