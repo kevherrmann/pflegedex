@@ -91,7 +91,11 @@ class SisFormulator
 
             Regeln:
             - Sprache: Deutsch, formell, neutraler Pflegestil.
-            - Hoechstens 3-4 Saetze pro Themenfeld.
+            - Schreibe pro Themenfeld einen fachlich ausreichenden Fliesstext.
+            - Zielumfang: 5-8 fachliche Saetze, wenn die Stichpunkte genug Inhalt liefern.
+            - Der Text soll Ressourcen, Einschraenkungen, Ursachen, Hilfebedarf, Vorlieben und Risiken benennen, sofern diese aus den Stichpunkten hervorgehen.
+            - Bei Risiken benennen: welches Risiko besteht, wodurch es entsteht und welche Folgen es fuer den Pflegealltag hat.
+            - Nichts erfinden. Wenn Stichpunkte knapp sind, knapp bleiben und keine Details hinzudichten.
             - Keine Erfindungen. Was nicht in den Stichpunkten steht, wird auch nicht erwaehnt.
             - Keine Diagnosen, keine medizinischen Bewertungen.
             - Personenbezeichnung: AUSSCHLIESSLICH "{$termCapitalized}" verwenden.
@@ -106,7 +110,7 @@ class SisFormulator
     private function fieldPrompt(string $fieldLabel, string $input): string
     {
         return sprintf(
-            "Themenfeld: %s\n\nStichpunkte der Pflegefachkraft:\n%s\n\nFormuliere daraus den fertigen SIS-Text:",
+            "Themenfeld: %s\n\nStichpunkte der Pflegefachkraft:\n%s\n\nFormuliere daraus den fertigen SIS-Text.\n\nAchte darauf:\n- Ressourcen und vorhandene Faehigkeiten benennen.\n- Einschraenkungen und Ursachen beschreiben.\n- Individuelle Wuensche, Gewohnheiten und Vorlieben aufnehmen.\n- Risiken nur benennen, wenn sie aus den Stichpunkten ableitbar sind.\n- Keine Massnahmenplanung schreiben, sondern eine fachliche Einschaetzung fuer die SIS.",
             $fieldLabel,
             $input,
         );

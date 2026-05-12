@@ -136,7 +136,15 @@ class CarePlanFormulator
 
             Regeln:
             - Sprache: Deutsch, sachlich, fachlicher Pflegestil.
-            - 2-5 Saetze. Kurze, konkrete, handlungsleitende Massnahmen.
+            - Schreibe handlungsleitend und ausreichend konkret.
+            - Zielumfang pro relevantem Themenblock: 4-8 konkrete Massnahmenpunkte oder kurze Absaetze.
+            - Der Text muss fuer eine fremde Pflegekraft verstaendlich sein.
+            - Beschreibe nur personelle Hilfen, Anleitung, Erinnerung, Motivation, Kontrolle, Beobachtung oder Uebernahme durch Pflege/Betreuung.
+            - Selbststaendige Handlungen des Bewohners nicht als Massnahme planen.
+            - Keine Selbstverstaendlichkeiten aus dem Immersobeweis wiederholen.
+            - Risiken nicht erneut als Begruendung ausformulieren, sondern daraus konkrete Massnahmen ableiten.
+            - Wenn Zeitangaben noetig sind, als ca.-Zeiten oder situativ formulieren.
+            - Abweichungen und Auffaelligkeiten gehoeren in den Pflegebericht.
             - Bezug zum SIS-Inhalt MUSS erkennbar sein. Nichts erfinden.
             - Keine Diagnosen, keine medizinischen Bewertungen.
             - Personenbezeichnung: AUSSCHLIESSLICH "{$termCapitalized}".
@@ -176,7 +184,7 @@ class CarePlanFormulator
         }
 
         return sprintf(
-            "Massnahmenplan-Themenblock: %s\n\nSIS-Inhalt des Bewohners:\n%s\n\nFormuliere fuer den Themenblock \"%s\" konkrete, handlungsleitende Pflegemassnahmen, die aus dem SIS-Inhalt ableitbar sind. Falls dieser Themenblock fuer den Bewohner nicht relevant ist, antworte ausschliesslich mit \"NICHT_RELEVANT\".",
+            "Massnahmenplan-Themenblock: %s\n\nSIS-Inhalt des Bewohners:\n%s\n\nFormuliere fuer den Themenblock \"%s\" einen professionellen, handlungsleitenden Massnahmenplan.\n\nStruktur:\n- Schreibe nur Massnahmen, die aus der SIS ableitbar sind.\n- Beschreibe konkret, was Pflege/Betreuung tun soll.\n- Benenne Hilfsmittel, Unterstuetzungsform, Situationen, ca.-Zeitpunkte oder Ausloeser, sofern ableitbar.\n- Benenne Beobachtungsauftraege und wann Abweichungen im Pflegebericht zu dokumentieren sind.\n- Keine Diagnosen erfinden.\n- Keine allgemeinen Selbstverstaendlichkeiten wie freundliche Begruessung, Intimsphaere achten, Zimmer lueften, Bett machen etc., ausser es gibt einen individuellen pflegerischen Grund.\n\nWenn fuer diesen Themenblock wirklich keine konkrete Massnahme ableitbar ist, antworte ausschliesslich mit \"NICHT_RELEVANT\".",
             $fieldLabel,
             $sisBlock,
             $fieldLabel,
