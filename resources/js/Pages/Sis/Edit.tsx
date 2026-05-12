@@ -37,7 +37,6 @@ type Props = {
 
 type FormShape = {
     opening_question: string;
-    completed_at: string;
     topics: Array<{ topic_number: number; content: string }>;
     risks: Array<{
         risk_kind: string;
@@ -56,7 +55,6 @@ export default function Edit({ resident, sis, topics, risks }: Props) {
 
     const { data, setData, patch, processing, errors } = useForm<FormShape>({
         opening_question: sis.openingQuestion ?? '',
-        completed_at: sis.completedAt ?? '',
         topics: topics.map((t) => ({
             topic_number: t.number,
             content: topicByNumber.get(t.number)?.content ?? '',
@@ -125,18 +123,10 @@ export default function Edit({ resident, sis, topics, risks }: Props) {
                             />
                             {errors.opening_question && <p className="mt-1 text-xs text-red-600">{errors.opening_question}</p>}
 
-                            <div className="mt-6">
-                                <label className="block text-sm font-medium text-gray-700" htmlFor="completed_at">
-                                    Fertiggestellt am (max. 14 Tage nach Aufnahme)
-                                </label>
-                                <input
-                                    id="completed_at"
-                                    type="date"
-                                    value={data.completed_at}
-                                    onChange={(e) => setData('completed_at', e.target.value)}
-                                    className="mt-1 block rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]"
-                                />
-                                {errors.completed_at && <p className="mt-1 text-xs text-red-600">{errors.completed_at}</p>}
+                            <div className="mt-6 rounded-md bg-gray-50 p-3 text-xs text-gray-600">
+                                {sis.completedAt
+                                    ? <>Fertiggestellt am <strong>{sis.completedAt}</strong>. Inhalte bleiben weiter editierbar.</>
+                                    : <>Noch nicht fertiggestellt. Über die Show-Seite per Button „Fertigstellen" abschließen.</>}
                             </div>
                         </div>
 

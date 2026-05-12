@@ -5,8 +5,15 @@ use App\Models\Resident;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
+use Spatie\Permission\Models\Role;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function (): void {
+    foreach (['Admin', 'PDL', 'Pflegekraft', 'Putzkraft', 'Hausmeister'] as $role) {
+        Role::findOrCreate($role, 'web');
+    }
+});
 
 it('assigns residents to exactly one location with core master data', function () {
     $location = Location::factory()->create(['name' => 'Wohnbereich Nord']);
@@ -40,17 +47,19 @@ it('scopes active residents to a location', function () {
 it('shows location-aware resident counts on the dashboard', function () {
     $location = Location::factory()->create(['name' => 'Wohnbereich Nord']);
     $user = User::factory()->for($location)->create();
+    $user->assignRole('PDL');
+    $user->locations()->syncWithoutDetaching([$location->id]);
 
     Resident::factory()->count(2)->for($location)->create(['active' => true]);
     Resident::factory()->for($location)->create(['active' => false]);
 
+    // Dashboard nutzt jetzt nicht mehr stats.*, sondern listet im
+    // recent-Block die zuletzt aufgenommenen aktiven Bewohner.
     $this->actingAs($user)
         ->get('/dashboard')
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('Dashboard')
-            ->where('stats.locationName', 'Wohnbereich Nord')
-            ->where('stats.residentsActive', 2)
-            ->where('stats.rolesPrepared', 3)
+            ->has('recent', 2) // 2 aktive, 1 inaktive Bewohner -> 2 im recent-Block
         );
 });

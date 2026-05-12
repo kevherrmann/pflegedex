@@ -115,6 +115,12 @@ class Resident extends Model implements Auditable
         return $this->hasOne(Sis::class);
     }
 
+    /** @return HasOne<CarePlan, $this> */
+    public function carePlan(): HasOne
+    {
+        return $this->hasOne(CarePlan::class);
+    }
+
     /**
      * @param  Builder<Resident>  $query
      * @return Builder<Resident>

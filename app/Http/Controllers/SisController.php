@@ -44,6 +44,7 @@ class SisController extends Controller
             'resident' => $this->residentPayload($resident),
             'sis' => $sis ? $this->sisPayload($sis) : null,
             'canEdit' => $request->user()?->hasRole('PDL') ?? false,
+            'carePlanExists' => $resident->carePlan()->exists(),
             'topics' => $this->topicCatalog(),
             'risks' => $this->riskCatalog(),
             'latestGeneration' => $latestGeneration ? [
@@ -173,7 +174,7 @@ class SisController extends Controller
             ->with(['topicEntries', 'risks'])
             ->firstOrFail();
 
-        $validated = $this->validatePayload($request, completedAtAllowed: true);
+        $validated = $this->validatePayload($request);
 
         DB::transaction(function () use ($sis, $request, $validated): void {
             $user = $request->user();
@@ -182,17 +183,8 @@ class SisController extends Controller
 
             $sis->forceFill([
                 'opening_question' => $validated['opening_question'] ?? null,
-                'completed_at' => $validated['completed_at'] ?? $sis->completed_at,
                 'updated_by' => $user->id,
             ])->save();
-
-            // Wenn completed_at gerade gesetzt wird und noch keine Evaluation
-            // geplant war: 8 Wochen ab Fertigstellung als ersten Termin setzen.
-            if ($sis->completed_at !== null && $sis->next_evaluation_due === null) {
-                $sis->forceFill([
-                    'next_evaluation_due' => $sis->completed_at->copy()->addWeeks(8),
-                ])->save();
-            }
 
             $this->syncTopics($sis, $validated['topics'] ?? []);
             $this->syncRisks($sis, $validated['risks'] ?? []);
@@ -201,6 +193,35 @@ class SisController extends Controller
         return redirect()
             ->route('residents.sis.show', $resident)
             ->with('success', 'SIS aktualisiert.');
+    }
+
+    public function complete(Request $request, Resident $resident): RedirectResponse
+    {
+        $this->authorizeWrite($request, $resident);
+
+        $sis = $resident->sis()->firstOrFail();
+
+        if ($sis->completed_at !== null) {
+            return back()->withErrors([
+                'completed_at' => 'SIS ist bereits fertiggestellt.',
+            ]);
+        }
+
+        DB::transaction(function () use ($sis, $request): void {
+            $user = $request->user();
+
+            $sis->forceFill([
+                'completed_at' => today(),
+                'next_evaluation_due' => today()->addWeeks(8),
+                'updated_by' => $user->id,
+            ])->save();
+
+            $sis->appendVersion('completed', $user);
+        });
+
+        return redirect()
+            ->route('residents.sis.show', $resident)
+            ->with('success', 'SIS fertiggestellt. Nächste Evaluation in 8 Wochen.');
     }
 
     public function evaluate(Request $request, Resident $resident): RedirectResponse
@@ -236,9 +257,9 @@ class SisController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function validatePayload(Request $request, bool $completedAtAllowed = false): array
+    private function validatePayload(Request $request): array
     {
-        $rules = [
+        return $request->validate([
             'opening_question' => ['nullable', 'string', 'max:5000'],
             'topics' => ['array'],
             'topics.*.topic_number' => ['required', 'integer', Rule::in(SisTopic::numbers())],
@@ -248,13 +269,7 @@ class SisController extends Controller
             'risks.*.is_at_risk' => ['required', 'boolean'],
             'risks.*.needs_further_assessment' => ['required', 'boolean'],
             'risks.*.notes' => ['nullable', 'string', 'max:5000'],
-        ];
-
-        if ($completedAtAllowed) {
-            $rules['completed_at'] = ['nullable', 'date', 'before_or_equal:today'];
-        }
-
-        return $request->validate($rules);
+        ]);
     }
 
     // ---- Persistence Helpers --------------------------------------------

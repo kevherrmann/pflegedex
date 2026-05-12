@@ -170,6 +170,12 @@ export default function Index({
                                                         >
                                                             SIS
                                                         </Link>
+                                                        <Link
+                                                            href={route('residents.care-plan.show', resident.id)}
+                                                            className="text-sm font-semibold text-[#9B1C3B] hover:underline"
+                                                        >
+                                                            MP
+                                                        </Link>
                                                         {canManageResidents && (
                                                             <Link
                                                                 href={route('residents.edit', resident.id)}

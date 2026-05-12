@@ -109,7 +109,7 @@ it('schreibt einen Versions-Snapshot beim Update mit alten Werten', function ():
     expect($sis->fresh()->opening_question)->toBe('Neuer Text');
 });
 
-it('setzt next_evaluation_due automatisch wenn completed_at gesetzt wird', function (): void {
+it('setzt completed_at und next_evaluation_due NICHT mehr ueber update (nur ueber complete-Button)', function (): void {
     $location = Location::factory()->create();
     $resident = Resident::factory()->for($location)->create();
     $sis = Sis::factory()->withTopicsAndRisks()->create([
@@ -123,18 +123,21 @@ it('setzt next_evaluation_due automatisch wenn completed_at gesetzt wird', funct
     $pdl->assignRole('PDL');
     $pdl->locations()->syncWithoutDetaching([$location->id]);
 
+    // completed_at im Form-Payload wird ignoriert (kein Validation-Error,
+    // weil das Feld nicht mehr Teil der Validation ist)
     $this->actingAs($pdl)
         ->patch(route('residents.sis.update', $resident), [
             'completed_at' => '2026-05-04',
-            'opening_question' => 'Fertiggestellt',
+            'opening_question' => 'Update-Versuch',
             'topics' => [],
             'risks' => [],
         ])
         ->assertRedirect();
 
     $sis->refresh();
-    expect($sis->completed_at?->toDateString())->toBe('2026-05-04')
-        ->and($sis->next_evaluation_due?->toDateString())->toBe('2026-06-29');
+    expect($sis->completed_at)->toBeNull()
+        ->and($sis->next_evaluation_due)->toBeNull()
+        ->and($sis->opening_question)->toBe('Update-Versuch');
 });
 
 it('setzt bei Evaluation evaluated_at und next_evaluation_due', function (): void {

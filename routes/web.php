@@ -1,12 +1,17 @@
 <?php
 
 use App\Http\Controllers\AuditController;
+use App\Http\Controllers\CarePlanController;
+use App\Http\Controllers\CarePlanGenerationController;
+use App\Http\Controllers\CarePlanPdfController;
 use App\Http\Controllers\CareReportController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ResidentController;
 use App\Http\Controllers\SisController;
 use App\Http\Controllers\SisGenerationController;
+use App\Http\Controllers\SisPdfController;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\UserController;
 use App\Models\Resident;
@@ -25,26 +30,9 @@ Route::get('/', function () {
     ]);
 });
 
-Route::get('/dashboard', function () {
-    $user = request()->user();
-    $locations = $user?->accessibleLocations() ?? collect();
-    $locationName = match ($locations->count()) {
-        0 => 'kein Wohnbereich zugeordnet',
-        1 => $locations->first()->name,
-        default => $locations->count().' Wohnbereiche',
-    };
-
-    return Inertia::render('Dashboard', [
-        'stats' => [
-            'locationName' => $locationName,
-            'residentsActive' => $locations->isNotEmpty()
-                ? Resident::query()->whereIn('location_id', $locations->pluck('id'))->active()->count()
-                : 0,
-            'rolesPrepared' => 3,
-            'locationsPrepared' => $locations->count(),
-        ],
-    ]);
-})->middleware(['auth', 'verified'])->name('dashboard');
+Route::get('/dashboard', [DashboardController::class, 'show'])
+    ->middleware(['auth', 'verified'])
+    ->name('dashboard');
 
 Route::middleware('auth')->group(function () {
     Route::get('/care-reports', [CareReportController::class, 'index'])->name('care-reports.index');
@@ -78,7 +66,22 @@ Route::middleware('auth')->group(function () {
     Route::post('/residents/{resident}/sis', [SisController::class, 'store'])->name('residents.sis.store');
     Route::get('/residents/{resident}/sis/edit', [SisController::class, 'edit'])->name('residents.sis.edit');
     Route::patch('/residents/{resident}/sis', [SisController::class, 'update'])->name('residents.sis.update');
+    Route::post('/residents/{resident}/sis/complete', [SisController::class, 'complete'])->name('residents.sis.complete');
     Route::post('/residents/{resident}/sis/evaluate', [SisController::class, 'evaluate'])->name('residents.sis.evaluate');
+    Route::get('/residents/{resident}/sis/pdf', [SisPdfController::class, 'download'])->name('residents.sis.pdf');
+
+    // Massnahmenplan (MP) - 1:1 zu Resident, setzt voraus dass SIS completed_at gesetzt hat
+    Route::get('/residents/{resident}/care-plan', [CarePlanController::class, 'show'])->name('residents.care-plan.show');
+    Route::get('/residents/{resident}/care-plan/create', [CarePlanController::class, 'create'])->name('residents.care-plan.create');
+    Route::post('/residents/{resident}/care-plan', [CarePlanController::class, 'store'])->name('residents.care-plan.store');
+    Route::get('/residents/{resident}/care-plan/edit', [CarePlanController::class, 'edit'])->name('residents.care-plan.edit');
+    Route::patch('/residents/{resident}/care-plan', [CarePlanController::class, 'update'])->name('residents.care-plan.update');
+    Route::post('/residents/{resident}/care-plan/evaluate', [CarePlanController::class, 'evaluate'])->name('residents.care-plan.evaluate');
+
+    // KI-Erstellung des Massnahmenplans aus der SIS
+    Route::post('/residents/{resident}/care-plan/generate', [CarePlanGenerationController::class, 'start'])->name('residents.care-plan.generate.start');
+    Route::get('/residents/{resident}/care-plan/generate/{generation}', [CarePlanGenerationController::class, 'show'])->name('residents.care-plan.generate.show');
+    Route::get('/residents/{resident}/care-plan/pdf', [CarePlanPdfController::class, 'download'])->name('residents.care-plan.pdf');
 
     Route::post('/residents/{resident}/sis/generate', [SisGenerationController::class, 'start'])->name('residents.sis.generate.start');
     Route::get('/residents/{resident}/sis/generate/{generation}', [SisGenerationController::class, 'show'])->name('residents.sis.generate.show');

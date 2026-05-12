@@ -45,12 +45,13 @@ type Props = {
     resident: Resident;
     sis: Sis | null;
     canEdit: boolean;
+    carePlanExists: boolean;
     topics: TopicCatalog[];
     risks: RiskCatalog[];
     latestGeneration: Generation | null;
 };
 
-export default function Show({ resident, sis, canEdit, topics, risks, latestGeneration }: Props) {
+export default function Show({ resident, sis, canEdit, carePlanExists, topics, risks, latestGeneration }: Props) {
     const [generation, setGeneration] = useState<Generation | null>(latestGeneration);
 
     // Polling: solange status='pending' oder 'running' ist, alle 2s den Status holen.
@@ -87,6 +88,28 @@ export default function Show({ resident, sis, canEdit, topics, risks, latestGene
             return;
         }
         router.post(route('residents.sis.evaluate', resident.id));
+    };
+
+    const handleComplete = () => {
+        if (
+            !confirm(
+                'SIS jetzt fachlich fertigstellen? Damit ist sie als abgeschlossen markiert und ein Maßnahmenplan kann erstellt werden. Inhalte bleiben weiter editierbar.',
+            )
+        ) {
+            return;
+        }
+        router.post(route('residents.sis.complete', resident.id));
+    };
+
+    const handleGenerateCarePlan = () => {
+        if (
+            !confirm(
+                'KI-Erstellung des Maßnahmenplans starten? Das dauert je nach Auslastung mehrere Minuten. Du kannst die Seite verlassen und später zurückkehren.',
+            )
+        ) {
+            return;
+        }
+        router.post(route('residents.care-plan.generate.start', resident.id));
     };
 
     const isRunning = generation !== null && (generation.status === 'pending' || generation.status === 'running');
@@ -207,6 +230,38 @@ export default function Show({ resident, sis, canEdit, topics, risks, latestGene
                                             >
                                                 Bearbeiten
                                             </Link>
+                                            <a
+                                                href={route('residents.sis.pdf', resident.id)}
+                                                className="rounded-md border border-[#54595F] px-4 py-2 text-sm font-semibold uppercase tracking-widest text-[#54595F] hover:bg-gray-50"
+                                            >
+                                                PDF
+                                            </a>
+                                            {sis.completedAt === null && (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleComplete}
+                                                    className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold uppercase tracking-widest text-white hover:bg-emerald-800"
+                                                >
+                                                    Fertigstellen
+                                                </button>
+                                            )}
+                                            {sis.completedAt !== null && !carePlanExists && (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleGenerateCarePlan}
+                                                    className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold uppercase tracking-widest text-white hover:bg-emerald-800"
+                                                >
+                                                    MP generieren
+                                                </button>
+                                            )}
+                                            {sis.completedAt !== null && carePlanExists && (
+                                                <Link
+                                                    href={route('residents.care-plan.show', resident.id)}
+                                                    className="rounded-md border border-[#9B1C3B] px-4 py-2 text-sm font-semibold uppercase tracking-widest text-[#9B1C3B] hover:bg-[#FAE7EC]"
+                                                >
+                                                    Maßnahmenplan
+                                                </Link>
+                                            )}
                                             <button
                                                 type="button"
                                                 onClick={handleEvaluate}

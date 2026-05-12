@@ -109,12 +109,13 @@ it('counts active residents from every accessible location on the dashboard', fu
     Resident::factory()->for($secondary)->create(['active' => true]);
     Resident::factory()->for($unassigned)->create(['active' => true]);
 
+    // Dashboard zeigt nur Bewohner aus den dem PDL zugeordneten Wohnbereichen.
+    // Der unassigned-Bewohner darf NICHT auftauchen.
     $this->actingAs($user)
         ->get('/dashboard')
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
-            ->where('stats.locationName', '2 Wohnbereiche')
-            ->where('stats.residentsActive', 2)
+            ->has('recent', 2) // primary + secondary, nicht unassigned
         );
 });
 

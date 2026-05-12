@@ -80,10 +80,33 @@ services:
 
   redis:
     image: redis:7-alpine
+    # Dev-Konfiguration: keine Persistenz, kein RDB-Snapshotting.
+    # - --save "": deaktiviert RDB-Snapshots (Hauptursache fuer den
+    #   MISCONF-RedisException-Fehler bei Disk-/Permission-Problemen)
+    # - --appendonly no: kein AOF-Log
+    # - --stop-writes-on-bgsave-error no: falls doch mal ein Snapshot
+    #   versucht wird, blockiert ein Fehler nicht alle Schreibvorgaenge
+    # - --maxmemory + --maxmemory-policy: harte Obergrenze, alte Keys
+    #   werden bei Speicherdruck verworfen (LRU). Schuetzt vor OOM
+    #   wenn Sessions/Cache lange leben.
+    # tmpfs ersetzt das vorherige redis-data-Volume - nach Container-Stop
+    # ist alles weg, das ist in Dev erwuenscht.
+    command:
+      - redis-server
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+      - --stop-writes-on-bgsave-error
+      - "no"
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - allkeys-lru
     ports:
       - "${REDIS_PORT:-6379}:6379"
-    volumes:
-      - redis-data:/data
+    tmpfs:
+      - /data:rw,noexec,nosuid,size=64m
 
   mailpit:
     image: axllent/mailpit:v1.21
@@ -137,6 +160,5 @@ services:
     restart: "no"
 
 volumes:
-  redis-data:
   mailpit-data:
   ollama-data:
