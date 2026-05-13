@@ -25,10 +25,21 @@ type AbsenceTypeOption = {
     label: string;
 };
 
+type VacationBalance = {
+    annualVacationDays: string;
+    vacationDaysCarriedOver: string;
+    totalVacationDays: string;
+    approvedVacationDays: string;
+    requestedVacationDays: string;
+    remainingVacationDays: string;
+    availableVacationDays: string;
+};
+
 type Props = {
     absenceRequests: AbsenceRequestItem[];
     canRequestAbsence: boolean;
     absenceTypes: AbsenceTypeOption[];
+    vacationBalance: VacationBalance;
 };
 
 function statusClass(status: string): string {
@@ -51,6 +62,7 @@ export default function AbsenceRequestsIndex({
     absenceRequests,
     canRequestAbsence,
     absenceTypes,
+    vacationBalance,
 }: Props) {
     const { data, setData, post, processing, errors, reset } = useForm({
         type: 'vacation',
@@ -81,6 +93,80 @@ export default function AbsenceRequestsIndex({
 
             <div className="py-12">
                 <div className="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
+                    <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
+                        <div className="border-b border-gray-200 p-6">
+                            <h3 className="text-lg font-semibold text-gray-900">
+                                Urlaubskonto
+                            </h3>
+                            <p className="mt-1 text-sm text-gray-600">
+                                Dein aktueller Überblick über genehmigten, beantragten und verfügbaren Urlaub.
+                            </p>
+                        </div>
+
+                        <div className="grid gap-4 p-6 md:grid-cols-2 xl:grid-cols-4">
+                            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                                <p className="text-sm text-gray-500">Jahresurlaub</p>
+                                <p className="mt-1 text-2xl font-semibold text-gray-900">
+                                    {vacationBalance.annualVacationDays}
+                                </p>
+                                <p className="mt-1 text-xs text-gray-500">Tage</p>
+                            </div>
+
+                            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                                <p className="text-sm text-gray-500">Vortrag aus Vorjahr</p>
+                                <p className="mt-1 text-2xl font-semibold text-gray-900">
+                                    {vacationBalance.vacationDaysCarriedOver}
+                                </p>
+                                <p className="mt-1 text-xs text-gray-500">Tage</p>
+                            </div>
+
+                            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                                <p className="text-sm text-gray-500">Gesamturlaub</p>
+                                <p className="mt-1 text-2xl font-semibold text-gray-900">
+                                    {vacationBalance.totalVacationDays}
+                                </p>
+                                <p className="mt-1 text-xs text-gray-500">Tage</p>
+                            </div>
+
+                            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                                <p className="text-sm text-gray-500">Resturlaub</p>
+                                <p className="mt-1 text-2xl font-semibold text-gray-900">
+                                    {vacationBalance.remainingVacationDays}
+                                </p>
+                                <p className="mt-1 text-xs text-gray-500">
+                                    nach genehmigtem Urlaub
+                                </p>
+                            </div>
+
+                            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                                <p className="text-sm text-gray-500">Genehmigt</p>
+                                <p className="mt-1 text-2xl font-semibold text-gray-900">
+                                    {vacationBalance.approvedVacationDays}
+                                </p>
+                                <p className="mt-1 text-xs text-gray-500">Tage</p>
+                            </div>
+
+                            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                                <p className="text-sm text-gray-500">Beantragt</p>
+                                <p className="mt-1 text-2xl font-semibold text-gray-900">
+                                    {vacationBalance.requestedVacationDays}
+                                </p>
+                                <p className="mt-1 text-xs text-gray-500">noch offen</p>
+                            </div>
+
+                            <div className="rounded-2xl border border-[#9B1C3B]/20 bg-[#9B1C3B]/5 p-4 md:col-span-2">
+                                <p className="text-sm text-[#9B1C3B]">
+                                    Verfügbar nach offenen Anträgen
+                                </p>
+                                <p className="mt-1 text-3xl font-semibold text-[#9B1C3B]">
+                                    {vacationBalance.availableVacationDays}
+                                </p>
+                                <p className="mt-1 text-xs text-[#9B1C3B]/80">
+                                    Resturlaub minus noch offene Urlaubsanträge
+                                </p>
+                            </div>
+                        </div>
+                    </div>
                     {canRequestAbsence && (
                         <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
                             <div className="border-b border-gray-200 p-6">

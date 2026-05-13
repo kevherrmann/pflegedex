@@ -13,10 +13,11 @@ use Inertia\Inertia;
 use Inertia\Response;
 use App\Enums\AbsenceRequestStatus;
 use App\Models\User;
+use App\Services\Absences\VacationBalanceService;
 
 class AbsenceRequestController extends Controller
 {
-    public function index(Request $request): Response
+    public function index(Request $request, VacationBalanceService $vacationBalanceService): Response
     {
         $user = $request->user();
 
@@ -42,6 +43,7 @@ class AbsenceRequestController extends Controller
                 ])
                 ->values(),
             'canRequestAbsence' => true,
+            'vacationBalance' => $vacationBalanceService->forUser($user),
             'absenceTypes' => [
                 [
                     'value' => AbsenceRequestType::Vacation->value,

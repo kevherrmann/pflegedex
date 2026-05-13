@@ -215,6 +215,22 @@ it('shows the absence request page to nursing staff', function (): void {
         'note' => 'Sommerurlaub',
     ]);
 
+    $employee->employeeProfile()->update([
+        'annual_vacation_days' => 30,
+        'vacation_days_carried_over' => 2,
+    ]);
+
+    AbsenceRequest::query()->create([
+        'user_id' => $employee->id,
+        'location_id' => $employee->location_id,
+        'type' => AbsenceRequestType::Vacation,
+        'starts_on' => '2026-05-01',
+        'ends_on' => '2026-05-05',
+        'days_count' => 5,
+        'status' => AbsenceRequestStatus::Approved,
+        'requested_by' => $employee->id,
+    ]);
+
     $this->actingAs($employee)
         ->get('/absence-requests')
         ->assertOk()
@@ -234,6 +250,13 @@ it('shows the absence request page to nursing staff', function (): void {
                 ->where('absenceRequests.0.status', AbsenceRequestStatus::Requested->value)
                 ->where('absenceRequests.0.statusLabel', 'Beantragt')
                 ->where('absenceRequests.0.note', 'Sommerurlaub')
+                ->where('vacationBalance.annualVacationDays', '30.00')
+                ->where('vacationBalance.vacationDaysCarriedOver', '2.00')
+                ->where('vacationBalance.totalVacationDays', '32.00')
+                ->where('vacationBalance.approvedVacationDays', '5.00')
+                ->where('vacationBalance.requestedVacationDays', '5.00')
+                ->where('vacationBalance.remainingVacationDays', '27.00')
+                ->where('vacationBalance.availableVacationDays', '22.00')
         );
 });
 
