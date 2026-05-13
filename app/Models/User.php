@@ -16,6 +16,7 @@ use OwenIt\Auditing\Auditable as AuditableTrait;
 use OwenIt\Auditing\Contracts\Auditable;
 use Spatie\Permission\Traits\HasRoles;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class User extends Authenticatable implements Auditable
 {
@@ -132,5 +133,20 @@ class User extends Authenticatable implements Auditable
         $locationId = $location instanceof Location ? $location->id : $location;
 
         return $query->where('location_id', $locationId);
+    }
+
+    public function absenceRequests(): HasMany
+    {
+        return $this->hasMany(AbsenceRequest::class);
+    }
+
+    public function requestedAbsenceRequests(): HasMany
+    {
+        return $this->hasMany(AbsenceRequest::class, 'requested_by');
+    }
+
+    public function decidedAbsenceRequests(): HasMany
+    {
+        return $this->hasMany(AbsenceRequest::class, 'decided_by');
     }
 }
