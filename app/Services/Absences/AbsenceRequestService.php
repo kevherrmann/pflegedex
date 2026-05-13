@@ -5,10 +5,11 @@ namespace App\Services\Absences;
 use App\Enums\AbsenceRequestStatus;
 use App\Enums\AbsenceRequestType;
 use App\Models\AbsenceRequest;
+use App\Models\RosterBlackoutDay;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Validation\ValidationException;
-use Illuminate\Support\Facades\DB;
+
 class AbsenceRequestService
 {
     /**
@@ -31,6 +32,9 @@ class AbsenceRequestService
 
         $startsOn = CarbonImmutable::parse($data['starts_on'])->startOfDay();
         $endsOn = CarbonImmutable::parse($data['ends_on'])->startOfDay();
+        $type = $data['type'] ?? AbsenceRequestType::Vacation;
+        $type = $type instanceof AbsenceRequestType ? $type : AbsenceRequestType::from($type);
+        $locationId = $data['location_id'] ?? $employee->location_id;
 
         if ($endsOn->lt($startsOn)) {
             throw ValidationException::withMessages([
@@ -38,14 +42,15 @@ class AbsenceRequestService
             ]);
         }
 
+        $this->ensureNoRosterBlackoutDay($type, $locationId, $startsOn->toDateString(), $endsOn->toDateString());
         $this->ensureNoOverlappingRequest($employee, $startsOn->toDateString(), $endsOn->toDateString());
 
         $daysCount = $data['days_count'] ?? $startsOn->diffInDays($endsOn) + 1;
 
         return AbsenceRequest::query()->create([
             'user_id' => $employee->id,
-            'location_id' => $data['location_id'] ?? $employee->location_id,
-            'type' => $data['type'] ?? AbsenceRequestType::Vacation,
+            'location_id' => $locationId,
+            'type' => $type,
             'starts_on' => $startsOn->toDateString(),
             'ends_on' => $endsOn->toDateString(),
             'days_count' => $daysCount,
@@ -70,6 +75,37 @@ class AbsenceRequestService
             ]);
         }
     }
+
+private function ensureNoRosterBlackoutDay(
+    AbsenceRequestType $type,
+    ?string $locationId,
+    string $startsOn,
+    string $endsOn,
+): void {
+    if ($locationId === null) {
+        return;
+    }
+
+    $query = RosterBlackoutDay::query()
+        ->forLocation($locationId)
+        ->betweenDates($startsOn, $endsOn);
+
+    if ($type === AbsenceRequestType::Vacation) {
+        $query->blockingVacation();
+    }
+
+    if ($type === AbsenceRequestType::OvertimeCompensation) {
+        $query->blockingOvertimeCompensation();
+    }
+
+    if (! $query->exists()) {
+        return;
+    }
+
+    throw ValidationException::withMessages([
+        'starts_on' => 'Im gewählten Zeitraum liegt eine Urlaubssperre.',
+    ]);
+}
 
     public function approve(AbsenceRequest $absenceRequest, User $decidedBy): AbsenceRequest
     {

@@ -6,6 +6,7 @@ use App\Enums\EmploymentArea;
 use App\Models\AbsenceRequest;
 use App\Models\EmployeeProfile;
 use App\Models\Location;
+use App\Models\RosterBlackoutDay;
 use App\Models\User;
 use App\Services\Absences\AbsenceRequestService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -28,6 +29,23 @@ function createEmployeeWithProfile(EmploymentArea $area): User
     ]);
 
     return $user;
+}
+
+function createRosterBlackoutDayForAbsenceRequestTest(
+    string $locationId,
+    string $date,
+    User $createdBy,
+    bool $blocksVacation = true,
+    bool $blocksOvertimeCompensation = true,
+): RosterBlackoutDay {
+    return RosterBlackoutDay::query()->create([
+        'location_id' => $locationId,
+        'date' => $date,
+        'reason' => 'Urlaubssperre',
+        'blocks_vacation' => $blocksVacation,
+        'blocks_overtime_compensation' => $blocksOvertimeCompensation,
+        'created_by' => $createdBy->id,
+    ]);
 }
 
 it('allows nursing staff to request vacation', function (): void {
@@ -137,4 +155,108 @@ it('stores the location of the employee by default', function (): void {
     ]);
 
     expect($request->location_id)->toBe($employee->location_id);
+});
+
+it('blocks vacation when a matching roster blackout day exists in the requested period', function (): void {
+    $employee = createEmployeeWithProfile(EmploymentArea::Nursing);
+
+    createRosterBlackoutDayForAbsenceRequestTest(
+        locationId: $employee->location_id,
+        date: '2026-12-24',
+        createdBy: $employee,
+        blocksVacation: true,
+        blocksOvertimeCompensation: false,
+    );
+
+    expect(fn () => app(AbsenceRequestService::class)->request($employee, $employee, [
+        'type' => AbsenceRequestType::Vacation,
+        'starts_on' => '2026-12-20',
+        'ends_on' => '2026-12-27',
+    ]))->toThrow(ValidationException::class);
+
+    expect(AbsenceRequest::query()->count())->toBe(0);
+});
+
+it('allows vacation when only non-vacation roster blackout days exist in the requested period', function (): void {
+    $employee = createEmployeeWithProfile(EmploymentArea::Nursing);
+
+    createRosterBlackoutDayForAbsenceRequestTest(
+        locationId: $employee->location_id,
+        date: '2026-12-24',
+        createdBy: $employee,
+        blocksVacation: false,
+        blocksOvertimeCompensation: true,
+    );
+
+    $request = app(AbsenceRequestService::class)->request($employee, $employee, [
+        'type' => AbsenceRequestType::Vacation,
+        'starts_on' => '2026-12-20',
+        'ends_on' => '2026-12-27',
+    ]);
+
+    expect($request)->toBeInstanceOf(AbsenceRequest::class)
+        ->and($request->type)->toBe(AbsenceRequestType::Vacation);
+});
+
+it('blocks overtime compensation when a matching roster blackout day exists in the requested period', function (): void {
+    $employee = createEmployeeWithProfile(EmploymentArea::Nursing);
+
+    createRosterBlackoutDayForAbsenceRequestTest(
+        locationId: $employee->location_id,
+        date: '2027-01-02',
+        createdBy: $employee,
+        blocksVacation: false,
+        blocksOvertimeCompensation: true,
+    );
+
+    expect(fn () => app(AbsenceRequestService::class)->request($employee, $employee, [
+        'type' => AbsenceRequestType::OvertimeCompensation,
+        'starts_on' => '2027-01-01',
+        'ends_on' => '2027-01-03',
+    ]))->toThrow(ValidationException::class);
+
+    expect(AbsenceRequest::query()->count())->toBe(0);
+});
+
+it('allows overtime compensation when only vacation roster blackout days exist in the requested period', function (): void {
+    $employee = createEmployeeWithProfile(EmploymentArea::Nursing);
+
+    createRosterBlackoutDayForAbsenceRequestTest(
+        locationId: $employee->location_id,
+        date: '2027-01-02',
+        createdBy: $employee,
+        blocksVacation: true,
+        blocksOvertimeCompensation: false,
+    );
+
+    $request = app(AbsenceRequestService::class)->request($employee, $employee, [
+        'type' => AbsenceRequestType::OvertimeCompensation,
+        'starts_on' => '2027-01-01',
+        'ends_on' => '2027-01-03',
+    ]);
+
+    expect($request)->toBeInstanceOf(AbsenceRequest::class)
+        ->and($request->type)->toBe(AbsenceRequestType::OvertimeCompensation);
+});
+
+it('does not block absence requests with roster blackout days from other locations', function (): void {
+    $employee = createEmployeeWithProfile(EmploymentArea::Nursing);
+    $otherLocation = Location::factory()->create();
+
+    createRosterBlackoutDayForAbsenceRequestTest(
+        locationId: $otherLocation->id,
+        date: '2027-02-10',
+        createdBy: $employee,
+        blocksVacation: true,
+        blocksOvertimeCompensation: true,
+    );
+
+    $request = app(AbsenceRequestService::class)->request($employee, $employee, [
+        'type' => AbsenceRequestType::Vacation,
+        'starts_on' => '2027-02-09',
+        'ends_on' => '2027-02-11',
+    ]);
+
+    expect($request)->toBeInstanceOf(AbsenceRequest::class)
+        ->and($request->location_id)->toBe($employee->location_id);
 });

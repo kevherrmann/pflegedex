@@ -6,6 +6,7 @@ use App\Enums\EmploymentArea;
 use App\Models\AbsenceRequest;
 use App\Models\EmployeeProfile;
 use App\Models\Location;
+use App\Models\RosterBlackoutDay;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -200,6 +201,34 @@ it('blocks overlapping active absence requests through http', function (): void 
 
     expect(AbsenceRequest::query()->count())->toBe(1);
 });
+
+it('returns a starts_on session error when a matching roster blackout day exists through http', function (): void {
+    $employee = createAbsenceHttpEmployeeWithProfile(EmploymentArea::Nursing);
+
+    RosterBlackoutDay::query()->create([
+        'location_id' => $employee->location_id,
+        'date' => '2027-03-15',
+        'reason' => 'Urlaubssperre',
+        'blocks_vacation' => true,
+        'blocks_overtime_compensation' => false,
+        'created_by' => $employee->id,
+    ]);
+
+    $this->actingAs($employee)
+        ->from('/dashboard')
+        ->post('/absence-requests', [
+            'type' => AbsenceRequestType::Vacation->value,
+            'starts_on' => '2027-03-10',
+            'ends_on' => '2027-03-20',
+        ])
+        ->assertRedirect('/dashboard')
+        ->assertSessionHasErrors([
+            'starts_on' => 'Im gewählten Zeitraum liegt eine Urlaubssperre.',
+        ]);
+
+    expect(AbsenceRequest::query()->count())->toBe(0);
+});
+
 it('shows the absence request page to nursing staff', function (): void {
     $employee = createAbsenceHttpEmployeeWithProfile(EmploymentArea::Nursing);
 
