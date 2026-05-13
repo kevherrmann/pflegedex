@@ -14,6 +14,9 @@ export default function Authenticated({
     const canUseAbsenceRequests =
         auth.permissions.canViewAbsenceRequests ||
         auth.permissions.canManageAbsenceRequests;
+    const absenceRequestsRoute = auth.permissions.canManageAbsenceRequests
+        ? 'absence-requests.manage'
+        : 'absence-requests.index';
     const canManageLocations = auth.permissions.manageLocations;
     const canViewResidents = auth.permissions.viewResidents;
     const canManageCareReports = auth.permissions.manageCareReports;
@@ -77,7 +80,7 @@ export default function Authenticated({
                                 )}
                                 {canUseAbsenceRequests && (
                                     <NavLink
-                                        href={route('absence-requests.index')}
+                                        href={route(absenceRequestsRoute)}
                                         active={route().current('absence-requests.*')}
                                     >
                                         Urlaub
@@ -237,7 +240,7 @@ export default function Authenticated({
                         )}
                         {canUseAbsenceRequests && (
                             <ResponsiveNavLink
-                                href={route('absence-requests.index')}
+                                href={route(absenceRequestsRoute)}
                                 active={route().current('absence-requests.*')}
                             >
                                 Urlaub

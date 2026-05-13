@@ -11,6 +11,8 @@ use App\Models\AbsenceRequest;
 use Illuminate\Http\Response as HttpResponse;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Enums\AbsenceRequestStatus;
+use App\Models\User;
 
 class AbsenceRequestController extends Controller
 {
@@ -76,5 +78,79 @@ class AbsenceRequestController extends Controller
         );
 
         return back()->with('status', 'absence-request-created');
+    }
+
+    public function manage(Request $request): Response
+    {
+        abort_unless(
+            $request->user()?->hasRole('PDL'),
+            HttpResponse::HTTP_FORBIDDEN,
+        );
+
+        return Inertia::render('AbsenceRequests/Manage', [
+            'absenceRequests' => AbsenceRequest::query()
+                ->with(['user.employeeProfile', 'user.location', 'requestedBy', 'decidedBy'])
+                ->orderByRaw("case when status = ? then 0 else 1 end", [AbsenceRequestStatus::Requested->value])
+                ->orderByDesc('starts_on')
+                ->get()
+                ->map(fn(AbsenceRequest $absenceRequest): array => [
+                    'id' => $absenceRequest->id,
+                    'employeeName' => $absenceRequest->user?->name,
+                    'employeeEmail' => $absenceRequest->user?->email,
+                    'employmentAreaLabel' => $absenceRequest->user?->employeeProfile?->employment_area?->label(),
+                    'locationName' => $absenceRequest->location?->name ?? $absenceRequest->user?->location?->name,
+                    'type' => $absenceRequest->type->value,
+                    'typeLabel' => $absenceRequest->type->label(),
+                    'startsOn' => $absenceRequest->starts_on->toDateString(),
+                    'endsOn' => $absenceRequest->ends_on->toDateString(),
+                    'daysCount' => $absenceRequest->days_count,
+                    'status' => $absenceRequest->status->value,
+                    'statusLabel' => $absenceRequest->status->label(),
+                    'note' => $absenceRequest->note,
+                    'rejectionReason' => $absenceRequest->rejection_reason,
+                    'requestedByName' => $absenceRequest->requestedBy?->name,
+                    'decidedByName' => $absenceRequest->decidedBy?->name,
+                    'decidedAt' => $absenceRequest->decided_at?->toDateTimeString(),
+                    'createdAt' => $absenceRequest->created_at?->toDateString(),
+                ])
+                ->values(),
+        ]);
+    }
+    public function approve(
+        Request $request,
+        AbsenceRequest $absenceRequest,
+        AbsenceRequestService $absenceRequestService,
+    ): RedirectResponse {
+        abort_unless(
+            $request->user()?->hasRole('PDL'),
+            HttpResponse::HTTP_FORBIDDEN,
+        );
+
+        $absenceRequestService->approve($absenceRequest, $request->user());
+
+        return back()->with('status', 'absence-request-approved');
+    }
+
+    public function reject(
+        Request $request,
+        AbsenceRequest $absenceRequest,
+        AbsenceRequestService $absenceRequestService,
+    ): RedirectResponse {
+        abort_unless(
+            $request->user()?->hasRole('PDL'),
+            HttpResponse::HTTP_FORBIDDEN,
+        );
+
+        $validated = $request->validate([
+            'rejection_reason' => ['required', 'string', 'max:2000'],
+        ]);
+
+        $absenceRequestService->reject(
+            $absenceRequest,
+            $request->user(),
+            $validated['rejection_reason'],
+        );
+
+        return back()->with('status', 'absence-request-rejected');
     }
 }

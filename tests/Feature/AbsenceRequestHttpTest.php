@@ -9,9 +9,17 @@ use App\Models\Location;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
+use Spatie\Permission\Models\Role;
 
 uses(RefreshDatabase::class);
 
+beforeEach(function (): void {
+    Role::findOrCreate('Admin');
+    Role::findOrCreate('PDL');
+    Role::findOrCreate('Pflegekraft');
+    Role::findOrCreate('Putzkraft');
+    Role::findOrCreate('Hausmeister');
+});
 function createAbsenceHttpEmployeeWithProfile(EmploymentArea $area): User
 {
     $location = Location::factory()->create();
@@ -249,4 +257,260 @@ it('blocks caretakers from viewing the absence request page', function (): void 
     $this->actingAs($employee)
         ->get('/absence-requests')
         ->assertForbidden();
+});
+
+it('shares absence request permissions for nursing staff', function (): void {
+    $employee = createAbsenceHttpEmployeeWithProfile(EmploymentArea::Nursing);
+
+    $this->actingAs($employee)
+        ->get('/absence-requests')
+        ->assertOk()
+        ->assertInertia(
+            fn(Assert $page) => $page
+                ->where('auth.permissions.canViewAbsenceRequests', true)
+                ->where('auth.permissions.canManageAbsenceRequests', false)
+        );
+});
+
+it('shares absence request permissions for cleaning staff', function (): void {
+    $employee = createAbsenceHttpEmployeeWithProfile(EmploymentArea::Cleaning);
+
+    $this->actingAs($employee)
+        ->get('/absence-requests')
+        ->assertOk()
+        ->assertInertia(
+            fn(Assert $page) => $page
+                ->where('auth.permissions.canViewAbsenceRequests', true)
+                ->where('auth.permissions.canManageAbsenceRequests', false)
+        );
+});
+it('shares absence management permission for PDL users', function (): void {
+    $location = Location::factory()->create();
+
+    $pdl = User::factory()
+        ->for($location)
+        ->create();
+
+    $pdl->assignRole('PDL');
+
+    $this->actingAs($pdl)
+        ->get('/staff')
+        ->assertOk()
+        ->assertInertia(
+            fn(Assert $page) => $page
+                ->where('auth.permissions.canViewAbsenceRequests', false)
+                ->where('auth.permissions.canManageAbsenceRequests', true)
+        );
+});
+
+it('lets PDL users view the absence request management page', function (): void {
+    $location = Location::factory()->create();
+
+    $pdl = User::factory()
+        ->for($location)
+        ->create();
+
+    $pdl->assignRole('PDL');
+
+    $employee = createAbsenceHttpEmployeeWithProfile(EmploymentArea::Nursing);
+    $employee->forceFill([
+        'location_id' => $location->id,
+    ])->save();
+
+    $employee->locations()->sync([$location->id]);
+
+    AbsenceRequest::query()->create([
+        'user_id' => $employee->id,
+        'location_id' => $location->id,
+        'type' => AbsenceRequestType::Vacation,
+        'starts_on' => '2026-06-01',
+        'ends_on' => '2026-06-05',
+        'days_count' => 5,
+        'status' => AbsenceRequestStatus::Requested,
+        'requested_by' => $employee->id,
+        'note' => 'Sommerurlaub',
+    ]);
+
+    $this->actingAs($pdl)
+        ->get('/absence-requests/manage')
+        ->assertOk()
+        ->assertInertia(
+            fn(Assert $page) => $page
+                ->component('AbsenceRequests/Manage')
+                ->where('absenceRequests.0.employeeName', $employee->name)
+                ->where('absenceRequests.0.employeeEmail', $employee->email)
+                ->where('absenceRequests.0.employmentAreaLabel', 'Pflege')
+                ->where('absenceRequests.0.locationName', $location->name)
+                ->where('absenceRequests.0.type', AbsenceRequestType::Vacation->value)
+                ->where('absenceRequests.0.typeLabel', 'Urlaub')
+                ->where('absenceRequests.0.startsOn', '2026-06-01')
+                ->where('absenceRequests.0.endsOn', '2026-06-05')
+                ->where('absenceRequests.0.daysCount', '5.00')
+                ->where('absenceRequests.0.status', AbsenceRequestStatus::Requested->value)
+                ->where('absenceRequests.0.statusLabel', 'Beantragt')
+                ->where('absenceRequests.0.note', 'Sommerurlaub')
+        );
+});
+
+it('lets PDL users approve open absence requests', function (): void {
+    $location = Location::factory()->create();
+
+    $pdl = User::factory()
+        ->for($location)
+        ->create();
+
+    $pdl->assignRole('PDL');
+
+    $employee = createAbsenceHttpEmployeeWithProfile(EmploymentArea::Nursing);
+
+    $absenceRequest = AbsenceRequest::query()->create([
+        'user_id' => $employee->id,
+        'location_id' => $employee->location_id,
+        'type' => AbsenceRequestType::Vacation,
+        'starts_on' => '2026-07-01',
+        'ends_on' => '2026-07-03',
+        'days_count' => 3,
+        'status' => AbsenceRequestStatus::Requested,
+        'requested_by' => $employee->id,
+    ]);
+
+    $this->actingAs($pdl)
+        ->from('/absence-requests/manage')
+        ->patch("/absence-requests/{$absenceRequest->id}/approve")
+        ->assertRedirect('/absence-requests/manage')
+        ->assertSessionHas('status', 'absence-request-approved');
+
+    $absenceRequest->refresh();
+
+    expect($absenceRequest->status)->toBe(AbsenceRequestStatus::Approved)
+        ->and($absenceRequest->decided_by)->toBe($pdl->id)
+        ->and($absenceRequest->decided_at)->not->toBeNull()
+        ->and($absenceRequest->rejection_reason)->toBeNull();
+});
+
+it('lets PDL users reject open absence requests with a reason', function (): void {
+    $location = Location::factory()->create();
+
+    $pdl = User::factory()
+        ->for($location)
+        ->create();
+
+    $pdl->assignRole('PDL');
+
+    $employee = createAbsenceHttpEmployeeWithProfile(EmploymentArea::Nursing);
+
+    $absenceRequest = AbsenceRequest::query()->create([
+        'user_id' => $employee->id,
+        'location_id' => $employee->location_id,
+        'type' => AbsenceRequestType::Vacation,
+        'starts_on' => '2026-08-01',
+        'ends_on' => '2026-08-05',
+        'days_count' => 5,
+        'status' => AbsenceRequestStatus::Requested,
+        'requested_by' => $employee->id,
+    ]);
+
+    $this->actingAs($pdl)
+        ->from('/absence-requests/manage')
+        ->patch("/absence-requests/{$absenceRequest->id}/reject", [
+            'rejection_reason' => 'Mindestbesetzung wäre gefährdet.',
+        ])
+        ->assertRedirect('/absence-requests/manage')
+        ->assertSessionHas('status', 'absence-request-rejected');
+
+    $absenceRequest->refresh();
+
+    expect($absenceRequest->status)->toBe(AbsenceRequestStatus::Rejected)
+        ->and($absenceRequest->decided_by)->toBe($pdl->id)
+        ->and($absenceRequest->decided_at)->not->toBeNull()
+        ->and($absenceRequest->rejection_reason)->toBe('Mindestbesetzung wäre gefährdet.');
+});
+
+it('requires a rejection reason when PDL users reject absence requests', function (): void {
+    $location = Location::factory()->create();
+
+    $pdl = User::factory()
+        ->for($location)
+        ->create();
+
+    $pdl->assignRole('PDL');
+
+    $employee = createAbsenceHttpEmployeeWithProfile(EmploymentArea::Nursing);
+
+    $absenceRequest = AbsenceRequest::query()->create([
+        'user_id' => $employee->id,
+        'location_id' => $employee->location_id,
+        'type' => AbsenceRequestType::Vacation,
+        'starts_on' => '2026-09-01',
+        'ends_on' => '2026-09-05',
+        'days_count' => 5,
+        'status' => AbsenceRequestStatus::Requested,
+        'requested_by' => $employee->id,
+    ]);
+
+    $this->actingAs($pdl)
+        ->from('/absence-requests/manage')
+        ->patch("/absence-requests/{$absenceRequest->id}/reject", [
+            'rejection_reason' => '',
+        ])
+        ->assertRedirect('/absence-requests/manage')
+        ->assertSessionHasErrors('rejection_reason');
+
+    expect($absenceRequest->refresh()->status)->toBe(AbsenceRequestStatus::Requested);
+});
+
+it('blocks non PDL users from managing absence requests', function (): void {
+    $employee = createAbsenceHttpEmployeeWithProfile(EmploymentArea::Nursing);
+
+    $absenceRequest = AbsenceRequest::query()->create([
+        'user_id' => $employee->id,
+        'location_id' => $employee->location_id,
+        'type' => AbsenceRequestType::Vacation,
+        'starts_on' => '2026-10-01',
+        'ends_on' => '2026-10-05',
+        'days_count' => 5,
+        'status' => AbsenceRequestStatus::Requested,
+        'requested_by' => $employee->id,
+    ]);
+
+    $this->actingAs($employee)
+        ->get('/absence-requests/manage')
+        ->assertForbidden();
+
+    $this->actingAs($employee)
+        ->patch("/absence-requests/{$absenceRequest->id}/approve")
+        ->assertForbidden();
+
+    expect($absenceRequest->refresh()->status)->toBe(AbsenceRequestStatus::Requested);
+});
+
+it('does not allow approving already decided absence requests', function (): void {
+    $location = Location::factory()->create();
+
+    $pdl = User::factory()
+        ->for($location)
+        ->create();
+
+    $pdl->assignRole('PDL');
+
+    $employee = createAbsenceHttpEmployeeWithProfile(EmploymentArea::Nursing);
+
+    $absenceRequest = AbsenceRequest::query()->create([
+        'user_id' => $employee->id,
+        'location_id' => $employee->location_id,
+        'type' => AbsenceRequestType::Vacation,
+        'starts_on' => '2026-11-01',
+        'ends_on' => '2026-11-05',
+        'days_count' => 5,
+        'status' => AbsenceRequestStatus::Approved,
+        'requested_by' => $employee->id,
+        'decided_by' => $pdl->id,
+        'decided_at' => now(),
+    ]);
+
+    $this->actingAs($pdl)
+        ->from('/absence-requests/manage')
+        ->patch("/absence-requests/{$absenceRequest->id}/approve")
+        ->assertRedirect('/absence-requests/manage')
+        ->assertSessionHasErrors('status');
 });

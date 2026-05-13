@@ -93,8 +93,20 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
+    Route::get('/absence-requests', [AbsenceRequestController::class, 'index'])
+        ->name('absence-requests.index');
+
     Route::post('/absence-requests', [AbsenceRequestController::class, 'store'])
         ->name('absence-requests.store');
+
+    Route::get('/absence-requests/manage', [AbsenceRequestController::class, 'manage'])
+        ->name('absence-requests.manage');
+
+    Route::patch('/absence-requests/{absenceRequest}/approve', [AbsenceRequestController::class, 'approve'])
+        ->name('absence-requests.approve');
+
+    Route::patch('/absence-requests/{absenceRequest}/reject', [AbsenceRequestController::class, 'reject'])
+        ->name('absence-requests.reject');
 });
 
 require __DIR__ . '/auth.php';

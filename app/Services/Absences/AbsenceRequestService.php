@@ -8,7 +8,7 @@ use App\Models\AbsenceRequest;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Validation\ValidationException;
-
+use Illuminate\Support\Facades\DB;
 class AbsenceRequestService
 {
     /**
@@ -69,5 +69,41 @@ class AbsenceRequestService
                 'starts_on' => 'Für diesen Zeitraum existiert bereits ein aktiver Abwesenheitsantrag.',
             ]);
         }
+    }
+
+    public function approve(AbsenceRequest $absenceRequest, User $decidedBy): AbsenceRequest
+    {
+        if (!$absenceRequest->isOpen()) {
+            throw ValidationException::withMessages([
+                'status' => 'Nur offene Anträge können genehmigt werden.',
+            ]);
+        }
+
+        $absenceRequest->forceFill([
+            'status' => AbsenceRequestStatus::Approved,
+            'decided_by' => $decidedBy->id,
+            'decided_at' => now(),
+            'rejection_reason' => null,
+        ])->save();
+
+        return $absenceRequest->refresh();
+    }
+
+    public function reject(AbsenceRequest $absenceRequest, User $decidedBy, string $reason): AbsenceRequest
+    {
+        if (!$absenceRequest->isOpen()) {
+            throw ValidationException::withMessages([
+                'status' => 'Nur offene Anträge können abgelehnt werden.',
+            ]);
+        }
+
+        $absenceRequest->forceFill([
+            'status' => AbsenceRequestStatus::Rejected,
+            'decided_by' => $decidedBy->id,
+            'decided_at' => now(),
+            'rejection_reason' => $reason,
+        ])->save();
+
+        return $absenceRequest->refresh();
     }
 }
