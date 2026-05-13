@@ -6,6 +6,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
+use App\Enums\EmploymentArea;
 
 uses(RefreshDatabase::class);
 
@@ -29,11 +30,12 @@ it('allows only PDL users to open staff management', function () {
     $this->actingAs($pdl)
         ->get('/staff')
         ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page
-            ->component('Staff/Index')
-            ->has('staffUsers', 1)
-            ->has('locations', 1)
-            ->where('staffUsers.0.name', 'Pflege Eins')
+        ->assertInertia(
+            fn(Assert $page) => $page
+                ->component('Staff/Index')
+                ->has('staffUsers', 1)
+                ->has('locations', 1)
+                ->where('staffUsers.0.name', 'Pflege Eins')
         );
 
     $this->actingAs($admin)->get('/staff')->assertForbidden();
@@ -54,16 +56,38 @@ it('lets PDL users create operational staff for accessible Wohnbereiche only', f
             'password' => 'sicheres-passwort',
             'role' => 'Pflegekraft',
             'location_ids' => [$first->id, $second->id],
+            'is_nursing_specialist' => true,
+            'weekly_hours' => 30,
+            'regular_work_days_per_week' => 4,
+            'annual_vacation_days' => 28,
+            'vacation_days_carried_over' => 2,
+            'overtime_minutes_balance' => 120,
+            'can_work_early' => true,
+            'can_work_late' => true,
+            'can_work_night' => false,
+            'active' => true,
         ])
         ->assertRedirect('/staff');
 
     $staff = User::query()->where('email', 'pflege@pflegedex.local')->first();
+    $staff->load('employeeProfile');
 
     expect($staff)->not->toBeNull()
         ->and($staff->hasRole('Pflegekraft'))->toBeTrue()
         ->and($staff->location_id)->toBe($first->id)
         ->and($staff->locations()->pluck('locations.id')->all())->toEqualCanonicalizing([$first->id, $second->id])
-        ->and(Hash::check('sicheres-passwort', $staff->password))->toBeTrue();
+        ->and(Hash::check('sicheres-passwort', $staff->password))->toBeTrue()
+        ->and($staff->employeeProfile)->not->toBeNull()
+        ->and($staff->employeeProfile->employment_area)->toBe(EmploymentArea::Nursing)
+        ->and($staff->employeeProfile->is_nursing_specialist)->toBeTrue()
+        ->and($staff->employeeProfile->weekly_hours)->toBe('30.00')
+        ->and($staff->employeeProfile->regular_work_days_per_week)->toBe(4)
+        ->and($staff->employeeProfile->annual_vacation_days)->toBe(28)
+        ->and($staff->employeeProfile->vacation_days_carried_over)->toBe(2)
+        ->and($staff->employeeProfile->overtime_minutes_balance)->toBe(120)
+        ->and($staff->employeeProfile->can_work_early)->toBeTrue()
+        ->and($staff->employeeProfile->can_work_late)->toBeTrue()
+        ->and($staff->employeeProfile->can_work_night)->toBeFalse();
 
     $this->actingAs($pdl)
         ->post('/staff', [
@@ -86,8 +110,8 @@ it('prevents PDL users from creating admin or PDL accounts through staff managem
     foreach (['Admin', 'PDL'] as $role) {
         $this->actingAs($pdl)
             ->post('/staff', [
-                'name' => 'Verboten '.$role,
-                'email' => strtolower($role).'@pflegedex.local',
+                'name' => 'Verboten ' . $role,
+                'email' => strtolower($role) . '@pflegedex.local',
                 'password' => 'sicheres-passwort',
                 'role' => $role,
                 'location_ids' => [$location->id],
@@ -108,32 +132,53 @@ it('lets PDL users edit staff in their Wohnbereiche', function () {
     $staff->locations()->attach([$first->id]);
 
     $this->actingAs($pdl)
-        ->get('/staff/'.$staff->id.'/edit')
+        ->get('/staff/' . $staff->id . '/edit')
         ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page
-            ->component('Staff/Edit')
-            ->where('staffUser.name', 'Alter Name')
-            ->has('locations', 2)
+        ->assertInertia(
+            fn(Assert $page) => $page
+                ->component('Staff/Edit')
+                ->where('staffUser.name', 'Alter Name')
+                ->has('locations', 2)
         );
 
     $this->actingAs($pdl)
-        ->patch('/staff/'.$staff->id, [
+        ->patch('/staff/' . $staff->id, [
             'name' => 'Neuer Name',
             'email' => 'neu@pflegedex.local',
             'password' => 'neues-passwort',
             'role' => 'Hausmeister',
             'location_ids' => [$second->id],
+            'is_nursing_specialist' => false,
+            'weekly_hours' => 20,
+            'regular_work_days_per_week' => 3,
+            'annual_vacation_days' => 24,
+            'vacation_days_carried_over' => 1,
+            'overtime_minutes_balance' => -60,
+            'can_work_early' => true,
+            'can_work_late' => false,
+            'can_work_night' => false,
+            'active' => true,
         ])
         ->assertRedirect('/staff');
 
     $staff->refresh();
-
+    $staff->load('employeeProfile');
     expect($staff->name)->toBe('Neuer Name')
         ->and($staff->email)->toBe('neu@pflegedex.local')
         ->and($staff->hasRole('Hausmeister'))->toBeTrue()
         ->and($staff->location_id)->toBe($second->id)
         ->and($staff->locations()->pluck('locations.id')->all())->toEqualCanonicalizing([$second->id])
-        ->and(Hash::check('neues-passwort', $staff->password))->toBeTrue();
+        ->and(Hash::check('neues-passwort', $staff->password))->toBeTrue()->and($staff->employeeProfile)->not->toBeNull()
+        ->and($staff->employeeProfile->employment_area)->toBe(EmploymentArea::Caretaker)
+        ->and($staff->employeeProfile->is_nursing_specialist)->toBeFalse()
+        ->and($staff->employeeProfile->weekly_hours)->toBe('20.00')
+        ->and($staff->employeeProfile->regular_work_days_per_week)->toBe(3)
+        ->and($staff->employeeProfile->annual_vacation_days)->toBe(24)
+        ->and($staff->employeeProfile->vacation_days_carried_over)->toBe(1)
+        ->and($staff->employeeProfile->overtime_minutes_balance)->toBe(-60)
+        ->and($staff->employeeProfile->can_work_early)->toBeTrue()
+        ->and($staff->employeeProfile->can_work_late)->toBeFalse()
+        ->and($staff->employeeProfile->can_work_night)->toBeFalse();
 });
 
 it('prevents PDL users from editing staff outside their Wohnbereiche', function () {
@@ -146,14 +191,131 @@ it('prevents PDL users from editing staff outside their Wohnbereiche', function 
     $staff->assignRole('Pflegekraft');
     $staff->locations()->attach([$foreign->id]);
 
-    $this->actingAs($pdl)->get('/staff/'.$staff->id.'/edit')->assertForbidden();
+    $this->actingAs($pdl)->get('/staff/' . $staff->id . '/edit')->assertForbidden();
 
     $this->actingAs($pdl)
-        ->patch('/staff/'.$staff->id, [
+        ->patch('/staff/' . $staff->id, [
             'name' => 'Verboten',
             'email' => 'verboten@pflegedex.local',
             'role' => 'Pflegekraft',
             'location_ids' => [$own->id],
         ])
         ->assertForbidden();
+});
+
+it('maps cleaning staff to cleaning employee profiles', function (): void {
+    $location = Location::factory()->create();
+
+    $pdl = User::factory()->for($location)->create();
+    $pdl->assignRole('PDL');
+
+    $this->actingAs($pdl)
+        ->post('/staff', [
+            'name' => 'Putz Eins',
+            'email' => 'putz@pflegedex.local',
+            'password' => 'sicheres-passwort',
+            'role' => 'Putzkraft',
+            'location_ids' => [$location->id],
+            'weekly_hours' => 25,
+            'annual_vacation_days' => 26,
+            'can_work_early' => true,
+            'can_work_late' => false,
+            'can_work_night' => false,
+        ])
+        ->assertRedirect('/staff');
+
+    $staff = User::query()
+        ->where('email', 'putz@pflegedex.local')
+        ->with('employeeProfile')
+        ->firstOrFail();
+
+    expect($staff->employeeProfile)->not->toBeNull()
+        ->and($staff->employeeProfile->employment_area)->toBe(EmploymentArea::Cleaning)
+        ->and($staff->employeeProfile->is_nursing_specialist)->toBeFalse()
+        ->and($staff->employeeProfile->weekly_hours)->toBe('25.00')
+        ->and($staff->employeeProfile->annual_vacation_days)->toBe(26)
+        ->and($staff->employeeProfile->can_work_early)->toBeTrue()
+        ->and($staff->employeeProfile->can_work_late)->toBeFalse()
+        ->and($staff->employeeProfile->can_work_night)->toBeFalse();
+});
+
+it('maps caretakers to caretaker employee profiles and excludes absence requests', function (): void {
+    $location = Location::factory()->create();
+
+    $pdl = User::factory()->for($location)->create();
+    $pdl->assignRole('PDL');
+
+    $this->actingAs($pdl)
+        ->post('/staff', [
+            'name' => 'Hausmeister Eins',
+            'email' => 'hausmeister@pflegedex.local',
+            'password' => 'sicheres-passwort',
+            'role' => 'Hausmeister',
+            'location_ids' => [$location->id],
+            'weekly_hours' => 39,
+            'annual_vacation_days' => 30,
+            'can_work_early' => true,
+            'can_work_late' => false,
+            'can_work_night' => false,
+        ])
+        ->assertRedirect('/staff');
+
+    $staff = User::query()
+        ->where('email', 'hausmeister@pflegedex.local')
+        ->with('employeeProfile')
+        ->firstOrFail();
+
+    expect($staff->employeeProfile)->not->toBeNull()
+        ->and($staff->employeeProfile->employment_area)->toBe(EmploymentArea::Caretaker)
+        ->and($staff->employeeProfile->canRequestAbsence())->toBeFalse()
+        ->and($staff->canRequestAbsence())->toBeFalse();
+});
+
+it('passes employee profile data to the staff edit page', function (): void {
+    $location = Location::factory()->create();
+
+    $pdl = User::factory()->for($location)->create();
+    $pdl->assignRole('PDL');
+
+    $staff = User::factory()->for($location)->create([
+        'name' => 'Anna Pflege',
+        'email' => 'anna.pflege@pflegedex.local',
+    ]);
+
+    $staff->assignRole('Pflegekraft');
+    $staff->locations()->sync([$location->id]);
+
+    $staff->employeeProfile()->create([
+        'employment_area' => EmploymentArea::Nursing,
+        'is_nursing_specialist' => true,
+        'weekly_hours' => 32,
+        'regular_work_days_per_week' => 4,
+        'annual_vacation_days' => 28,
+        'vacation_days_carried_over' => 2,
+        'overtime_minutes_balance' => 90,
+        'can_work_early' => true,
+        'can_work_late' => true,
+        'can_work_night' => false,
+        'active' => true,
+    ]);
+
+    $this->actingAs($pdl)
+        ->get('/staff/' . $staff->id . '/edit')
+        ->assertOk()
+        ->assertInertia(
+            fn(Assert $page) => $page
+                ->component('Staff/Edit')
+                ->where('staffUser.employeeProfile.employmentArea', EmploymentArea::Nursing->value)
+                ->where('staffUser.employeeProfile.employmentAreaLabel', 'Pflege')
+                ->where('staffUser.employeeProfile.isNursingSpecialist', true)
+                ->where('staffUser.employeeProfile.weeklyHours', '32.00')
+                ->where('staffUser.employeeProfile.regularWorkDaysPerWeek', 4)
+                ->where('staffUser.employeeProfile.annualVacationDays', 28)
+                ->where('staffUser.employeeProfile.vacationDaysCarriedOver', 2)
+                ->where('staffUser.employeeProfile.overtimeMinutesBalance', 90)
+                ->where('staffUser.employeeProfile.canWorkEarly', true)
+                ->where('staffUser.employeeProfile.canWorkLate', true)
+                ->where('staffUser.employeeProfile.canWorkNight', false)
+                ->where('staffUser.employeeProfile.active', true)
+        );
 });

@@ -5,6 +5,7 @@ import TextInput from '@/Components/TextInput';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { FormEventHandler } from 'react';
+import EmployeeProfileFields from '@/Components/Staff/EmployeeProfileFields';
 
 type LocationOption = { id: string; name: string };
 type StaffUser = {
@@ -29,12 +30,32 @@ export default function Index({ staffUsers, locations, roles }: StaffIndexProps)
         password: string;
         role: string;
         location_ids: string[];
+        is_nursing_specialist: boolean;
+        weekly_hours: string;
+        regular_work_days_per_week: string;
+        annual_vacation_days: string;
+        vacation_days_carried_over: string;
+        overtime_minutes_balance: string;
+        can_work_early: boolean;
+        can_work_late: boolean;
+        can_work_night: boolean;
+        active: boolean;
     }>({
         name: '',
         email: '',
         password: '',
         role: 'Pflegekraft',
         location_ids: locations.length === 1 ? [locations[0].id] : [],
+        is_nursing_specialist: false,
+        weekly_hours: '39',
+        regular_work_days_per_week: '',
+        annual_vacation_days: '30',
+        vacation_days_carried_over: '0',
+        overtime_minutes_balance: '0',
+        can_work_early: true,
+        can_work_late: true,
+        can_work_night: false,
+        active: true,
     });
 
     const toggleLocation = (locationId: string, checked: boolean) => {
@@ -49,7 +70,22 @@ export default function Index({ staffUsers, locations, roles }: StaffIndexProps)
     const submit: FormEventHandler = (event) => {
         event.preventDefault();
         post(route('staff.store'), {
-            onSuccess: () => reset('name', 'email', 'password'),
+            onSuccess: () =>
+                reset(
+                    'name',
+                    'email',
+                    'password',
+                    'is_nursing_specialist',
+                    'weekly_hours',
+                    'regular_work_days_per_week',
+                    'annual_vacation_days',
+                    'vacation_days_carried_over',
+                    'overtime_minutes_balance',
+                    'can_work_early',
+                    'can_work_late',
+                    'can_work_night',
+                    'active',
+                ),
         });
     };
 
@@ -148,7 +184,16 @@ export default function Index({ staffUsers, locations, roles }: StaffIndexProps)
 
                             <div>
                                 <InputLabel htmlFor="role" value="Rolle" />
-                                <select id="role" value={data.role} onChange={(event) => setData('role', event.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]">
+                                <select id="role" value={data.role} onChange={(event) => {
+                                    const role = event.target.value;
+
+                                    setData((currentData) => ({
+                                        ...currentData,
+                                        role,
+                                        is_nursing_specialist:
+                                            role === 'Pflegekraft' ? currentData.is_nursing_specialist : false,
+                                    }));
+                                }} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]">
                                     {roles.map((role) => <option key={role} value={role}>{role}</option>)}
                                 </select>
                                 <InputError message={errors.role} className="mt-2" />
@@ -171,7 +216,7 @@ export default function Index({ staffUsers, locations, roles }: StaffIndexProps)
                                 </div>
                                 <InputError message={errors.location_ids} className="mt-2" />
                             </div>
-
+                            <EmployeeProfileFields data={data} setData={setData} errors={errors} />
                             <PrimaryButton disabled={processing || locations.length === 0}>
                                 Mitarbeiter speichern
                             </PrimaryButton>

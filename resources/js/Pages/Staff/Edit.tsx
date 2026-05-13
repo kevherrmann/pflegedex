@@ -5,8 +5,23 @@ import TextInput from '@/Components/TextInput';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { FormEventHandler } from 'react';
+import EmployeeProfileFields from '@/Components/Staff/EmployeeProfileFields';
 
 type LocationOption = { id: string; name: string };
+type EmployeeProfile = {
+    employmentArea: string;
+    employmentAreaLabel: string;
+    isNursingSpecialist: boolean;
+    weeklyHours: string;
+    regularWorkDaysPerWeek: number | null;
+    annualVacationDays: number;
+    vacationDaysCarriedOver: number;
+    overtimeMinutesBalance: number;
+    canWorkEarly: boolean;
+    canWorkLate: boolean;
+    canWorkNight: boolean;
+    active: boolean;
+};
 type StaffUser = {
     id: string;
     name: string;
@@ -14,6 +29,7 @@ type StaffUser = {
     role: string;
     locationIds: string[];
     locations: LocationOption[];
+    employeeProfile: EmployeeProfile | null;
 };
 
 type StaffEditProps = {
@@ -29,12 +45,36 @@ export default function Edit({ staffUser, locations, roles }: StaffEditProps) {
         password: string;
         role: string;
         location_ids: string[];
+        is_nursing_specialist: boolean;
+        weekly_hours: string;
+        regular_work_days_per_week: string;
+        annual_vacation_days: string;
+        vacation_days_carried_over: string;
+        overtime_minutes_balance: string;
+        can_work_early: boolean;
+        can_work_late: boolean;
+        can_work_night: boolean;
+        active: boolean;
     }>({
         name: staffUser.name,
         email: staffUser.email,
         password: '',
         role: staffUser.role,
-        location_ids: staffUser.locationIds,
+        location_ids: staffUser.locationIds, is_nursing_specialist:
+            staffUser.employeeProfile?.isNursingSpecialist ?? false,
+        weekly_hours: staffUser.employeeProfile?.weeklyHours ?? '39',
+        regular_work_days_per_week:
+            staffUser.employeeProfile?.regularWorkDaysPerWeek?.toString() ?? '',
+        annual_vacation_days:
+            staffUser.employeeProfile?.annualVacationDays?.toString() ?? '30',
+        vacation_days_carried_over:
+            staffUser.employeeProfile?.vacationDaysCarriedOver?.toString() ?? '0',
+        overtime_minutes_balance:
+            staffUser.employeeProfile?.overtimeMinutesBalance?.toString() ?? '0',
+        can_work_early: staffUser.employeeProfile?.canWorkEarly ?? true,
+        can_work_late: staffUser.employeeProfile?.canWorkLate ?? true,
+        can_work_night: staffUser.employeeProfile?.canWorkNight ?? false,
+        active: staffUser.employeeProfile?.active ?? true,
     });
 
     const toggleLocation = (locationId: string, checked: boolean) => {
@@ -80,7 +120,15 @@ export default function Edit({ staffUser, locations, roles }: StaffEditProps) {
 
                             <div>
                                 <InputLabel htmlFor="role" value="Rolle" />
-                                <select id="role" value={data.role} onChange={(event) => setData('role', event.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]">
+                                <select id="role" value={data.role} onChange={(event) => {
+                                    const role = event.target.value;
+
+                                    setData('role', role);
+
+                                    if (role !== 'Pflegekraft') {
+                                        setData('is_nursing_specialist', false);
+                                    }
+                                }} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]">
                                     {roles.map((role) => <option key={role} value={role}>{role}</option>)}
                                 </select>
                                 <InputError message={errors.role} className="mt-2" />
@@ -104,7 +152,7 @@ export default function Edit({ staffUser, locations, roles }: StaffEditProps) {
                                 <InputError message={errors.location_ids} className="mt-2" />
                             </div>
                         </div>
-
+                        <EmployeeProfileFields data={data} setData={setData} errors={errors} />
                         <div className="mt-8 flex justify-end gap-3">
                             <Link href={route('staff.index')} className="rounded-md px-4 py-2 text-sm font-semibold text-[#54595F] hover:underline">Abbrechen</Link>
                             <PrimaryButton disabled={processing}>Mitarbeiter aktualisieren</PrimaryButton>
