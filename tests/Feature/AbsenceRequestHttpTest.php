@@ -8,6 +8,7 @@ use App\Models\EmployeeProfile;
 use App\Models\Location;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 
 uses(RefreshDatabase::class);
 
@@ -190,4 +191,62 @@ it('blocks overlapping active absence requests through http', function (): void 
         ->assertSessionHasErrors('starts_on');
 
     expect(AbsenceRequest::query()->count())->toBe(1);
+});
+it('shows the absence request page to nursing staff', function (): void {
+    $employee = createAbsenceHttpEmployeeWithProfile(EmploymentArea::Nursing);
+
+    AbsenceRequest::query()->create([
+        'user_id' => $employee->id,
+        'location_id' => $employee->location_id,
+        'type' => AbsenceRequestType::Vacation,
+        'starts_on' => '2026-06-01',
+        'ends_on' => '2026-06-05',
+        'days_count' => 5,
+        'status' => AbsenceRequestStatus::Requested,
+        'requested_by' => $employee->id,
+        'note' => 'Sommerurlaub',
+    ]);
+
+    $this->actingAs($employee)
+        ->get('/absence-requests')
+        ->assertOk()
+        ->assertInertia(
+            fn(Assert $page) => $page
+                ->component('AbsenceRequests/Index')
+                ->where('canRequestAbsence', true)
+                ->where('absenceTypes.0.value', AbsenceRequestType::Vacation->value)
+                ->where('absenceTypes.0.label', 'Urlaub')
+                ->where('absenceTypes.1.value', AbsenceRequestType::OvertimeCompensation->value)
+                ->where('absenceTypes.1.label', 'Überstundenfrei')
+                ->where('absenceRequests.0.type', AbsenceRequestType::Vacation->value)
+                ->where('absenceRequests.0.typeLabel', 'Urlaub')
+                ->where('absenceRequests.0.startsOn', '2026-06-01')
+                ->where('absenceRequests.0.endsOn', '2026-06-05')
+                ->where('absenceRequests.0.daysCount', '5.00')
+                ->where('absenceRequests.0.status', AbsenceRequestStatus::Requested->value)
+                ->where('absenceRequests.0.statusLabel', 'Beantragt')
+                ->where('absenceRequests.0.note', 'Sommerurlaub')
+        );
+});
+
+it('shows the absence request page to cleaning staff', function (): void {
+    $employee = createAbsenceHttpEmployeeWithProfile(EmploymentArea::Cleaning);
+
+    $this->actingAs($employee)
+        ->get('/absence-requests')
+        ->assertOk()
+        ->assertInertia(
+            fn(Assert $page) => $page
+                ->component('AbsenceRequests/Index')
+                ->where('canRequestAbsence', true)
+                ->has('absenceRequests', 0)
+        );
+});
+
+it('blocks caretakers from viewing the absence request page', function (): void {
+    $employee = createAbsenceHttpEmployeeWithProfile(EmploymentArea::Caretaker);
+
+    $this->actingAs($employee)
+        ->get('/absence-requests')
+        ->assertForbidden();
 });

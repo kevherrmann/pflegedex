@@ -11,6 +11,9 @@ export default function Authenticated({
 }: PropsWithChildren<{ header?: ReactNode }>) {
     const { auth } = usePage().props;
     const user = auth.user;
+    const canUseAbsenceRequests =
+        auth.permissions.canViewAbsenceRequests ||
+        auth.permissions.canManageAbsenceRequests;
     const canManageLocations = auth.permissions.manageLocations;
     const canViewResidents = auth.permissions.viewResidents;
     const canManageCareReports = auth.permissions.manageCareReports;
@@ -70,6 +73,14 @@ export default function Authenticated({
                                         active={route().current('care-reports.index')}
                                     >
                                         Pflegeberichte
+                                    </NavLink>
+                                )}
+                                {canUseAbsenceRequests && (
+                                    <NavLink
+                                        href={route('absence-requests.index')}
+                                        active={route().current('absence-requests.*')}
+                                    >
+                                        Urlaub
                                     </NavLink>
                                 )}
                                 {canManageStaff && (
@@ -222,6 +233,14 @@ export default function Authenticated({
                                 active={route().current('care-reports.index')}
                             >
                                 Pflegeberichte
+                            </ResponsiveNavLink>
+                        )}
+                        {canUseAbsenceRequests && (
+                            <ResponsiveNavLink
+                                href={route('absence-requests.index')}
+                                active={route().current('absence-requests.*')}
+                            >
+                                Urlaub
                             </ResponsiveNavLink>
                         )}
                         {canManageStaff && (

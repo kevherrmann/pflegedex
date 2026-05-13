@@ -18,6 +18,8 @@ export type PageProps<
             manageStaff: boolean;
             managePdlAccounts: boolean;
             viewAuditLog: boolean;
+            canViewAbsenceRequests: boolean;
+            canManageAbsenceRequests: boolean;
         };
     };
     ai: {

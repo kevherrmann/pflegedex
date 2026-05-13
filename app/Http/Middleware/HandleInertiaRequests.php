@@ -42,6 +42,8 @@ class HandleInertiaRequests extends Middleware
                     'manageStaff' => $request->user()?->hasRole('PDL') ?? false,
                     'managePdlAccounts' => $request->user()?->hasRole('Admin') ?? false,
                     'viewAuditLog' => $request->user()?->hasAnyRole(['PDL', 'Pflegekraft']) ?? false,
+                    'canViewAbsenceRequests' => $request->user()?->canRequestAbsence() ?? false,
+                    'canManageAbsenceRequests' => $request->user()?->hasRole('PDL') ?? false,
                 ],
             ],
             'ai' => $this->aiStatus($request),
