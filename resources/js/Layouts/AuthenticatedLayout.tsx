@@ -102,6 +102,14 @@ export default function Authenticated({
                                         Schichten
                                     </NavLink>
                                 )}
+                                {auth.permissions.canManageAbsenceRequests && (
+                                    <NavLink
+                                        href={route('rosters.index')}
+                                        active={route().current('rosters.*')}
+                                    >
+                                        Dienstpläne
+                                    </NavLink>
+                                )}
                                 {canManageStaff && (
                                     <NavLink
                                         href={route('staff.index')}
@@ -276,6 +284,14 @@ export default function Authenticated({
                                 active={route().current('shift-templates.*')}
                             >
                                 Schichten
+                            </ResponsiveNavLink>
+                        )}
+                        {auth.permissions.canManageAbsenceRequests && (
+                            <ResponsiveNavLink
+                                href={route('rosters.index')}
+                                active={route().current('rosters.*')}
+                            >
+                                Dienstpläne
                             </ResponsiveNavLink>
                         )}
                         {canManageStaff && (

@@ -9,6 +9,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ResidentController;
+use App\Http\Controllers\RosterController;
 use App\Http\Controllers\RosterBlackoutDayController;
 use App\Http\Controllers\ShiftTemplateController;
 use App\Http\Controllers\SisController;
@@ -124,6 +125,21 @@ Route::middleware('auth')->group(function () {
 
     Route::patch('/shift-templates/{shiftTemplate}/staffing-rule', [ShiftTemplateController::class, 'updateStaffingRule'])
         ->name('shift-templates.staffing-rule.update');
+
+    Route::get('/rosters', [RosterController::class, 'index'])
+        ->name('rosters.index');
+
+    Route::post('/rosters', [RosterController::class, 'store'])
+        ->name('rosters.store');
+
+    Route::patch('/rosters/{roster}/publish', [RosterController::class, 'publish'])
+        ->name('rosters.publish');
+
+    Route::patch('/rosters/{roster}/lock', [RosterController::class, 'lock'])
+        ->name('rosters.lock');
+
+    Route::patch('/rosters/{roster}/reopen', [RosterController::class, 'reopen'])
+        ->name('rosters.reopen');
 });
 
 require __DIR__ . '/auth.php';
