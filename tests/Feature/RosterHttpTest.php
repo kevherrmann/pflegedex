@@ -248,6 +248,53 @@ it('lets PDL users publish a draft roster', function (): void {
         ->and($roster->published_at)->not->toBeNull();
 });
 
+it('blocks PDL users from publishing a roster with validator errors through http', function (): void {
+    $pdl = createRosterHttpUser('PDL');
+    $location = Location::factory()->create();
+    $roster = createRosterHttpRoster($location, $pdl);
+    $shiftTemplate = createRosterHttpShiftTemplate($location);
+
+    createRosterHttpStaffingRule($shiftTemplate, [
+        'required_total_staff' => 1,
+        'required_specialists' => 0,
+    ]);
+
+    $this->actingAs($pdl)
+        ->from('/rosters')
+        ->patch("/rosters/{$roster->id}/publish")
+        ->assertRedirect('/rosters')
+        ->assertSessionHasErrors('status');
+
+    expect($roster->refresh()->status)->toBe(RosterStatus::Draft)
+        ->and($roster->published_at)->toBeNull();
+});
+
+it('lets PDL users publish a green roster through http', function (): void {
+    $pdl = createRosterHttpUser('PDL');
+    $location = Location::factory()->create();
+    $employee = createRosterHttpEmployee($location);
+    $roster = createRosterHttpRoster($location, $pdl);
+    $shiftTemplate = createRosterHttpShiftTemplate($location);
+
+    createRosterHttpStaffingRule($shiftTemplate, [
+        'required_total_staff' => 1,
+        'required_specialists' => 0,
+    ]);
+
+    foreach (rosterHttpJanuary2027Dates() as $date) {
+        createRosterHttpShift($roster, $employee, $shiftTemplate, $date);
+    }
+
+    $this->actingAs($pdl)
+        ->from('/rosters')
+        ->patch("/rosters/{$roster->id}/publish")
+        ->assertRedirect('/rosters')
+        ->assertSessionHas('status', 'roster-published');
+
+    expect($roster->refresh()->status)->toBe(RosterStatus::Published)
+        ->and($roster->published_at)->not->toBeNull();
+});
+
 it('lets PDL users lock a published roster', function (): void {
     $pdl = createRosterHttpUser('PDL');
     $location = Location::factory()->create();

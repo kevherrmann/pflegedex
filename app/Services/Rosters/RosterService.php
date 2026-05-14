@@ -10,6 +10,10 @@ use Illuminate\Validation\ValidationException;
 
 class RosterService
 {
+    public function __construct(private readonly RosterValidator $rosterValidator)
+    {
+    }
+
     public function createOrGetDraft(Location $location, User $createdBy, int $year, int $month): Roster
     {
         $this->validateYear($year);
@@ -33,6 +37,12 @@ class RosterService
         if (! $roster->isEditable()) {
             throw ValidationException::withMessages([
                 'status' => 'Nur bearbeitbare Dienstpläne können veröffentlicht werden.',
+            ]);
+        }
+
+        if ($this->rosterValidator->validate($roster)->hasErrors()) {
+            throw ValidationException::withMessages([
+                'status' => 'Der Dienstplan enthält noch Fehler und kann nicht veröffentlicht werden.',
             ]);
         }
 
