@@ -94,6 +94,14 @@ export default function Authenticated({
                                         Urlaubssperren
                                     </NavLink>
                                 )}
+                                {auth.permissions.canManageAbsenceRequests && (
+                                    <NavLink
+                                        href={route('shift-templates.index')}
+                                        active={route().current('shift-templates.*')}
+                                    >
+                                        Schichten
+                                    </NavLink>
+                                )}
                                 {canManageStaff && (
                                     <NavLink
                                         href={route('staff.index')}
@@ -260,6 +268,14 @@ export default function Authenticated({
                                 active={route().current('roster-blackout-days.*')}
                             >
                                 Urlaubssperren
+                            </ResponsiveNavLink>
+                        )}
+                        {auth.permissions.canManageAbsenceRequests && (
+                            <ResponsiveNavLink
+                                href={route('shift-templates.index')}
+                                active={route().current('shift-templates.*')}
+                            >
+                                Schichten
                             </ResponsiveNavLink>
                         )}
                         {canManageStaff && (

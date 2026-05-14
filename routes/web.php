@@ -10,6 +10,7 @@ use App\Http\Controllers\LocationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ResidentController;
 use App\Http\Controllers\RosterBlackoutDayController;
+use App\Http\Controllers\ShiftTemplateController;
 use App\Http\Controllers\SisController;
 use App\Http\Controllers\SisGenerationController;
 use App\Http\Controllers\SisPdfController;
@@ -114,6 +115,15 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/roster-blackout-days', [RosterBlackoutDayController::class, 'store'])
         ->name('roster-blackout-days.store');
+
+    Route::get('/shift-templates', [ShiftTemplateController::class, 'index'])
+        ->name('shift-templates.index');
+
+    Route::patch('/shift-templates/{shiftTemplate}', [ShiftTemplateController::class, 'update'])
+        ->name('shift-templates.update');
+
+    Route::patch('/shift-templates/{shiftTemplate}/staffing-rule', [ShiftTemplateController::class, 'updateStaffingRule'])
+        ->name('shift-templates.staffing-rule.update');
 });
 
 require __DIR__ . '/auth.php';
