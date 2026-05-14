@@ -133,6 +133,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/rosters', [RosterController::class, 'store'])
         ->name('rosters.store');
 
+    Route::get('/rosters/{roster}', [RosterController::class, 'show'])
+        ->name('rosters.show');
+
     Route::patch('/rosters/{roster}/publish', [RosterController::class, 'publish'])
         ->name('rosters.publish');
 

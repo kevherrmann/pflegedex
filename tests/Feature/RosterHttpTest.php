@@ -148,6 +148,137 @@ it('blocks non PDL users from viewing the rosters page', function (): void {
         ->assertForbidden();
 });
 
+it('shows the roster detail page to PDL users', function (): void {
+    $pdl = createRosterHttpUser('PDL');
+    $location = Location::factory()->create();
+    $roster = createRosterHttpRoster($location, $pdl);
+
+    $this->actingAs($pdl)
+        ->get("/rosters/{$roster->id}")
+        ->assertOk()
+        ->assertInertia(
+            fn (Assert $page) => $page
+                ->component('Rosters/Show')
+                ->where('roster.id', $roster->id)
+        );
+});
+
+it('blocks non PDL users from viewing the roster detail page', function (): void {
+    $user = createRosterHttpUser('Pflegekraft');
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $roster = createRosterHttpRoster($location, $createdBy);
+
+    $this->actingAs($user)
+        ->get("/rosters/{$roster->id}")
+        ->assertForbidden();
+});
+
+it('passes roster employees and shift templates to the roster detail page', function (): void {
+    $pdl = createRosterHttpUser('PDL');
+    $location = Location::factory()->create(['name' => 'Wohnbereich B']);
+    $otherLocation = Location::factory()->create();
+    $employee = createRosterHttpEmployee($location, [
+        'is_nursing_specialist' => true,
+        'can_work_night' => true,
+    ]);
+    $roster = createRosterHttpRoster($location, $pdl);
+    $shiftTemplate = createRosterHttpShiftTemplate($location);
+
+    createRosterHttpShiftTemplate($otherLocation, ['code' => 'late']);
+
+    $this->actingAs($pdl)
+        ->get("/rosters/{$roster->id}")
+        ->assertOk()
+        ->assertInertia(
+            fn (Assert $page) => $page
+                ->component('Rosters/Show')
+                ->where('roster.id', $roster->id)
+                ->where('roster.locationId', $location->id)
+                ->where('roster.locationName', 'Wohnbereich B')
+                ->where('employees.0.id', $employee->id)
+                ->where('employees.0.name', $employee->name)
+                ->where('employees.0.email', $employee->email)
+                ->where('employees.0.locationId', $location->id)
+                ->where('employees.0.isNursingSpecialist', true)
+                ->where('employees.0.canWorkEarly', true)
+                ->where('employees.0.canWorkLate', true)
+                ->where('employees.0.canWorkNight', true)
+                ->where('shiftTemplates.0.id', $shiftTemplate->id)
+                ->where('shiftTemplates.0.locationId', $location->id)
+                ->where('shiftTemplates.0.name', 'Frühdienst')
+                ->where('shiftTemplates.0.code', 'early')
+                ->where('shiftTemplates.0.startsAt', '06:00')
+                ->where('shiftTemplates.0.endsAt', '14:00')
+                ->has('shiftTemplates', 1)
+        );
+});
+
+it('passes roster shifts to the roster detail page', function (): void {
+    $pdl = createRosterHttpUser('PDL');
+    $location = Location::factory()->create();
+    $employee = createRosterHttpEmployee($location);
+    $roster = createRosterHttpRoster($location, $pdl);
+    $shiftTemplate = createRosterHttpShiftTemplate($location);
+
+    Shift::query()->create([
+        'roster_id' => $roster->id,
+        'location_id' => $location->id,
+        'user_id' => $employee->id,
+        'shift_template_id' => $shiftTemplate->id,
+        'date' => '2027-01-10',
+        'starts_at' => '2027-01-10 06:00:00',
+        'ends_at' => '2027-01-10 14:00:00',
+        'source' => ShiftSource::Manual,
+        'note' => 'Notiz',
+    ]);
+
+    $this->actingAs($pdl)
+        ->get("/rosters/{$roster->id}")
+        ->assertOk()
+        ->assertInertia(
+            fn (Assert $page) => $page
+                ->where('roster.id', $roster->id)
+                ->where('roster.shifts.0.date', '2027-01-10')
+                ->where('roster.shifts.0.employeeName', $employee->name)
+                ->where('roster.shifts.0.shiftTemplateName', 'Frühdienst')
+                ->where('roster.shifts.0.shiftTemplateCode', 'early')
+                ->where('roster.shifts.0.note', 'Notiz')
+                ->has('roster.shifts.0.startsAt')
+                ->has('roster.shifts.0.endsAt')
+        );
+});
+
+it('passes roster validation flash results to the roster detail page', function (): void {
+    $pdl = createRosterHttpUser('PDL');
+    $location = Location::factory()->create();
+    $roster = createRosterHttpRoster($location, $pdl);
+
+    $this->actingAs($pdl)
+        ->withSession([
+            'rosterValidationResult' => [
+                'rosterId' => $roster->id,
+                'status' => 'yellow',
+                'errors' => [],
+                'warnings' => [
+                    [
+                        'code' => 'missing_staffing_rule',
+                        'message' => 'Hinweis',
+                        'context' => ['date' => '2027-01-01'],
+                    ],
+                ],
+            ],
+        ])
+        ->get("/rosters/{$roster->id}")
+        ->assertOk()
+        ->assertInertia(
+            fn (Assert $page) => $page
+                ->where('rosterValidationResult.rosterId', $roster->id)
+                ->where('rosterValidationResult.status', 'yellow')
+                ->where('rosterValidationResult.warnings.0.code', 'missing_staffing_rule')
+        );
+});
+
 it('passes locations and rosters to inertia', function (): void {
     $pdl = createRosterHttpUser('PDL');
     $location = Location::factory()->create([
@@ -442,36 +573,6 @@ it('blocks non PDL users from validating rosters', function (): void {
     $this->actingAs($user)
         ->post("/rosters/{$roster->id}/validate")
         ->assertForbidden();
-});
-
-it('passes roster validation flash results to inertia', function (): void {
-    $pdl = createRosterHttpUser('PDL');
-    $location = Location::factory()->create();
-    $roster = createRosterHttpRoster($location, $pdl);
-
-    $this->actingAs($pdl)
-        ->withSession([
-            'rosterValidationResult' => [
-                'rosterId' => $roster->id,
-                'status' => 'yellow',
-                'errors' => [],
-                'warnings' => [
-                    [
-                        'code' => 'missing_staffing_rule',
-                        'message' => 'Hinweis',
-                        'context' => ['date' => '2027-01-01'],
-                    ],
-                ],
-            ],
-        ])
-        ->get('/rosters')
-        ->assertOk()
-        ->assertInertia(
-            fn (Assert $page) => $page
-                ->where('rosterValidationResult.rosterId', $roster->id)
-                ->where('rosterValidationResult.status', 'yellow')
-                ->where('rosterValidationResult.warnings.0.code', 'missing_staffing_rule')
-        );
 });
 
 it('flashes green status for a green validation result', function (): void {

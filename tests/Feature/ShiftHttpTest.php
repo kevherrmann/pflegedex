@@ -148,14 +148,15 @@ it('passes employees and shift templates to inertia', function (): void {
         'is_nursing_specialist' => true,
         'can_work_night' => true,
     ]);
+    $roster = createShiftHttpRoster($location, $pdl);
     $shiftTemplate = createShiftHttpShiftTemplate($location);
 
     $this->actingAs($pdl)
-        ->get('/rosters')
+        ->get("/rosters/{$roster->id}")
         ->assertOk()
         ->assertInertia(
             fn (Assert $page) => $page
-                ->component('Rosters/Index')
+                ->component('Rosters/Show')
                 ->where('employees.0.id', $employee->id)
                 ->where('employees.0.name', $employee->name)
                 ->where('employees.0.email', $employee->email)
@@ -193,18 +194,19 @@ it('passes roster shifts to inertia', function (): void {
     ]);
 
     $this->actingAs($pdl)
-        ->get('/rosters')
+        ->get("/rosters/{$roster->id}")
         ->assertOk()
         ->assertInertia(
             fn (Assert $page) => $page
-                ->where('rosters.0.id', $roster->id)
-                ->where('rosters.0.shifts.0.date', '2027-01-10')
-                ->where('rosters.0.shifts.0.employeeName', $employee->name)
-                ->where('rosters.0.shifts.0.shiftTemplateName', 'Frühdienst')
-                ->where('rosters.0.shifts.0.shiftTemplateCode', 'early')
-                ->where('rosters.0.shifts.0.note', 'Notiz')
-                ->has('rosters.0.shifts.0.startsAt')
-                ->has('rosters.0.shifts.0.endsAt')
+                ->component('Rosters/Show')
+                ->where('roster.id', $roster->id)
+                ->where('roster.shifts.0.date', '2027-01-10')
+                ->where('roster.shifts.0.employeeName', $employee->name)
+                ->where('roster.shifts.0.shiftTemplateName', 'Frühdienst')
+                ->where('roster.shifts.0.shiftTemplateCode', 'early')
+                ->where('roster.shifts.0.note', 'Notiz')
+                ->has('roster.shifts.0.startsAt')
+                ->has('roster.shifts.0.endsAt')
         );
 });
 
