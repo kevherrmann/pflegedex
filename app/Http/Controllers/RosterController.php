@@ -2,8 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\EmploymentArea;
 use App\Models\Location;
 use App\Models\Roster;
+use App\Models\Shift;
+use App\Models\ShiftTemplate;
+use App\Models\User;
 use App\Services\Rosters\RosterService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -29,8 +33,40 @@ class RosterController extends Controller
                     'name' => $location->name,
                 ])
                 ->values(),
+            'employees' => User::query()
+                ->with('employeeProfile')
+                ->whereHas('employeeProfile', fn ($query) => $query
+                    ->where('active', true)
+                    ->where('employment_area', EmploymentArea::Nursing->value))
+                ->orderBy('name')
+                ->get()
+                ->map(fn (User $user): array => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'locationId' => $user->location_id,
+                    'isNursingSpecialist' => $user->employeeProfile?->is_nursing_specialist ?? false,
+                    'canWorkEarly' => $user->employeeProfile?->can_work_early ?? false,
+                    'canWorkLate' => $user->employeeProfile?->can_work_late ?? false,
+                    'canWorkNight' => $user->employeeProfile?->can_work_night ?? false,
+                ])
+                ->values(),
+            'shiftTemplates' => ShiftTemplate::query()
+                ->where('active', true)
+                ->orderBy('location_id')
+                ->orderBy('starts_at')
+                ->get()
+                ->map(fn (ShiftTemplate $shiftTemplate): array => [
+                    'id' => $shiftTemplate->id,
+                    'locationId' => $shiftTemplate->location_id,
+                    'name' => $shiftTemplate->name,
+                    'code' => $shiftTemplate->code,
+                    'startsAt' => $shiftTemplate->starts_at,
+                    'endsAt' => $shiftTemplate->ends_at,
+                ])
+                ->values(),
             'rosters' => Roster::query()
-                ->with(['location', 'createdBy'])
+                ->with(['location', 'createdBy', 'shifts.user', 'shifts.shiftTemplate'])
                 ->withCount('shifts')
                 ->orderByDesc('year')
                 ->orderByDesc('month')
@@ -51,6 +87,19 @@ class RosterController extends Controller
                     'createdByName' => $roster->createdBy?->name,
                     'shiftsCount' => $roster->shifts_count,
                     'createdAt' => $roster->created_at?->toDateTimeString(),
+                    'shifts' => $roster->shifts
+                        ->sortBy(fn (Shift $shift): string => $shift->date->toDateString() . ' ' . $shift->starts_at->toDateTimeString())
+                        ->map(fn (Shift $shift): array => [
+                            'id' => $shift->id,
+                            'date' => $shift->date->toDateString(),
+                            'startsAt' => $shift->starts_at->toDateTimeString(),
+                            'endsAt' => $shift->ends_at->toDateTimeString(),
+                            'employeeName' => $shift->user?->name,
+                            'shiftTemplateName' => $shift->shiftTemplate?->name,
+                            'shiftTemplateCode' => $shift->shiftTemplate?->code,
+                            'note' => $shift->note,
+                        ])
+                        ->values(),
                 ])
                 ->values(),
         ]);

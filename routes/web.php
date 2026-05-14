@@ -11,6 +11,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ResidentController;
 use App\Http\Controllers\RosterController;
 use App\Http\Controllers\RosterBlackoutDayController;
+use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\ShiftTemplateController;
 use App\Http\Controllers\SisController;
 use App\Http\Controllers\SisGenerationController;
@@ -140,6 +141,9 @@ Route::middleware('auth')->group(function () {
 
     Route::patch('/rosters/{roster}/reopen', [RosterController::class, 'reopen'])
         ->name('rosters.reopen');
+
+    Route::post('/rosters/{roster}/shifts', [ShiftController::class, 'store'])
+        ->name('rosters.shifts.store');
 });
 
 require __DIR__ . '/auth.php';
