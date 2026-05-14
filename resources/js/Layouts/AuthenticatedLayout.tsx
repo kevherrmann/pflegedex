@@ -86,6 +86,14 @@ export default function Authenticated({
                                         Urlaub
                                     </NavLink>
                                 )}
+                                {auth.permissions.canManageAbsenceRequests && (
+                                    <NavLink
+                                        href={route('roster-blackout-days.index')}
+                                        active={route().current('roster-blackout-days.*')}
+                                    >
+                                        Urlaubssperren
+                                    </NavLink>
+                                )}
                                 {canManageStaff && (
                                     <NavLink
                                         href={route('staff.index')}
@@ -244,6 +252,14 @@ export default function Authenticated({
                                 active={route().current('absence-requests.*')}
                             >
                                 Urlaub
+                            </ResponsiveNavLink>
+                        )}
+                        {auth.permissions.canManageAbsenceRequests && (
+                            <ResponsiveNavLink
+                                href={route('roster-blackout-days.index')}
+                                active={route().current('roster-blackout-days.*')}
+                            >
+                                Urlaubssperren
                             </ResponsiveNavLink>
                         )}
                         {canManageStaff && (

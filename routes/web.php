@@ -9,6 +9,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ResidentController;
+use App\Http\Controllers\RosterBlackoutDayController;
 use App\Http\Controllers\SisController;
 use App\Http\Controllers\SisGenerationController;
 use App\Http\Controllers\SisPdfController;
@@ -107,6 +108,12 @@ Route::middleware('auth')->group(function () {
 
     Route::patch('/absence-requests/{absenceRequest}/reject', [AbsenceRequestController::class, 'reject'])
         ->name('absence-requests.reject');
+
+    Route::get('/roster-blackout-days', [RosterBlackoutDayController::class, 'index'])
+        ->name('roster-blackout-days.index');
+
+    Route::post('/roster-blackout-days', [RosterBlackoutDayController::class, 'store'])
+        ->name('roster-blackout-days.store');
 });
 
 require __DIR__ . '/auth.php';
