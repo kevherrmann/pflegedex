@@ -3,12 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\Roster;
+use App\Models\Shift;
 use App\Models\ShiftTemplate;
 use App\Models\User;
 use App\Services\Rosters\ShiftService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
+use Illuminate\Validation\ValidationException;
 
 class ShiftController extends Controller
 {
@@ -38,5 +40,25 @@ class ShiftController extends Controller
         );
 
         return back()->with('status', 'shift-created');
+    }
+
+    public function destroy(Request $request, Roster $roster, Shift $shift): RedirectResponse
+    {
+        abort_unless(
+            $request->user()?->hasRole('PDL'),
+            HttpResponse::HTTP_FORBIDDEN,
+        );
+
+        abort_unless($shift->roster_id === $roster->id, HttpResponse::HTTP_NOT_FOUND);
+
+        if (! $roster->isEditable()) {
+            throw ValidationException::withMessages([
+                'status' => 'Nur bearbeitbare Dienstpläne können geändert werden.',
+            ]);
+        }
+
+        $shift->delete();
+
+        return back()->with('status', 'shift-deleted');
     }
 }

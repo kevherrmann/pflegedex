@@ -78,6 +78,21 @@ function createShiftHttpEmployee(Location $location, array $profileAttributes = 
     return $employee->refresh();
 }
 
+function createShiftHttpShift(Roster $roster, User $employee, ShiftTemplate $shiftTemplate, array $attributes = []): Shift
+{
+    return Shift::query()->create([
+        'roster_id' => $roster->id,
+        'location_id' => $roster->location_id,
+        'user_id' => $employee->id,
+        'shift_template_id' => $shiftTemplate->id,
+        'date' => $attributes['date'] ?? '2027-01-10',
+        'starts_at' => $attributes['starts_at'] ?? '2027-01-10 06:00:00',
+        'ends_at' => $attributes['ends_at'] ?? '2027-01-10 14:00:00',
+        'source' => $attributes['source'] ?? ShiftSource::Manual,
+        'note' => $attributes['note'] ?? null,
+    ]);
+}
+
 it('lets PDL users add a shift to a draft roster', function (): void {
     $pdl = createShiftHttpUser('PDL');
     $location = Location::factory()->create();
@@ -339,4 +354,104 @@ it('calculates night shift end time on the following day through http', function
 
     expect($shift->starts_at->format('Y-m-d H:i:s'))->toBe('2027-01-10 22:00:00')
         ->and($shift->ends_at->format('Y-m-d H:i:s'))->toBe('2027-01-11 06:00:00');
+});
+
+it('lets PDL users delete a shift from an editable roster', function (): void {
+    $pdl = createShiftHttpUser('PDL');
+    $location = Location::factory()->create();
+    $employee = createShiftHttpEmployee($location);
+    $roster = createShiftHttpRoster($location, $pdl);
+    $shiftTemplate = createShiftHttpShiftTemplate($location);
+    $shift = createShiftHttpShift($roster, $employee, $shiftTemplate);
+
+    $this->actingAs($pdl)
+        ->from('/rosters')
+        ->delete("/rosters/{$roster->id}/shifts/{$shift->id}")
+        ->assertRedirect('/rosters')
+        ->assertSessionHas('status', 'shift-deleted');
+
+    $this->assertDatabaseMissing('shifts', [
+        'id' => $shift->id,
+    ]);
+});
+
+it('blocks non PDL users from deleting shifts', function (): void {
+    $user = createShiftHttpUser('Pflegekraft');
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createShiftHttpEmployee($location);
+    $roster = createShiftHttpRoster($location, $createdBy);
+    $shiftTemplate = createShiftHttpShiftTemplate($location);
+    $shift = createShiftHttpShift($roster, $employee, $shiftTemplate);
+
+    $this->actingAs($user)
+        ->delete("/rosters/{$roster->id}/shifts/{$shift->id}")
+        ->assertForbidden();
+
+    $this->assertDatabaseHas('shifts', [
+        'id' => $shift->id,
+    ]);
+});
+
+it('does not delete a shift through the wrong roster URL', function (): void {
+    $pdl = createShiftHttpUser('PDL');
+    $location = Location::factory()->create();
+    $otherLocation = Location::factory()->create();
+    $employee = createShiftHttpEmployee($location);
+    $roster = createShiftHttpRoster($location, $pdl);
+    $otherRoster = createShiftHttpRoster($otherLocation, $pdl);
+    $shiftTemplate = createShiftHttpShiftTemplate($location);
+    $shift = createShiftHttpShift($roster, $employee, $shiftTemplate);
+
+    $this->actingAs($pdl)
+        ->delete("/rosters/{$otherRoster->id}/shifts/{$shift->id}")
+        ->assertNotFound();
+
+    $this->assertDatabaseHas('shifts', [
+        'id' => $shift->id,
+    ]);
+});
+
+it('does not delete shifts from published or locked rosters', function (): void {
+    $pdl = createShiftHttpUser('PDL');
+
+    foreach ([RosterStatus::Published, RosterStatus::Locked] as $index => $status) {
+        $location = Location::factory()->create();
+        $employee = createShiftHttpEmployee($location);
+        $roster = createShiftHttpRoster($location, $pdl, [
+            'month' => $index + 1,
+            'status' => $status,
+        ]);
+        $shiftTemplate = createShiftHttpShiftTemplate($location);
+        $shift = createShiftHttpShift($roster, $employee, $shiftTemplate, [
+            'date' => sprintf('2027-%02d-10', $index + 1),
+            'starts_at' => sprintf('2027-%02d-10 06:00:00', $index + 1),
+            'ends_at' => sprintf('2027-%02d-10 14:00:00', $index + 1),
+        ]);
+
+        $this->actingAs($pdl)
+            ->from('/rosters')
+            ->delete("/rosters/{$roster->id}/shifts/{$shift->id}")
+            ->assertRedirect('/rosters')
+            ->assertSessionHasErrors('status');
+
+        $this->assertDatabaseHas('shifts', [
+            'id' => $shift->id,
+        ]);
+    }
+});
+
+it('removes the shift from the database after deletion', function (): void {
+    $pdl = createShiftHttpUser('PDL');
+    $location = Location::factory()->create();
+    $employee = createShiftHttpEmployee($location);
+    $roster = createShiftHttpRoster($location, $pdl);
+    $shiftTemplate = createShiftHttpShiftTemplate($location);
+    $shift = createShiftHttpShift($roster, $employee, $shiftTemplate);
+
+    $this->actingAs($pdl)
+        ->from('/rosters')
+        ->delete("/rosters/{$roster->id}/shifts/{$shift->id}");
+
+    expect(Shift::query()->whereKey($shift->id)->exists())->toBeFalse();
 });

@@ -127,6 +127,16 @@ function statusClass(status: string): string {
     return 'bg-gray-100 text-gray-700';
 }
 
+function deleteShift(roster: RosterItem, shift: ShiftItem): void {
+    if (!window.confirm('Diesen Dienst wirklich löschen?')) {
+        return;
+    }
+
+    router.delete(route('rosters.shifts.destroy', [roster.id, shift.id]), {
+        preserveScroll: true,
+    });
+}
+
 function RosterActions({ roster }: { roster: RosterItem }) {
     const patch = (routeName: string) => {
         router.patch(route(routeName, roster.id), {}, { preserveScroll: true });
@@ -413,7 +423,7 @@ function ShiftCreatePanel({
                         {roster.shifts.map((shift) => (
                             <li
                                 key={shift.id}
-                                className="grid gap-2 py-3 text-sm text-gray-700 md:grid-cols-4"
+                                className="grid gap-2 py-3 text-sm text-gray-700 md:grid-cols-[1fr_1.4fr_1.2fr_2fr_auto] md:items-center"
                             >
                                 <span className="font-medium text-gray-900">
                                     {shift.date}
@@ -430,6 +440,17 @@ function ShiftCreatePanel({
                                     {formatDateTime(shift.endsAt)}
                                     {shift.note ? ` · ${shift.note}` : ''}
                                 </span>
+                                {roster.isEditable && (
+                                    <span className="flex justify-start md:justify-end">
+                                        <button
+                                            type="button"
+                                            onClick={() => deleteShift(roster, shift)}
+                                            className="rounded-md border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50"
+                                        >
+                                            Löschen
+                                        </button>
+                                    </span>
+                                )}
                             </li>
                         ))}
                     </ul>

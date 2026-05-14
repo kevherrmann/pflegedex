@@ -147,6 +147,9 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/rosters/{roster}/shifts', [ShiftController::class, 'store'])
         ->name('rosters.shifts.store');
+
+    Route::delete('/rosters/{roster}/shifts/{shift}', [ShiftController::class, 'destroy'])
+        ->name('rosters.shifts.destroy');
 });
 
 require __DIR__ . '/auth.php';
