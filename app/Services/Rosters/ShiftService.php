@@ -1,0 +1,144 @@
+<?php
+
+namespace App\Services\Rosters;
+
+use App\Enums\EmploymentArea;
+use App\Enums\ShiftSource;
+use App\Models\EmployeeProfile;
+use App\Models\Roster;
+use App\Models\Shift;
+use App\Models\ShiftTemplate;
+use App\Models\User;
+use Carbon\CarbonImmutable;
+use Illuminate\Validation\ValidationException;
+
+class ShiftService
+{
+    public function assignManualShift(
+        Roster $roster,
+        User $employee,
+        ShiftTemplate $shiftTemplate,
+        string $date,
+        ?string $note = null,
+    ): Shift {
+        if (! $roster->isEditable()) {
+            throw ValidationException::withMessages([
+                'status' => 'Nur bearbeitbare Dienstpläne können geändert werden.',
+            ]);
+        }
+
+        $employee->loadMissing('employeeProfile');
+        $employeeProfile = $employee->employeeProfile;
+
+        $this->ensureEmployeeCanBeAssigned($employeeProfile);
+        $this->ensureShiftTemplateMatchesRoster($roster, $shiftTemplate);
+
+        $shiftDate = $this->parseDateForRoster($roster, $date);
+
+        $this->ensureEmployeeCanWorkShiftTemplate($employeeProfile, $shiftTemplate);
+        $this->ensureNoDuplicateShift($employee, $shiftTemplate, $shiftDate->toDateString());
+
+        [$startsAt, $endsAt] = $this->buildShiftTimes($shiftDate, $shiftTemplate);
+
+        return Shift::query()->create([
+            'roster_id' => $roster->id,
+            'location_id' => $roster->location_id,
+            'user_id' => $employee->id,
+            'shift_template_id' => $shiftTemplate->id,
+            'date' => $shiftDate->toDateString(),
+            'starts_at' => $startsAt,
+            'ends_at' => $endsAt,
+            'source' => ShiftSource::Manual,
+            'note' => $note,
+        ]);
+    }
+
+    private function ensureEmployeeCanBeAssigned(?EmployeeProfile $employeeProfile): void
+    {
+        if ($employeeProfile === null || ! $employeeProfile->active) {
+            throw ValidationException::withMessages([
+                'user_id' => 'Der Mitarbeiter hat kein aktives Mitarbeiterprofil.',
+            ]);
+        }
+
+        if ($employeeProfile->employment_area !== EmploymentArea::Nursing) {
+            throw ValidationException::withMessages([
+                'user_id' => 'Nur Pflegekräfte können in den Pflege-Dienstplan eingetragen werden.',
+            ]);
+        }
+    }
+
+    private function ensureShiftTemplateMatchesRoster(Roster $roster, ShiftTemplate $shiftTemplate): void
+    {
+        if ($shiftTemplate->location_id !== $roster->location_id) {
+            throw ValidationException::withMessages([
+                'shift_template_id' => 'Die Schichtvorlage gehört nicht zum Wohnbereich des Dienstplans.',
+            ]);
+        }
+    }
+
+    private function parseDateForRoster(Roster $roster, string $date): CarbonImmutable
+    {
+        try {
+            $shiftDate = CarbonImmutable::parse($date)->startOfDay();
+        } catch (\Throwable) {
+            throw ValidationException::withMessages([
+                'date' => 'Das Datum ist ungültig.',
+            ]);
+        }
+
+        if ($shiftDate->year !== $roster->year || $shiftDate->month !== $roster->month) {
+            throw ValidationException::withMessages([
+                'date' => 'Das Datum muss im Monat des Dienstplans liegen.',
+            ]);
+        }
+
+        return $shiftDate;
+    }
+
+    private function ensureEmployeeCanWorkShiftTemplate(EmployeeProfile $employeeProfile, ShiftTemplate $shiftTemplate): void
+    {
+        $canWorkShift = match ($shiftTemplate->code) {
+            'early' => $employeeProfile->can_work_early,
+            'late' => $employeeProfile->can_work_late,
+            'night' => $employeeProfile->can_work_night,
+            default => true,
+        };
+
+        if (! $canWorkShift) {
+            throw ValidationException::withMessages([
+                'shift_template_id' => 'Der Mitarbeiter darf diese Schicht nicht arbeiten.',
+            ]);
+        }
+    }
+
+    private function ensureNoDuplicateShift(User $employee, ShiftTemplate $shiftTemplate, string $date): void
+    {
+        $exists = Shift::query()
+            ->where('user_id', $employee->id)
+            ->whereDate('date', $date)
+            ->where('shift_template_id', $shiftTemplate->id)
+            ->exists();
+
+        if ($exists) {
+            throw ValidationException::withMessages([
+                'user_id' => 'Der Mitarbeiter ist an diesem Tag bereits für diese Schicht eingetragen.',
+            ]);
+        }
+    }
+
+    /**
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable}
+     */
+    private function buildShiftTimes(CarbonImmutable $shiftDate, ShiftTemplate $shiftTemplate): array
+    {
+        $startsAt = CarbonImmutable::parse($shiftDate->toDateString() . ' ' . $shiftTemplate->starts_at);
+        $endsAt = CarbonImmutable::parse($shiftDate->toDateString() . ' ' . $shiftTemplate->ends_at);
+
+        if ($endsAt->lessThanOrEqualTo($startsAt)) {
+            $endsAt = $endsAt->addDay();
+        }
+
+        return [$startsAt, $endsAt];
+    }
+}
