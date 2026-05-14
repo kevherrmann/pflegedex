@@ -42,6 +42,19 @@ type ShiftItem = {
     note: string | null;
 };
 
+type ValidationEntry = {
+    code: string;
+    message: string;
+    context: Record<string, unknown>;
+};
+
+type RosterValidationResult = {
+    rosterId: string;
+    status: 'green' | 'yellow' | 'red';
+    errors: ValidationEntry[];
+    warnings: ValidationEntry[];
+};
+
 type RosterItem = {
     id: string;
     locationId: string;
@@ -65,6 +78,7 @@ type Props = {
     rosters: RosterItem[];
     employees: EmployeeOption[];
     shiftTemplates: ShiftTemplateOption[];
+    rosterValidationResult: RosterValidationResult | null;
 };
 
 const months = [
@@ -118,12 +132,35 @@ function RosterActions({ roster }: { roster: RosterItem }) {
         router.patch(route(routeName, roster.id), {}, { preserveScroll: true });
     };
 
+    const validate = () => {
+        router.post(route('rosters.validate', roster.id), {}, { preserveScroll: true });
+    };
+
     if (roster.status === 'locked') {
-        return <span className="text-sm text-gray-500">Gesperrt</span>;
+        return (
+            <div className="flex flex-wrap gap-2">
+                <button
+                    type="button"
+                    onClick={validate}
+                    className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                >
+                    Dienstplan prüfen
+                </button>
+                <span className="py-2 text-sm text-gray-500">Gesperrt</span>
+            </div>
+        );
     }
 
     return (
         <div className="flex flex-wrap gap-2">
+            <button
+                type="button"
+                onClick={validate}
+                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+            >
+                Dienstplan prüfen
+            </button>
+
             {roster.isEditable && (
                 <button
                     type="button"
@@ -160,10 +197,12 @@ function ShiftCreatePanel({
     roster,
     employees,
     shiftTemplates,
+    validationResult,
 }: {
     roster: RosterItem;
     employees: EmployeeOption[];
     shiftTemplates: ShiftTemplateOption[];
+    validationResult: RosterValidationResult | null;
 }) {
     const rosterEmployees = employees.filter(
         (employee) => employee.locationId === null || employee.locationId === roster.locationId,
@@ -286,6 +325,82 @@ function ShiftCreatePanel({
             </form>
 
             <div className="border-t border-gray-200 p-6">
+                {validationResult?.rosterId === roster.id && (
+                    <div
+                        className={`mb-6 rounded-md border p-4 text-sm ${
+                            validationResult.status === 'red'
+                                ? 'border-red-200 bg-red-50 text-red-900'
+                                : validationResult.status === 'yellow'
+                                  ? 'border-amber-200 bg-amber-50 text-amber-900'
+                                  : 'border-green-200 bg-green-50 text-green-900'
+                        }`}
+                    >
+                        <p className="font-semibold">
+                            {validationResult.status === 'red' &&
+                                'Der Dienstplan hat Fehler.'}
+                            {validationResult.status === 'yellow' &&
+                                'Der Dienstplan hat Hinweise.'}
+                            {validationResult.status === 'green' &&
+                                'Der Dienstplan erfüllt alle aktuell geprüften Regeln.'}
+                        </p>
+
+                        {(validationResult.errors.length > 0 ||
+                            validationResult.warnings.length > 0) && (
+                            <div className="mt-3 space-y-3">
+                                {validationResult.errors.length > 0 && (
+                                    <div>
+                                        <p className="font-medium">Fehler</p>
+                                        <ul className="mt-1 space-y-2">
+                                            {validationResult.errors.map((entry, index) => (
+                                                <li key={`${entry.code}-error-${index}`}>
+                                                    <span className="font-mono text-xs">
+                                                        {entry.code}
+                                                    </span>{' '}
+                                                    {entry.message}
+                                                    <pre className="mt-1 overflow-x-auto rounded bg-white/70 p-2 text-xs">
+                                                        {JSON.stringify(
+                                                            entry.context,
+                                                            null,
+                                                            2,
+                                                        )}
+                                                    </pre>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+
+                                {validationResult.warnings.length > 0 && (
+                                    <div>
+                                        <p className="font-medium">Hinweise</p>
+                                        <ul className="mt-1 space-y-2">
+                                            {validationResult.warnings.map(
+                                                (entry, index) => (
+                                                    <li
+                                                        key={`${entry.code}-warning-${index}`}
+                                                    >
+                                                        <span className="font-mono text-xs">
+                                                            {entry.code}
+                                                        </span>{' '}
+                                                        {entry.message}
+                                                        <pre className="mt-1 overflow-x-auto rounded bg-white/70 p-2 text-xs">
+                                                            {JSON.stringify(
+                                                                entry.context,
+                                                                null,
+                                                                2,
+                                                            )}
+                                                        </pre>
+                                                    </li>
+                                                ),
+                                            )}
+                                        </ul>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 <h4 className="text-base font-semibold text-gray-900">
                     Eingetragene Dienste
                 </h4>
@@ -329,6 +444,7 @@ export default function RostersIndex({
     rosters,
     employees,
     shiftTemplates,
+    rosterValidationResult,
 }: Props) {
     const { data, setData, post, processing, errors } = useForm({
         location_id: locations[0]?.id ?? '',
@@ -524,6 +640,7 @@ export default function RostersIndex({
                                     roster={roster}
                                     employees={employees}
                                     shiftTemplates={shiftTemplates}
+                                    validationResult={rosterValidationResult}
                                 />
                             ))}
                         </div>

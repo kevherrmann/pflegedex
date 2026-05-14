@@ -9,6 +9,7 @@ use App\Models\Shift;
 use App\Models\ShiftTemplate;
 use App\Models\User;
 use App\Services\Rosters\RosterService;
+use App\Services\Rosters\RosterValidator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
@@ -25,6 +26,7 @@ class RosterController extends Controller
         );
 
         return Inertia::render('Rosters/Index', [
+            'rosterValidationResult' => $request->session()->get('rosterValidationResult'),
             'locations' => Location::query()
                 ->orderBy('name')
                 ->get(['id', 'name'])
@@ -164,5 +166,26 @@ class RosterController extends Controller
         $rosterService->reopen($roster);
 
         return back()->with('status', 'roster-reopened');
+    }
+
+    public function validateRoster(Request $request, Roster $roster, RosterValidator $rosterValidator): RedirectResponse
+    {
+        abort_unless(
+            $request->user()?->hasRole('PDL'),
+            HttpResponse::HTTP_FORBIDDEN,
+        );
+
+        $result = $rosterValidator->validate($roster);
+
+        return back()
+            ->with('status', 'roster-validated')
+            ->with('rosterValidationResult', [
+                'rosterId' => $roster->id,
+                'status' => $result->isRed()
+                    ? 'red'
+                    : ($result->isYellow() ? 'yellow' : 'green'),
+                'errors' => $result->errors,
+                'warnings' => $result->warnings,
+            ]);
     }
 }

@@ -1,9 +1,16 @@
 <?php
 
+use App\Enums\EmploymentArea;
 use App\Enums\RosterStatus;
+use App\Enums\ShiftSource;
+use App\Models\EmployeeProfile;
 use App\Models\Location;
 use App\Models\Roster;
+use App\Models\Shift;
+use App\Models\ShiftStaffingRule;
+use App\Models\ShiftTemplate;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
@@ -34,6 +41,91 @@ function createRosterHttpRoster(Location $location, User $createdBy, array $attr
         'published_at' => $attributes['published_at'] ?? null,
         'created_by' => $createdBy->id,
     ]);
+}
+
+function createRosterHttpEmployee(Location $location, array $profileAttributes = []): User
+{
+    $employee = User::factory()->for($location)->create();
+
+    EmployeeProfile::query()->create([
+        'user_id' => $employee->id,
+        'employment_area' => $profileAttributes['employment_area'] ?? EmploymentArea::Nursing,
+        'is_nursing_specialist' => $profileAttributes['is_nursing_specialist'] ?? false,
+        'weekly_hours' => $profileAttributes['weekly_hours'] ?? 39.00,
+        'regular_work_days_per_week' => $profileAttributes['regular_work_days_per_week'] ?? 5,
+        'annual_vacation_days' => $profileAttributes['annual_vacation_days'] ?? 30,
+        'vacation_days_carried_over' => $profileAttributes['vacation_days_carried_over'] ?? 0,
+        'overtime_minutes_balance' => $profileAttributes['overtime_minutes_balance'] ?? 0,
+        'can_work_early' => $profileAttributes['can_work_early'] ?? true,
+        'can_work_late' => $profileAttributes['can_work_late'] ?? true,
+        'can_work_night' => $profileAttributes['can_work_night'] ?? false,
+        'active' => $profileAttributes['active'] ?? true,
+    ]);
+
+    return $employee->refresh();
+}
+
+function createRosterHttpShiftTemplate(Location $location, array $attributes = []): ShiftTemplate
+{
+    return ShiftTemplate::query()->create([
+        'location_id' => $location->id,
+        'name' => $attributes['name'] ?? 'Frühdienst',
+        'code' => $attributes['code'] ?? 'early',
+        'starts_at' => $attributes['starts_at'] ?? '06:00',
+        'ends_at' => $attributes['ends_at'] ?? '14:00',
+        'duration_minutes' => $attributes['duration_minutes'] ?? 480,
+        'color' => $attributes['color'] ?? '#F59E0B',
+        'active' => $attributes['active'] ?? true,
+    ]);
+}
+
+function createRosterHttpStaffingRule(ShiftTemplate $shiftTemplate, array $attributes = []): ShiftStaffingRule
+{
+    return ShiftStaffingRule::query()->create([
+        'location_id' => $shiftTemplate->location_id,
+        'shift_template_id' => $shiftTemplate->id,
+        'weekday' => $attributes['weekday'] ?? null,
+        'required_total_staff' => $attributes['required_total_staff'] ?? 1,
+        'required_specialists' => $attributes['required_specialists'] ?? 0,
+    ]);
+}
+
+function createRosterHttpShift(
+    Roster $roster,
+    User $employee,
+    ShiftTemplate $shiftTemplate,
+    string $date,
+): Shift {
+    $shiftDate = CarbonImmutable::parse($date)->startOfDay();
+    $startsAt = CarbonImmutable::parse($shiftDate->toDateString() . ' ' . $shiftTemplate->starts_at);
+    $endsAt = CarbonImmutable::parse($shiftDate->toDateString() . ' ' . $shiftTemplate->ends_at);
+
+    if ($endsAt->lessThanOrEqualTo($startsAt)) {
+        $endsAt = $endsAt->addDay();
+    }
+
+    return Shift::query()->create([
+        'roster_id' => $roster->id,
+        'location_id' => $roster->location_id,
+        'user_id' => $employee->id,
+        'shift_template_id' => $shiftTemplate->id,
+        'date' => $shiftDate->toDateString(),
+        'starts_at' => $startsAt,
+        'ends_at' => $endsAt,
+        'source' => ShiftSource::Manual,
+        'note' => null,
+    ]);
+}
+
+function rosterHttpJanuary2027Dates(): array
+{
+    $dates = [];
+
+    for ($date = CarbonImmutable::create(2027, 1, 1); $date->month === 1; $date = $date->addDay()) {
+        $dates[] = $date->toDateString();
+    }
+
+    return $dates;
 }
 
 it('shows the rosters page to PDL users', function (): void {
@@ -270,4 +362,127 @@ it('returns a session error for invalid years', function (): void {
         ])
         ->assertRedirect('/rosters')
         ->assertSessionHasErrors('year');
+});
+
+it('lets PDL users validate a roster and flashes the validation result', function (): void {
+    $pdl = createRosterHttpUser('PDL');
+    $location = Location::factory()->create();
+    $roster = createRosterHttpRoster($location, $pdl);
+    $shiftTemplate = createRosterHttpShiftTemplate($location);
+
+    createRosterHttpStaffingRule($shiftTemplate, [
+        'required_total_staff' => 1,
+        'required_specialists' => 0,
+    ]);
+
+    $this->actingAs($pdl)
+        ->from('/rosters')
+        ->post("/rosters/{$roster->id}/validate")
+        ->assertRedirect('/rosters')
+        ->assertSessionHas('status', 'roster-validated')
+        ->assertSessionHas('rosterValidationResult', fn (array $result): bool => $result['rosterId'] === $roster->id
+            && $result['status'] === 'red'
+            && count($result['errors']) > 0
+            && $result['warnings'] === []);
+});
+
+it('blocks non PDL users from validating rosters', function (): void {
+    $user = createRosterHttpUser('Pflegekraft');
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $roster = createRosterHttpRoster($location, $createdBy);
+
+    $this->actingAs($user)
+        ->post("/rosters/{$roster->id}/validate")
+        ->assertForbidden();
+});
+
+it('passes roster validation flash results to inertia', function (): void {
+    $pdl = createRosterHttpUser('PDL');
+    $location = Location::factory()->create();
+    $roster = createRosterHttpRoster($location, $pdl);
+
+    $this->actingAs($pdl)
+        ->withSession([
+            'rosterValidationResult' => [
+                'rosterId' => $roster->id,
+                'status' => 'yellow',
+                'errors' => [],
+                'warnings' => [
+                    [
+                        'code' => 'missing_staffing_rule',
+                        'message' => 'Hinweis',
+                        'context' => ['date' => '2027-01-01'],
+                    ],
+                ],
+            ],
+        ])
+        ->get('/rosters')
+        ->assertOk()
+        ->assertInertia(
+            fn (Assert $page) => $page
+                ->where('rosterValidationResult.rosterId', $roster->id)
+                ->where('rosterValidationResult.status', 'yellow')
+                ->where('rosterValidationResult.warnings.0.code', 'missing_staffing_rule')
+        );
+});
+
+it('flashes green status for a green validation result', function (): void {
+    $pdl = createRosterHttpUser('PDL');
+    $location = Location::factory()->create();
+    $employee = createRosterHttpEmployee($location, ['is_nursing_specialist' => true]);
+    $roster = createRosterHttpRoster($location, $pdl);
+    $shiftTemplate = createRosterHttpShiftTemplate($location);
+
+    createRosterHttpStaffingRule($shiftTemplate, [
+        'required_total_staff' => 1,
+        'required_specialists' => 0,
+    ]);
+
+    foreach (rosterHttpJanuary2027Dates() as $date) {
+        createRosterHttpShift($roster, $employee, $shiftTemplate, $date);
+    }
+
+    $this->actingAs($pdl)
+        ->from('/rosters')
+        ->post("/rosters/{$roster->id}/validate")
+        ->assertRedirect('/rosters')
+        ->assertSessionHas('rosterValidationResult', fn (array $result): bool => $result['status'] === 'green'
+            && $result['errors'] === []
+            && $result['warnings'] === []);
+});
+
+it('flashes yellow status for a validation result with warnings', function (): void {
+    $pdl = createRosterHttpUser('PDL');
+    $location = Location::factory()->create();
+    $roster = createRosterHttpRoster($location, $pdl);
+
+    createRosterHttpShiftTemplate($location);
+
+    $this->actingAs($pdl)
+        ->from('/rosters')
+        ->post("/rosters/{$roster->id}/validate")
+        ->assertRedirect('/rosters')
+        ->assertSessionHas('rosterValidationResult', fn (array $result): bool => $result['status'] === 'yellow'
+            && $result['errors'] === []
+            && count($result['warnings']) > 0);
+});
+
+it('flashes red status for a validation result with errors', function (): void {
+    $pdl = createRosterHttpUser('PDL');
+    $location = Location::factory()->create();
+    $roster = createRosterHttpRoster($location, $pdl);
+    $shiftTemplate = createRosterHttpShiftTemplate($location);
+
+    createRosterHttpStaffingRule($shiftTemplate, [
+        'required_total_staff' => 1,
+        'required_specialists' => 0,
+    ]);
+
+    $this->actingAs($pdl)
+        ->from('/rosters')
+        ->post("/rosters/{$roster->id}/validate")
+        ->assertRedirect('/rosters')
+        ->assertSessionHas('rosterValidationResult', fn (array $result): bool => $result['status'] === 'red'
+            && count($result['errors']) > 0);
 });

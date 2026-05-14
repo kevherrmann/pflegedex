@@ -142,6 +142,9 @@ Route::middleware('auth')->group(function () {
     Route::patch('/rosters/{roster}/reopen', [RosterController::class, 'reopen'])
         ->name('rosters.reopen');
 
+    Route::post('/rosters/{roster}/validate', [RosterController::class, 'validateRoster'])
+        ->name('rosters.validate');
+
     Route::post('/rosters/{roster}/shifts', [ShiftController::class, 'store'])
         ->name('rosters.shifts.store');
 });
