@@ -1,8 +1,11 @@
 <?php
 
+use App\Enums\AbsenceRequestStatus;
+use App\Enums\AbsenceRequestType;
 use App\Enums\EmploymentArea;
 use App\Enums\RosterStatus;
 use App\Enums\ShiftSource;
+use App\Models\AbsenceRequest;
 use App\Models\EmployeeProfile;
 use App\Models\Location;
 use App\Models\Roster;
@@ -101,6 +104,24 @@ function createRosterValidatorShift(
         'ends_at' => $endsAt,
         'source' => ShiftSource::Manual,
         'note' => null,
+    ]);
+}
+
+function createRosterValidatorAbsenceRequest(User $employee, User $requestedBy, array $attributes = []): AbsenceRequest
+{
+    return AbsenceRequest::query()->create([
+        'user_id' => $employee->id,
+        'location_id' => $attributes['location_id'] ?? $employee->location_id,
+        'type' => $attributes['type'] ?? AbsenceRequestType::Vacation,
+        'starts_on' => $attributes['starts_on'] ?? '2027-01-10',
+        'ends_on' => $attributes['ends_on'] ?? '2027-01-10',
+        'days_count' => $attributes['days_count'] ?? 1,
+        'status' => $attributes['status'] ?? AbsenceRequestStatus::Approved,
+        'requested_by' => $attributes['requested_by'] ?? $requestedBy->id,
+        'decided_by' => $attributes['decided_by'] ?? $requestedBy->id,
+        'decided_at' => $attributes['decided_at'] ?? now(),
+        'rejection_reason' => $attributes['rejection_reason'] ?? null,
+        'note' => $attributes['note'] ?? null,
     ]);
 }
 
@@ -293,4 +314,87 @@ it('reports green yellow and red result states', function (): void {
         ->and($red->isGreen())->toBeFalse()
         ->and($red->isYellow())->toBeFalse()
         ->and($red->isRed())->toBeTrue();
+});
+
+it('adds an employee absent error when a shift overlaps approved absence', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createRosterValidatorEmployee($location);
+    $roster = createRosterValidatorRoster($location, $createdBy);
+    $shiftTemplate = createRosterValidatorShiftTemplate($location);
+    $shift = createRosterValidatorShift($roster, $employee, $shiftTemplate, '2027-01-10');
+    $absenceRequest = createRosterValidatorAbsenceRequest($employee, $createdBy, [
+        'starts_on' => '2027-01-10',
+        'ends_on' => '2027-01-10',
+        'type' => AbsenceRequestType::Vacation,
+        'status' => AbsenceRequestStatus::Approved,
+    ]);
+
+    $result = app(RosterValidator::class)->validate($roster);
+    $absenceError = collect($result->errors)->first(
+        fn (array $error): bool => $error['code'] === 'employee_absent',
+    );
+
+    expect($absenceError)->not->toBeNull()
+        ->and($absenceError['context']['userId'])->toBe($employee->id)
+        ->and($absenceError['context']['shiftId'])->toBe($shift->id)
+        ->and($absenceError['context']['date'])->toBe('2027-01-10')
+        ->and($absenceError['context']['absenceRequestId'])->toBe($absenceRequest->id)
+        ->and($absenceError['context']['absenceType'])->toBe(AbsenceRequestType::Vacation->value)
+        ->and($absenceError['context']['absenceStartsOn'])->toBe('2027-01-10')
+        ->and($absenceError['context']['absenceEndsOn'])->toBe('2027-01-10');
+});
+
+it('does not add employee absent errors for requested or rejected absences', function (AbsenceRequestStatus $status): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createRosterValidatorEmployee($location);
+    $roster = createRosterValidatorRoster($location, $createdBy);
+    $shiftTemplate = createRosterValidatorShiftTemplate($location);
+
+    createRosterValidatorShift($roster, $employee, $shiftTemplate, '2027-01-10');
+    createRosterValidatorAbsenceRequest($employee, $createdBy, [
+        'starts_on' => '2027-01-10',
+        'ends_on' => '2027-01-10',
+        'status' => $status,
+        'decided_by' => $status === AbsenceRequestStatus::Requested ? null : $createdBy->id,
+        'decided_at' => $status === AbsenceRequestStatus::Requested ? null : now(),
+        'rejection_reason' => $status === AbsenceRequestStatus::Rejected ? 'Nicht genehmigt' : null,
+    ]);
+
+    $result = app(RosterValidator::class)->validate($roster);
+
+    expect(rosterValidatorCodes($result->errors))->not->toContain('employee_absent');
+})->with([
+    AbsenceRequestStatus::Requested,
+    AbsenceRequestStatus::Rejected,
+]);
+
+it('detects employee absent errors for night shifts when absence is on the following day', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createRosterValidatorEmployee($location, ['can_work_night' => true]);
+    $roster = createRosterValidatorRoster($location, $createdBy);
+    $shiftTemplate = createRosterValidatorShiftTemplate($location, [
+        'name' => 'Nachtdienst',
+        'code' => 'night',
+        'starts_at' => '22:00',
+        'ends_at' => '06:00',
+    ]);
+    $shift = createRosterValidatorShift($roster, $employee, $shiftTemplate, '2027-01-10');
+
+    createRosterValidatorAbsenceRequest($employee, $createdBy, [
+        'starts_on' => '2027-01-11',
+        'ends_on' => '2027-01-11',
+        'status' => AbsenceRequestStatus::Approved,
+    ]);
+
+    $result = app(RosterValidator::class)->validate($roster);
+    $absenceError = collect($result->errors)->first(
+        fn (array $error): bool => $error['code'] === 'employee_absent',
+    );
+
+    expect($absenceError)->not->toBeNull()
+        ->and($absenceError['context']['shiftId'])->toBe($shift->id)
+        ->and($absenceError['context']['absenceStartsOn'])->toBe('2027-01-11');
 });

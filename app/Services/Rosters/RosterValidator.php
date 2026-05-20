@@ -2,6 +2,8 @@
 
 namespace App\Services\Rosters;
 
+use App\Enums\AbsenceRequestStatus;
+use App\Models\AbsenceRequest;
 use App\Models\Roster;
 use App\Models\Shift;
 use App\Models\ShiftStaffingRule;
@@ -32,6 +34,7 @@ class RosterValidator
             ->get();
 
         $this->validateStaffing($roster, $shiftTemplates, $result);
+        $this->validateAbsenceConflicts($roster, $result);
         $this->validateRestPeriods($roster, $result);
 
         return $result;
@@ -158,6 +161,56 @@ class RosterValidator
                     }
                 }
             });
+    }
+
+    private function validateAbsenceConflicts(Roster $roster, RosterValidationResult $result): void
+    {
+        if ($roster->shifts->isEmpty()) {
+            return;
+        }
+
+        $userIds = $roster->shifts
+            ->pluck('user_id')
+            ->unique()
+            ->values();
+
+        $shiftStartDate = $roster->shifts
+            ->min(fn (Shift $shift): string => $shift->starts_at->toDateString());
+        $shiftEndDate = $roster->shifts
+            ->max(fn (Shift $shift): string => $shift->ends_at->toDateString());
+
+        $absenceRequests = AbsenceRequest::query()
+            ->whereIn('user_id', $userIds)
+            ->where('status', AbsenceRequestStatus::Approved->value)
+            ->whereDate('starts_on', '<=', $shiftEndDate)
+            ->whereDate('ends_on', '>=', $shiftStartDate)
+            ->get()
+            ->groupBy('user_id');
+
+        foreach ($roster->shifts as $shift) {
+            $absenceRequest = $absenceRequests
+                ->get($shift->user_id, collect())
+                ->first(fn (AbsenceRequest $absenceRequest): bool => $absenceRequest->starts_on->toDateString() <= $shift->ends_at->toDateString()
+                    && $absenceRequest->ends_on->toDateString() >= $shift->starts_at->toDateString());
+
+            if ($absenceRequest === null) {
+                continue;
+            }
+
+            $result->addError(
+                'employee_absent',
+                'Der Mitarbeiter ist während dieser Schicht abwesend.',
+                [
+                    'userId' => $shift->user_id,
+                    'shiftId' => $shift->id,
+                    'date' => $shift->date->toDateString(),
+                    'absenceRequestId' => $absenceRequest->id,
+                    'absenceType' => $absenceRequest->type->value,
+                    'absenceStartsOn' => $absenceRequest->starts_on->toDateString(),
+                    'absenceEndsOn' => $absenceRequest->ends_on->toDateString(),
+                ],
+            );
+        }
     }
 
     /**

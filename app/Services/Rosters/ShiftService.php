@@ -2,8 +2,10 @@
 
 namespace App\Services\Rosters;
 
+use App\Enums\AbsenceRequestStatus;
 use App\Enums\EmploymentArea;
 use App\Enums\ShiftSource;
+use App\Models\AbsenceRequest;
 use App\Models\EmployeeProfile;
 use App\Models\Roster;
 use App\Models\Shift;
@@ -34,11 +36,11 @@ class ShiftService
         $this->ensureShiftTemplateMatchesRoster($roster, $shiftTemplate);
 
         $shiftDate = $this->parseDateForRoster($roster, $date);
+        [$startsAt, $endsAt] = $this->buildShiftTimes($shiftDate, $shiftTemplate);
 
         $this->ensureEmployeeCanWorkShiftTemplate($employeeProfile, $shiftTemplate);
+        $this->ensureNoApprovedAbsenceOverlap($employee, $startsAt, $endsAt);
         $this->ensureNoDuplicateShift($employee, $shiftTemplate, $shiftDate->toDateString());
-
-        [$startsAt, $endsAt] = $this->buildShiftTimes($shiftDate, $shiftTemplate);
 
         return Shift::query()->create([
             'roster_id' => $roster->id,
@@ -108,6 +110,25 @@ class ShiftService
         if (! $canWorkShift) {
             throw ValidationException::withMessages([
                 'shift_template_id' => 'Der Mitarbeiter darf diese Schicht nicht arbeiten.',
+            ]);
+        }
+    }
+
+    private function ensureNoApprovedAbsenceOverlap(
+        User $employee,
+        CarbonImmutable $startsAt,
+        CarbonImmutable $endsAt,
+    ): void {
+        $hasApprovedAbsence = AbsenceRequest::query()
+            ->where('user_id', $employee->id)
+            ->where('status', AbsenceRequestStatus::Approved->value)
+            ->whereDate('starts_on', '<=', $endsAt->toDateString())
+            ->whereDate('ends_on', '>=', $startsAt->toDateString())
+            ->exists();
+
+        if ($hasApprovedAbsence) {
+            throw ValidationException::withMessages([
+                'user_id' => 'Der Mitarbeiter ist im Zeitraum der Schicht abwesend.',
             ]);
         }
     }

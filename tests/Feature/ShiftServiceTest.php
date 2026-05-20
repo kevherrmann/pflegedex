@@ -1,8 +1,11 @@
 <?php
 
+use App\Enums\AbsenceRequestStatus;
+use App\Enums\AbsenceRequestType;
 use App\Enums\EmploymentArea;
 use App\Enums\RosterStatus;
 use App\Enums\ShiftSource;
+use App\Models\AbsenceRequest;
 use App\Models\EmployeeProfile;
 use App\Models\Location;
 use App\Models\Roster;
@@ -62,6 +65,24 @@ function createShiftServiceEmployee(Location $location, array $profileAttributes
     ]);
 
     return $employee->refresh();
+}
+
+function createShiftServiceAbsenceRequest(User $employee, User $requestedBy, array $attributes = []): AbsenceRequest
+{
+    return AbsenceRequest::query()->create([
+        'user_id' => $employee->id,
+        'location_id' => $attributes['location_id'] ?? $employee->location_id,
+        'type' => $attributes['type'] ?? AbsenceRequestType::Vacation,
+        'starts_on' => $attributes['starts_on'] ?? '2027-01-10',
+        'ends_on' => $attributes['ends_on'] ?? '2027-01-10',
+        'days_count' => $attributes['days_count'] ?? 1,
+        'status' => $attributes['status'] ?? AbsenceRequestStatus::Approved,
+        'requested_by' => $attributes['requested_by'] ?? $requestedBy->id,
+        'decided_by' => $attributes['decided_by'] ?? $requestedBy->id,
+        'decided_at' => $attributes['decided_at'] ?? now(),
+        'rejection_reason' => $attributes['rejection_reason'] ?? null,
+        'note' => $attributes['note'] ?? null,
+    ]);
 }
 
 function assertShiftServiceValidationField(callable $callback, string $field): void
@@ -319,4 +340,105 @@ it('stores notes on manual shifts', function (): void {
     );
 
     expect($shift->note)->toBe('Einarbeitung beachten');
+});
+
+it('blocks assigning an employee with approved vacation on the shift day', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createShiftServiceEmployee($location);
+    $roster = createShiftServiceRoster($location, $createdBy);
+    $shiftTemplate = createShiftServiceShiftTemplate($location);
+
+    createShiftServiceAbsenceRequest($employee, $createdBy, [
+        'starts_on' => '2027-01-10',
+        'ends_on' => '2027-01-10',
+        'status' => AbsenceRequestStatus::Approved,
+    ]);
+
+    assertShiftServiceValidationField(
+        fn () => app(ShiftService::class)->assignManualShift($roster, $employee, $shiftTemplate, '2027-01-10'),
+        'user_id',
+    );
+});
+
+it('blocks night shifts when an approved absence is on the following day', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createShiftServiceEmployee($location, ['can_work_night' => true]);
+    $roster = createShiftServiceRoster($location, $createdBy);
+    $shiftTemplate = createShiftServiceShiftTemplate($location, [
+        'name' => 'Nachtdienst',
+        'code' => 'night',
+        'starts_at' => '22:00',
+        'ends_at' => '06:00',
+    ]);
+
+    createShiftServiceAbsenceRequest($employee, $createdBy, [
+        'starts_on' => '2027-01-11',
+        'ends_on' => '2027-01-11',
+        'status' => AbsenceRequestStatus::Approved,
+    ]);
+
+    assertShiftServiceValidationField(
+        fn () => app(ShiftService::class)->assignManualShift($roster, $employee, $shiftTemplate, '2027-01-10'),
+        'user_id',
+    );
+});
+
+it('does not block requested absence requests', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createShiftServiceEmployee($location);
+    $roster = createShiftServiceRoster($location, $createdBy);
+    $shiftTemplate = createShiftServiceShiftTemplate($location);
+
+    createShiftServiceAbsenceRequest($employee, $createdBy, [
+        'starts_on' => '2027-01-10',
+        'ends_on' => '2027-01-10',
+        'status' => AbsenceRequestStatus::Requested,
+        'decided_by' => null,
+        'decided_at' => null,
+    ]);
+
+    $shift = app(ShiftService::class)->assignManualShift($roster, $employee, $shiftTemplate, '2027-01-10');
+
+    expect($shift)->toBeInstanceOf(Shift::class);
+});
+
+it('does not block rejected absence requests', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createShiftServiceEmployee($location);
+    $roster = createShiftServiceRoster($location, $createdBy);
+    $shiftTemplate = createShiftServiceShiftTemplate($location);
+
+    createShiftServiceAbsenceRequest($employee, $createdBy, [
+        'starts_on' => '2027-01-10',
+        'ends_on' => '2027-01-10',
+        'status' => AbsenceRequestStatus::Rejected,
+        'rejection_reason' => 'Nicht genehmigt',
+    ]);
+
+    $shift = app(ShiftService::class)->assignManualShift($roster, $employee, $shiftTemplate, '2027-01-10');
+
+    expect($shift)->toBeInstanceOf(Shift::class);
+});
+
+it('does not block absences from other employees', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createShiftServiceEmployee($location);
+    $otherEmployee = createShiftServiceEmployee($location);
+    $roster = createShiftServiceRoster($location, $createdBy);
+    $shiftTemplate = createShiftServiceShiftTemplate($location);
+
+    createShiftServiceAbsenceRequest($otherEmployee, $createdBy, [
+        'starts_on' => '2027-01-10',
+        'ends_on' => '2027-01-10',
+        'status' => AbsenceRequestStatus::Approved,
+    ]);
+
+    $shift = app(ShiftService::class)->assignManualShift($roster, $employee, $shiftTemplate, '2027-01-10');
+
+    expect($shift)->toBeInstanceOf(Shift::class);
 });
