@@ -34,21 +34,35 @@ class RosterValidationResult
         return $this->hasErrors();
     }
 
-    public function addError(string $code, string $message, array $context = []): void
-    {
+    public function addError(
+        string $code,
+        string $message,
+        array $context = [],
+        ?string $title = null,
+        ?string $details = null,
+    ): void {
         $this->errors[] = [
             'code' => $code,
             'message' => $message,
             'context' => $context,
+            'title' => $title,
+            'details' => $details,
         ];
     }
 
-    public function addWarning(string $code, string $message, array $context = []): void
-    {
+    public function addWarning(
+        string $code,
+        string $message,
+        array $context = [],
+        ?string $title = null,
+        ?string $details = null,
+    ): void {
         $this->warnings[] = [
             'code' => $code,
             'message' => $message,
             'context' => $context,
+            'title' => $title,
+            'details' => $details,
         ];
     }
 }

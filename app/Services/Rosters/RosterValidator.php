@@ -69,6 +69,8 @@ class RosterValidator
                             'shiftTemplateId' => $shiftTemplate->id,
                             'shiftTemplateCode' => $shiftTemplate->code,
                         ],
+                        'Mindestbesetzung fehlt',
+                        'Für diese aktive Schichtvorlage ist keine Mindestbesetzung hinterlegt.',
                     );
 
                     continue;
@@ -88,6 +90,8 @@ class RosterValidator
                             'requiredTotalStaff' => $staffingRule->required_total_staff,
                             'actualTotalStaff' => $actualTotalStaff,
                         ],
+                        'Mindestbesetzung unterschritten',
+                        'Für diese Schicht sind weniger Mitarbeiter eingeplant als in der Mindestbesetzung hinterlegt.',
                     );
                 }
 
@@ -107,6 +111,8 @@ class RosterValidator
                             'requiredSpecialists' => $staffingRule->required_specialists,
                             'actualSpecialists' => $actualSpecialists,
                         ],
+                        'Fachkraft fehlt',
+                        'Für diese Schicht sind weniger Fachkräfte eingeplant als erforderlich.',
                     );
                 }
             }
@@ -165,6 +171,8 @@ class RosterValidator
                                 'restMinutes' => $restMinutes,
                                 'requiredRestMinutes' => self::REQUIRED_REST_MINUTES,
                             ],
+                            'Ruhezeit unterschritten',
+                            'Zwischen zwei Diensten liegt weniger als die erforderliche Ruhezeit.',
                         );
                     }
                 }
@@ -247,6 +255,8 @@ class RosterValidator
                 'month' => $roster->month,
                 'year' => $roster->year,
             ],
+            'Zu viele Arbeitstage am Stück',
+            'Der Mitarbeiter ist länger als empfohlen ohne freien Tag eingeplant.',
         );
     }
 
@@ -289,6 +299,8 @@ class RosterValidator
                         'month' => $roster->month,
                         'year' => $roster->year,
                     ],
+                    'Zu viele Wochenenden geplant',
+                    'Der Mitarbeiter ist an mehr Wochenenden eingeplant als empfohlen.',
                 );
             });
     }
@@ -323,6 +335,8 @@ class RosterValidator
                         'month' => $roster->month,
                         'year' => $roster->year,
                     ],
+                    'Kein freier Tag im Monat',
+                    'Der Mitarbeiter hat im Dienstplanmonat keinen freien Kalendertag.',
                 );
             });
     }
@@ -371,6 +385,8 @@ class RosterValidator
                             'month' => $roster->month,
                             'year' => $roster->year,
                         ],
+                        'Ersatzruhetag für Sonntag fehlt',
+                        'Für Sonntagsarbeit wurde im bekannten Ausgleichszeitraum kein freier Kalendertag gefunden.',
                     );
                 }
             });
@@ -422,6 +438,8 @@ class RosterValidator
                     'absenceStartsOn' => $absenceRequest->starts_on->toDateString(),
                     'absenceEndsOn' => $absenceRequest->ends_on->toDateString(),
                 ],
+                'Mitarbeiter ist abwesend',
+                'Der Mitarbeiter hat im Zeitraum dieses Dienstes eine genehmigte Abwesenheit.',
             );
         }
     }
@@ -463,6 +481,8 @@ class RosterValidator
                         'month' => $roster->month,
                         'year' => $roster->year,
                     ],
+                    'Soll-Arbeitszeit überschritten',
+                    'Der Mitarbeiter ist über seiner monatlichen Soll-Arbeitszeit geplant.',
                 );
             });
     }

@@ -320,6 +320,58 @@ it('reports green yellow and red result states', function (): void {
         ->and($red->isRed())->toBeTrue();
 });
 
+it('stores title and details for validation errors', function (): void {
+    $result = new RosterValidationResult();
+
+    $result->addError(
+        'test_error',
+        'Fehler',
+        ['field' => 'value'],
+        'Fehlertitel',
+        'Ausführlicher Fehlerhinweis.',
+    );
+
+    expect($result->errors[0])->toMatchArray([
+        'code' => 'test_error',
+        'message' => 'Fehler',
+        'context' => ['field' => 'value'],
+        'title' => 'Fehlertitel',
+        'details' => 'Ausführlicher Fehlerhinweis.',
+    ]);
+});
+
+it('stores title and details for validation warnings', function (): void {
+    $result = new RosterValidationResult();
+
+    $result->addWarning(
+        'test_warning',
+        'Hinweis',
+        ['field' => 'value'],
+        'Hinweistitel',
+        'Ausführlicher Hinweis.',
+    );
+
+    expect($result->warnings[0])->toMatchArray([
+        'code' => 'test_warning',
+        'message' => 'Hinweis',
+        'context' => ['field' => 'value'],
+        'title' => 'Hinweistitel',
+        'details' => 'Ausführlicher Hinweis.',
+    ]);
+});
+
+it('stores null title and details when they are omitted', function (): void {
+    $result = new RosterValidationResult();
+
+    $result->addError('test_error', 'Fehler');
+    $result->addWarning('test_warning', 'Hinweis');
+
+    expect($result->errors[0]['title'])->toBeNull()
+        ->and($result->errors[0]['details'])->toBeNull()
+        ->and($result->warnings[0]['title'])->toBeNull()
+        ->and($result->warnings[0]['details'])->toBeNull();
+});
+
 it('adds an employee absent error when a shift overlaps approved absence', function (): void {
     $location = Location::factory()->create();
     $createdBy = User::factory()->create();
@@ -615,7 +667,9 @@ it('adds a too many weekends warning when an employee works three weekends', fun
             '2027-01-16',
         ])
         ->and($warning['context']['month'])->toBe(1)
-        ->and($warning['context']['year'])->toBe(2027);
+        ->and($warning['context']['year'])->toBe(2027)
+        ->and($warning['title'])->toBe('Zu viele Wochenenden geplant')
+        ->and($warning['details'])->toBe('Der Mitarbeiter ist an mehr Wochenenden eingeplant als empfohlen.');
 });
 
 it('does not add a too many weekends warning when an employee works two weekends', function (): void {
