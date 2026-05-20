@@ -13,6 +13,7 @@ use App\Models\Shift;
 use App\Models\ShiftTemplate;
 use App\Models\User;
 use App\Services\Rosters\ShiftService;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 
@@ -81,6 +82,29 @@ function createShiftServiceAbsenceRequest(User $employee, User $requestedBy, arr
         'decided_by' => $attributes['decided_by'] ?? $requestedBy->id,
         'decided_at' => $attributes['decided_at'] ?? now(),
         'rejection_reason' => $attributes['rejection_reason'] ?? null,
+        'note' => $attributes['note'] ?? null,
+    ]);
+}
+
+function createShiftServiceShift(Roster $roster, User $employee, ShiftTemplate $shiftTemplate, string $date, array $attributes = []): Shift
+{
+    $shiftDate = CarbonImmutable::parse($date)->startOfDay();
+    $startsAt = CarbonImmutable::parse($shiftDate->toDateString() . ' ' . $shiftTemplate->starts_at);
+    $endsAt = CarbonImmutable::parse($shiftDate->toDateString() . ' ' . $shiftTemplate->ends_at);
+
+    if ($endsAt->lessThanOrEqualTo($startsAt)) {
+        $endsAt = $endsAt->addDay();
+    }
+
+    return Shift::query()->create([
+        'roster_id' => $roster->id,
+        'location_id' => $attributes['location_id'] ?? $roster->location_id,
+        'user_id' => $attributes['user_id'] ?? $employee->id,
+        'shift_template_id' => $attributes['shift_template_id'] ?? $shiftTemplate->id,
+        'date' => $attributes['date'] ?? $shiftDate->toDateString(),
+        'starts_at' => $attributes['starts_at'] ?? $startsAt,
+        'ends_at' => $attributes['ends_at'] ?? $endsAt,
+        'source' => $attributes['source'] ?? ShiftSource::Manual,
         'note' => $attributes['note'] ?? null,
     ]);
 }
@@ -441,4 +465,251 @@ it('does not block absences from other employees', function (): void {
     $shift = app(ShiftService::class)->assignManualShift($roster, $employee, $shiftTemplate, '2027-01-10');
 
     expect($shift)->toBeInstanceOf(Shift::class);
+});
+
+it('updates a manual shift employee template date and note', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $oldEmployee = createShiftServiceEmployee($location);
+    $newEmployee = createShiftServiceEmployee($location);
+    $roster = createShiftServiceRoster($location, $createdBy);
+    $earlyShiftTemplate = createShiftServiceShiftTemplate($location);
+    $lateShiftTemplate = createShiftServiceShiftTemplate($location, [
+        'name' => 'Spätdienst',
+        'code' => 'late',
+        'starts_at' => '14:00',
+        'ends_at' => '22:00',
+        'color' => '#3B82F6',
+    ]);
+    $shift = createShiftServiceShift($roster, $oldEmployee, $earlyShiftTemplate, '2027-01-10', [
+        'note' => 'Alt',
+    ]);
+
+    $updatedShift = app(ShiftService::class)->updateManualShift(
+        $shift,
+        $newEmployee,
+        $lateShiftTemplate,
+        '2027-01-11',
+        'Geändert',
+    );
+
+    expect($updatedShift->id)->toBe($shift->id)
+        ->and($updatedShift->roster_id)->toBe($roster->id)
+        ->and($updatedShift->location_id)->toBe($location->id)
+        ->and($updatedShift->user_id)->toBe($newEmployee->id)
+        ->and($updatedShift->shift_template_id)->toBe($lateShiftTemplate->id)
+        ->and($updatedShift->date->toDateString())->toBe('2027-01-11')
+        ->and($updatedShift->starts_at->format('Y-m-d H:i:s'))->toBe('2027-01-11 14:00:00')
+        ->and($updatedShift->ends_at->format('Y-m-d H:i:s'))->toBe('2027-01-11 22:00:00')
+        ->and($updatedShift->note)->toBe('Geändert');
+});
+
+it('updates night shifts to end on the following day', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createShiftServiceEmployee($location, ['can_work_night' => true]);
+    $roster = createShiftServiceRoster($location, $createdBy);
+    $earlyShiftTemplate = createShiftServiceShiftTemplate($location);
+    $nightShiftTemplate = createShiftServiceShiftTemplate($location, [
+        'name' => 'Nachtdienst',
+        'code' => 'night',
+        'starts_at' => '22:00',
+        'ends_at' => '06:00',
+    ]);
+    $shift = createShiftServiceShift($roster, $employee, $earlyShiftTemplate, '2027-01-10');
+
+    $updatedShift = app(ShiftService::class)->updateManualShift(
+        $shift,
+        $employee,
+        $nightShiftTemplate,
+        '2027-01-12',
+    );
+
+    expect($updatedShift->starts_at->format('Y-m-d H:i:s'))->toBe('2027-01-12 22:00:00')
+        ->and($updatedShift->ends_at->format('Y-m-d H:i:s'))->toBe('2027-01-13 06:00:00');
+});
+
+it('blocks updating shifts from published and locked rosters', function (RosterStatus $status): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createShiftServiceEmployee($location);
+    $roster = createShiftServiceRoster($location, $createdBy, ['status' => $status]);
+    $shiftTemplate = createShiftServiceShiftTemplate($location);
+    $shift = createShiftServiceShift($roster, $employee, $shiftTemplate, '2027-01-10');
+
+    assertShiftServiceValidationField(
+        fn () => app(ShiftService::class)->updateManualShift($shift, $employee, $shiftTemplate, '2027-01-11'),
+        'status',
+    );
+})->with([
+    RosterStatus::Published,
+    RosterStatus::Locked,
+]);
+
+it('blocks updating to employees without active nursing profiles', function (?array $profileAttributes): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $oldEmployee = createShiftServiceEmployee($location);
+    $newEmployee = $profileAttributes === null
+        ? User::factory()->for($location)->create()
+        : createShiftServiceEmployee($location, $profileAttributes);
+    $roster = createShiftServiceRoster($location, $createdBy);
+    $shiftTemplate = createShiftServiceShiftTemplate($location);
+    $shift = createShiftServiceShift($roster, $oldEmployee, $shiftTemplate, '2027-01-10');
+
+    assertShiftServiceValidationField(
+        fn () => app(ShiftService::class)->updateManualShift($shift, $newEmployee, $shiftTemplate, '2027-01-11'),
+        'user_id',
+    );
+})->with([
+    'missing profile' => [null],
+    'inactive profile' => [['active' => false]],
+    'cleaning profile' => [['employment_area' => EmploymentArea::Cleaning]],
+]);
+
+it('blocks updating to shift templates from another location', function (): void {
+    $location = Location::factory()->create();
+    $otherLocation = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createShiftServiceEmployee($location);
+    $roster = createShiftServiceRoster($location, $createdBy);
+    $shiftTemplate = createShiftServiceShiftTemplate($location);
+    $otherShiftTemplate = createShiftServiceShiftTemplate($otherLocation);
+    $shift = createShiftServiceShift($roster, $employee, $shiftTemplate, '2027-01-10');
+
+    assertShiftServiceValidationField(
+        fn () => app(ShiftService::class)->updateManualShift($shift, $employee, $otherShiftTemplate, '2027-01-11'),
+        'shift_template_id',
+    );
+});
+
+it('blocks updating shifts to dates outside the roster month', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createShiftServiceEmployee($location);
+    $roster = createShiftServiceRoster($location, $createdBy);
+    $shiftTemplate = createShiftServiceShiftTemplate($location);
+    $shift = createShiftServiceShift($roster, $employee, $shiftTemplate, '2027-01-10');
+
+    assertShiftServiceValidationField(
+        fn () => app(ShiftService::class)->updateManualShift($shift, $employee, $shiftTemplate, '2027-02-01'),
+        'date',
+    );
+});
+
+it('blocks updating employees to night shifts when they cannot work nights', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createShiftServiceEmployee($location, ['can_work_night' => false]);
+    $roster = createShiftServiceRoster($location, $createdBy);
+    $earlyShiftTemplate = createShiftServiceShiftTemplate($location);
+    $nightShiftTemplate = createShiftServiceShiftTemplate($location, [
+        'name' => 'Nachtdienst',
+        'code' => 'night',
+        'starts_at' => '22:00',
+        'ends_at' => '06:00',
+    ]);
+    $shift = createShiftServiceShift($roster, $employee, $earlyShiftTemplate, '2027-01-10');
+
+    assertShiftServiceValidationField(
+        fn () => app(ShiftService::class)->updateManualShift($shift, $employee, $nightShiftTemplate, '2027-01-11'),
+        'shift_template_id',
+    );
+});
+
+it('blocks updating shifts when approved absence overlaps', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createShiftServiceEmployee($location);
+    $roster = createShiftServiceRoster($location, $createdBy);
+    $shiftTemplate = createShiftServiceShiftTemplate($location);
+    $shift = createShiftServiceShift($roster, $employee, $shiftTemplate, '2027-01-10');
+
+    createShiftServiceAbsenceRequest($employee, $createdBy, [
+        'starts_on' => '2027-01-11',
+        'ends_on' => '2027-01-11',
+        'status' => AbsenceRequestStatus::Approved,
+    ]);
+
+    assertShiftServiceValidationField(
+        fn () => app(ShiftService::class)->updateManualShift($shift, $employee, $shiftTemplate, '2027-01-11'),
+        'user_id',
+    );
+});
+
+it('allows updating shifts when requested or rejected absence overlaps', function (AbsenceRequestStatus $status): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createShiftServiceEmployee($location);
+    $roster = createShiftServiceRoster($location, $createdBy);
+    $shiftTemplate = createShiftServiceShiftTemplate($location);
+    $shift = createShiftServiceShift($roster, $employee, $shiftTemplate, '2027-01-10');
+
+    createShiftServiceAbsenceRequest($employee, $createdBy, [
+        'starts_on' => '2027-01-11',
+        'ends_on' => '2027-01-11',
+        'status' => $status,
+        'decided_by' => $status === AbsenceRequestStatus::Requested ? null : $createdBy->id,
+        'decided_at' => $status === AbsenceRequestStatus::Requested ? null : now(),
+        'rejection_reason' => $status === AbsenceRequestStatus::Rejected ? 'Nicht genehmigt' : null,
+    ]);
+
+    $updatedShift = app(ShiftService::class)->updateManualShift($shift, $employee, $shiftTemplate, '2027-01-11');
+
+    expect($updatedShift->date->toDateString())->toBe('2027-01-11');
+})->with([
+    AbsenceRequestStatus::Requested,
+    AbsenceRequestStatus::Rejected,
+]);
+
+it('blocks updating to duplicate same employee date and shift template', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createShiftServiceEmployee($location);
+    $otherEmployee = createShiftServiceEmployee($location);
+    $roster = createShiftServiceRoster($location, $createdBy);
+    $shiftTemplate = createShiftServiceShiftTemplate($location);
+    $shift = createShiftServiceShift($roster, $otherEmployee, $shiftTemplate, '2027-01-10');
+    createShiftServiceShift($roster, $employee, $shiftTemplate, '2027-01-11');
+
+    assertShiftServiceValidationField(
+        fn () => app(ShiftService::class)->updateManualShift($shift, $employee, $shiftTemplate, '2027-01-11'),
+        'user_id',
+    );
+});
+
+it('does not count the updated shift itself as duplicate', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createShiftServiceEmployee($location);
+    $roster = createShiftServiceRoster($location, $createdBy);
+    $shiftTemplate = createShiftServiceShiftTemplate($location);
+    $shift = createShiftServiceShift($roster, $employee, $shiftTemplate, '2027-01-10');
+
+    $updatedShift = app(ShiftService::class)->updateManualShift(
+        $shift,
+        $employee,
+        $shiftTemplate,
+        '2027-01-10',
+        'Nur Notiz geändert',
+    );
+
+    expect($updatedShift->id)->toBe($shift->id)
+        ->and($updatedShift->note)->toBe('Nur Notiz geändert')
+        ->and(Shift::query()->count())->toBe(1);
+});
+
+it('sets source to manual when updating shifts', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createShiftServiceEmployee($location);
+    $roster = createShiftServiceRoster($location, $createdBy);
+    $shiftTemplate = createShiftServiceShiftTemplate($location);
+    $shift = createShiftServiceShift($roster, $employee, $shiftTemplate, '2027-01-10', [
+        'source' => ShiftSource::Auto,
+    ]);
+
+    $updatedShift = app(ShiftService::class)->updateManualShift($shift, $employee, $shiftTemplate, '2027-01-11');
+
+    expect($updatedShift->source)->toBe(ShiftSource::Manual);
 });

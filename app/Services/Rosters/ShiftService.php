@@ -55,6 +55,49 @@ class ShiftService
         ]);
     }
 
+    public function updateManualShift(
+        Shift $shift,
+        User $employee,
+        ShiftTemplate $shiftTemplate,
+        string $date,
+        ?string $note = null,
+    ): Shift {
+        $shift->loadMissing('roster');
+        $roster = $shift->roster;
+
+        if ($roster === null || ! $roster->isEditable()) {
+            throw ValidationException::withMessages([
+                'status' => 'Nur bearbeitbare Dienstpläne können geändert werden.',
+            ]);
+        }
+
+        $employee->loadMissing('employeeProfile');
+        $employeeProfile = $employee->employeeProfile;
+
+        $this->ensureEmployeeCanBeAssigned($employeeProfile);
+        $this->ensureShiftTemplateMatchesRoster($roster, $shiftTemplate);
+
+        $shiftDate = $this->parseDateForRoster($roster, $date);
+        [$startsAt, $endsAt] = $this->buildShiftTimes($shiftDate, $shiftTemplate);
+
+        $this->ensureEmployeeCanWorkShiftTemplate($employeeProfile, $shiftTemplate);
+        $this->ensureNoApprovedAbsenceOverlap($employee, $startsAt, $endsAt);
+        $this->ensureNoDuplicateShift($employee, $shiftTemplate, $shiftDate->toDateString(), $shift->id);
+
+        $shift->update([
+            'location_id' => $roster->location_id,
+            'user_id' => $employee->id,
+            'shift_template_id' => $shiftTemplate->id,
+            'date' => $shiftDate->toDateString(),
+            'starts_at' => $startsAt,
+            'ends_at' => $endsAt,
+            'source' => ShiftSource::Manual,
+            'note' => $note,
+        ]);
+
+        return $shift->refresh();
+    }
+
     private function ensureEmployeeCanBeAssigned(?EmployeeProfile $employeeProfile): void
     {
         if ($employeeProfile === null || ! $employeeProfile->active) {
@@ -133,13 +176,23 @@ class ShiftService
         }
     }
 
-    private function ensureNoDuplicateShift(User $employee, ShiftTemplate $shiftTemplate, string $date): void
+    private function ensureNoDuplicateShift(
+        User $employee,
+        ShiftTemplate $shiftTemplate,
+        string $date,
+        ?string $exceptShiftId = null,
+    ): void
     {
-        $exists = Shift::query()
+        $query = Shift::query()
             ->where('user_id', $employee->id)
             ->whereDate('date', $date)
-            ->where('shift_template_id', $shiftTemplate->id)
-            ->exists();
+            ->where('shift_template_id', $shiftTemplate->id);
+
+        if ($exceptShiftId !== null) {
+            $query->whereKeyNot($exceptShiftId);
+        }
+
+        $exists = $query->exists();
 
         if ($exists) {
             throw ValidationException::withMessages([
