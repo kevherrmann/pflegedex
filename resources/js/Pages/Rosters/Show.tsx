@@ -43,6 +43,8 @@ type ValidationEntry = {
     code: string;
     message: string;
     context: Record<string, unknown>;
+    title: string | null;
+    details: string | null;
 };
 
 type RosterValidationResult = {
@@ -271,12 +273,18 @@ function EntryList({ title, entries }: { title: string; entries: ValidationEntry
             <p className="font-medium">{title}</p>
             <ul className="mt-1 space-y-2">
                 {entries.map((entry, index) => (
-                    <li key={`${entry.code}-${index}`}>
-                        <span className="font-mono text-xs">{entry.code}</span>{' '}
-                        {entry.message}
-                        <pre className="mt-1 overflow-x-auto rounded bg-white/70 p-2 text-xs">
-                            {JSON.stringify(entry.context, null, 2)}
-                        </pre>
+                    <li key={`${entry.code}-${index}`} className="rounded bg-white/60 p-3">
+                        <p className="font-semibold">{entry.title ?? entry.message}</p>
+                        <p className="mt-1">{entry.details ?? entry.message}</p>
+                        <p className="mt-2 text-xs opacity-75">Code: {entry.code}</p>
+                        <details className="mt-2">
+                            <summary className="cursor-pointer text-xs font-medium opacity-75">
+                                Technische Details anzeigen
+                            </summary>
+                            <pre className="mt-2 overflow-x-auto rounded bg-white/80 p-2 text-xs">
+                                {JSON.stringify(entry.context, null, 2)}
+                            </pre>
+                        </details>
                     </li>
                 ))}
             </ul>
