@@ -151,6 +151,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/rosters/{roster}/shifts', [ShiftController::class, 'store'])
         ->name('rosters.shifts.store');
 
+    Route::patch('/rosters/{roster}/shifts/{shift}', [ShiftController::class, 'update'])
+        ->name('rosters.shifts.update');
+
     Route::delete('/rosters/{roster}/shifts/{shift}', [ShiftController::class, 'destroy'])
         ->name('rosters.shifts.destroy');
 });

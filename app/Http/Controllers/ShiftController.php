@@ -42,6 +42,36 @@ class ShiftController extends Controller
         return back()->with('status', 'shift-created');
     }
 
+    public function update(Request $request, Roster $roster, Shift $shift, ShiftService $shiftService): RedirectResponse
+    {
+        abort_unless(
+            $request->user()?->hasRole('PDL'),
+            HttpResponse::HTTP_FORBIDDEN,
+        );
+
+        abort_unless($shift->roster_id === $roster->id, HttpResponse::HTTP_NOT_FOUND);
+
+        $validated = $request->validate([
+            'user_id' => ['required', 'exists:users,id'],
+            'shift_template_id' => ['required', 'exists:shift_templates,id'],
+            'date' => ['required', 'date'],
+            'note' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $employee = User::query()->findOrFail($validated['user_id']);
+        $shiftTemplate = ShiftTemplate::query()->findOrFail($validated['shift_template_id']);
+
+        $shiftService->updateManualShift(
+            $shift,
+            $employee,
+            $shiftTemplate,
+            $validated['date'],
+            $validated['note'] ?? null,
+        );
+
+        return back()->with('status', 'shift-updated');
+    }
+
     public function destroy(Request $request, Roster $roster, Shift $shift): RedirectResponse
     {
         abort_unless(

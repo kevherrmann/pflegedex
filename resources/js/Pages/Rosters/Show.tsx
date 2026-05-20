@@ -4,7 +4,7 @@ import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { FormEventHandler } from 'react';
+import { FormEventHandler, useState } from 'react';
 
 type EmployeeOption = {
     id: string;
@@ -28,6 +28,8 @@ type ShiftTemplateOption = {
 
 type ShiftItem = {
     id: string;
+    userId: string;
+    shiftTemplateId: string;
     date: string;
     startsAt: string;
     endsAt: string;
@@ -392,7 +394,131 @@ function deleteShift(roster: RosterItem, shift: ShiftItem): void {
     });
 }
 
-function ShiftList({ roster }: { roster: RosterItem }) {
+function ShiftEditForm({
+    roster,
+    shift,
+    employees,
+    shiftTemplates,
+    onCancel,
+}: {
+    roster: RosterItem;
+    shift: ShiftItem;
+    employees: EmployeeOption[];
+    shiftTemplates: ShiftTemplateOption[];
+    onCancel: () => void;
+}) {
+    const rosterEmployees = employees.filter(
+        (employee) => employee.locationId === null || employee.locationId === roster.locationId,
+    );
+    const form = useForm({
+        user_id: shift.userId,
+        shift_template_id: shift.shiftTemplateId,
+        date: shift.date,
+        note: shift.note ?? '',
+    });
+
+    const submit: FormEventHandler = (event) => {
+        event.preventDefault();
+
+        form.patch(route('rosters.shifts.update', [roster.id, shift.id]), {
+            preserveScroll: true,
+            onSuccess: onCancel,
+        });
+    };
+
+    return (
+        <form
+            onSubmit={submit}
+            className="mt-3 grid gap-4 rounded-md border border-gray-200 bg-gray-50 p-4 md:grid-cols-2 lg:grid-cols-5 lg:items-end"
+        >
+            <div>
+                <InputLabel htmlFor={`edit-user-${shift.id}`} value="Mitarbeiter" />
+                <select
+                    id={`edit-user-${shift.id}`}
+                    value={form.data.user_id}
+                    onChange={(event) => form.setData('user_id', event.target.value)}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]"
+                >
+                    <option value="">Bitte wählen</option>
+                    {rosterEmployees.map((employee) => (
+                        <option key={employee.id} value={employee.id}>
+                            {employee.name}
+                            {employee.isNursingSpecialist ? ' · Fachkraft' : ''}
+                        </option>
+                    ))}
+                </select>
+                <InputError message={form.errors.user_id} className="mt-2" />
+            </div>
+
+            <div>
+                <InputLabel htmlFor={`edit-shift-template-${shift.id}`} value="Schicht" />
+                <select
+                    id={`edit-shift-template-${shift.id}`}
+                    value={form.data.shift_template_id}
+                    onChange={(event) =>
+                        form.setData('shift_template_id', event.target.value)
+                    }
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]"
+                >
+                    <option value="">Bitte wählen</option>
+                    {shiftTemplates.map((shiftTemplate) => (
+                        <option key={shiftTemplate.id} value={shiftTemplate.id}>
+                            {shiftTemplate.name} · {shiftTemplate.startsAt}-
+                            {shiftTemplate.endsAt}
+                        </option>
+                    ))}
+                </select>
+                <InputError message={form.errors.shift_template_id} className="mt-2" />
+            </div>
+
+            <div>
+                <InputLabel htmlFor={`edit-date-${shift.id}`} value="Datum" />
+                <TextInput
+                    id={`edit-date-${shift.id}`}
+                    type="date"
+                    value={form.data.date}
+                    onChange={(event) => form.setData('date', event.target.value)}
+                    className="mt-1 block w-full"
+                />
+                <InputError message={form.errors.date} className="mt-2" />
+            </div>
+
+            <div>
+                <InputLabel htmlFor={`edit-note-${shift.id}`} value="Notiz" />
+                <TextInput
+                    id={`edit-note-${shift.id}`}
+                    value={form.data.note}
+                    onChange={(event) => form.setData('note', event.target.value)}
+                    className="mt-1 block w-full"
+                />
+                <InputError message={form.errors.note} className="mt-2" />
+            </div>
+
+            <div className="flex gap-2 lg:justify-end">
+                <PrimaryButton disabled={form.processing}>Speichern</PrimaryButton>
+                <button
+                    type="button"
+                    onClick={onCancel}
+                    className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                >
+                    Abbrechen
+                </button>
+            </div>
+        </form>
+    );
+}
+
+function ShiftList({
+    roster,
+    employees,
+    shiftTemplates,
+}: {
+    roster: RosterItem;
+    employees: EmployeeOption[];
+    shiftTemplates: ShiftTemplateOption[];
+}) {
+    const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
+
     if (roster.shifts.length === 0) {
         return (
             <p className="mt-3 text-sm text-gray-600">
@@ -406,28 +532,52 @@ function ShiftList({ roster }: { roster: RosterItem }) {
             {roster.shifts.map((shift) => (
                 <li
                     key={shift.id}
-                    className="grid gap-2 py-3 text-sm text-gray-700 md:grid-cols-[1fr_1.4fr_1.2fr_2fr_auto] md:items-center"
+                    className="py-3 text-sm text-gray-700"
                 >
-                    <span className="font-medium text-gray-900">{shift.date}</span>
-                    <span>
-                        {shift.shiftTemplateName ?? 'Unbekannte Schicht'}{' '}
-                        {shift.shiftTemplateCode ? `(${shift.shiftTemplateCode})` : ''}
-                    </span>
-                    <span>{shift.employeeName ?? 'Unbekannt'}</span>
-                    <span className="text-gray-500">
-                        {formatDateTime(shift.startsAt)} bis {formatDateTime(shift.endsAt)}
-                        {shift.note ? ` · ${shift.note}` : ''}
-                    </span>
-                    {roster.isEditable && (
-                        <span className="flex justify-start md:justify-end">
-                            <button
-                                type="button"
-                                onClick={() => deleteShift(roster, shift)}
-                                className="rounded-md border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50"
-                            >
-                                Löschen
-                            </button>
+                    <div className="grid gap-2 md:grid-cols-[1fr_1.4fr_1.2fr_2fr_auto] md:items-center">
+                        <span className="font-medium text-gray-900">{shift.date}</span>
+                        <span>
+                            {shift.shiftTemplateName ?? 'Unbekannte Schicht'}{' '}
+                            {shift.shiftTemplateCode ? `(${shift.shiftTemplateCode})` : ''}
                         </span>
+                        <span>{shift.employeeName ?? 'Unbekannt'}</span>
+                        <span className="text-gray-500">
+                            {formatDateTime(shift.startsAt)} bis{' '}
+                            {formatDateTime(shift.endsAt)}
+                            {shift.note ? ` · ${shift.note}` : ''}
+                        </span>
+                        {roster.isEditable && (
+                            <span className="flex gap-2 md:justify-end">
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setEditingShiftId(
+                                            editingShiftId === shift.id ? null : shift.id,
+                                        )
+                                    }
+                                    className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                                >
+                                    Bearbeiten
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => deleteShift(roster, shift)}
+                                    className="rounded-md border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50"
+                                >
+                                    Löschen
+                                </button>
+                            </span>
+                        )}
+                    </div>
+
+                    {editingShiftId === shift.id && (
+                        <ShiftEditForm
+                            roster={roster}
+                            shift={shift}
+                            employees={employees}
+                            shiftTemplates={shiftTemplates}
+                            onCancel={() => setEditingShiftId(null)}
+                        />
                     )}
                 </li>
             ))}
@@ -545,7 +695,11 @@ export default function RosterShow({
                             </h3>
                         </div>
                         <div className="p-6">
-                            <ShiftList roster={roster} />
+                            <ShiftList
+                                roster={roster}
+                                employees={employees}
+                                shiftTemplates={shiftTemplates}
+                            />
                         </div>
                     </div>
                 </div>

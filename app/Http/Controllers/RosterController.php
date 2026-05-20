@@ -187,6 +187,8 @@ class RosterController extends Controller
     {
         $mapped = [
             'id' => $shift->id,
+            'userId' => $shift->user_id,
+            'shiftTemplateId' => $shift->shift_template_id,
             'startsAt' => $shift->starts_at->toDateTimeString(),
             'endsAt' => $shift->ends_at->toDateTimeString(),
             'employeeName' => $shift->user?->name,
