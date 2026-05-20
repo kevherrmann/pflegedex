@@ -41,6 +41,7 @@ class RosterValidator
         $this->validatePlannedWorkingHours($roster, $result);
         $this->validateConsecutiveWorkDays($roster, $result);
         $this->validateWeekendLoad($roster, $result);
+        $this->validateMonthlyFreeDays($roster, $result);
         $this->validateRestPeriods($roster, $result);
 
         return $result;
@@ -284,6 +285,40 @@ class RosterValidator
                         'workedWeekends' => $weekendStartsOn->count(),
                         'maxAllowedWeekends' => self::MAX_ALLOWED_WEEKENDS,
                         'weekendStartsOn' => $weekendStartsOn->all(),
+                        'month' => $roster->month,
+                        'year' => $roster->year,
+                    ],
+                );
+            });
+    }
+
+    private function validateMonthlyFreeDays(Roster $roster, RosterValidationResult $result): void
+    {
+        $monthDates = collect($this->datesForRosterMonth($roster))
+            ->map(fn (CarbonImmutable $date): string => $date->toDateString())
+            ->values();
+        $daysInMonth = $monthDates->count();
+
+        $roster->shifts
+            ->groupBy('user_id')
+            ->each(function (Collection $shifts, string $userId) use ($monthDates, $daysInMonth, $roster, $result): void {
+                $workedDays = $shifts
+                    ->map(fn (Shift $shift): string => $shift->date->toDateString())
+                    ->unique()
+                    ->intersect($monthDates)
+                    ->count();
+
+                if ($workedDays < $daysInMonth) {
+                    return;
+                }
+
+                $result->addWarning(
+                    'employee_has_no_free_day_in_month',
+                    'Der Mitarbeiter hat im Dienstplanmonat keinen freien Tag.',
+                    [
+                        'userId' => $userId,
+                        'workedDays' => $workedDays,
+                        'daysInMonth' => $daysInMonth,
                         'month' => $roster->month,
                         'year' => $roster->year,
                     ],

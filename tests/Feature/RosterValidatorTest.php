@@ -692,3 +692,93 @@ it('reports too many weekends as warning without errors', function (): void {
         ->and(rosterValidatorCodes($result->warnings))->toContain('employee_too_many_weekends')
         ->and($result->isYellow())->toBeTrue();
 });
+
+it('adds a no free day in month warning when an employee works every day in January', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createRosterValidatorEmployee($location, ['weekly_hours' => 300.00]);
+    $roster = createRosterValidatorRoster($location, $createdBy);
+    $shiftTemplate = createRosterValidatorShiftTemplate($location, ['active' => false]);
+
+    foreach (rosterValidatorDatesForJanuary2027() as $date) {
+        createRosterValidatorShift($roster, $employee, $shiftTemplate, $date);
+    }
+
+    $result = app(RosterValidator::class)->validate($roster);
+    $warning = collect($result->warnings)->first(
+        fn (array $warning): bool => $warning['code'] === 'employee_has_no_free_day_in_month',
+    );
+
+    expect($warning)->not->toBeNull()
+        ->and($warning['context']['userId'])->toBe($employee->id)
+        ->and($warning['context']['workedDays'])->toBe(31)
+        ->and($warning['context']['daysInMonth'])->toBe(31)
+        ->and($warning['context']['month'])->toBe(1)
+        ->and($warning['context']['year'])->toBe(2027);
+});
+
+it('does not add a no free day in month warning when an employee has at least one day off', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createRosterValidatorEmployee($location, ['weekly_hours' => 300.00]);
+    $roster = createRosterValidatorRoster($location, $createdBy);
+    $shiftTemplate = createRosterValidatorShiftTemplate($location, ['active' => false]);
+
+    foreach (range(1, 30) as $day) {
+        createRosterValidatorShift($roster, $employee, $shiftTemplate, sprintf('2027-01-%02d', $day));
+    }
+
+    $result = app(RosterValidator::class)->validate($roster);
+
+    expect(rosterValidatorCodes($result->warnings))->not->toContain('employee_has_no_free_day_in_month');
+});
+
+it('counts multiple shifts on the same date as one worked day for monthly free days', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createRosterValidatorEmployee($location, ['weekly_hours' => 300.00]);
+    $roster = createRosterValidatorRoster($location, $createdBy);
+    $earlyShiftTemplate = createRosterValidatorShiftTemplate($location, [
+        'active' => false,
+        'starts_at' => '06:00',
+        'ends_at' => '07:00',
+        'duration_minutes' => 60,
+    ]);
+    $lateShiftTemplate = createRosterValidatorShiftTemplate($location, [
+        'name' => 'Spätdienst',
+        'code' => 'late',
+        'active' => false,
+        'starts_at' => '18:00',
+        'ends_at' => '19:00',
+        'duration_minutes' => 60,
+    ]);
+
+    createRosterValidatorShift($roster, $employee, $earlyShiftTemplate, '2027-01-01');
+    createRosterValidatorShift($roster, $employee, $lateShiftTemplate, '2027-01-01');
+
+    foreach (range(2, 30) as $day) {
+        createRosterValidatorShift($roster, $employee, $earlyShiftTemplate, sprintf('2027-01-%02d', $day));
+    }
+
+    $result = app(RosterValidator::class)->validate($roster);
+
+    expect(rosterValidatorCodes($result->warnings))->not->toContain('employee_has_no_free_day_in_month');
+});
+
+it('reports no free day in month as warning without errors', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createRosterValidatorEmployee($location, ['weekly_hours' => 300.00]);
+    $roster = createRosterValidatorRoster($location, $createdBy);
+    $shiftTemplate = createRosterValidatorShiftTemplate($location, ['active' => false]);
+
+    foreach (rosterValidatorDatesForJanuary2027() as $date) {
+        createRosterValidatorShift($roster, $employee, $shiftTemplate, $date);
+    }
+
+    $result = app(RosterValidator::class)->validate($roster);
+
+    expect($result->errors)->toBeEmpty()
+        ->and(rosterValidatorCodes($result->warnings))->toContain('employee_has_no_free_day_in_month')
+        ->and($result->isYellow())->toBeTrue();
+});
