@@ -249,6 +249,100 @@ it('passes roster shifts to the roster detail page', function (): void {
         );
 });
 
+it('passes calendar days for every day of the roster month', function (): void {
+    $pdl = createRosterHttpUser('PDL');
+    $location = Location::factory()->create();
+    $roster = createRosterHttpRoster($location, $pdl);
+
+    $this->actingAs($pdl)
+        ->get("/rosters/{$roster->id}")
+        ->assertOk()
+        ->assertInertia(
+            fn (Assert $page) => $page
+                ->has('calendarDays', 31)
+                ->where('calendarDays.0.date', '2027-01-01')
+                ->where('calendarDays.30.date', '2027-01-31')
+        );
+});
+
+it('passes German weekday labels in calendar days', function (): void {
+    $pdl = createRosterHttpUser('PDL');
+    $location = Location::factory()->create();
+    $roster = createRosterHttpRoster($location, $pdl);
+
+    $this->actingAs($pdl)
+        ->get("/rosters/{$roster->id}")
+        ->assertOk()
+        ->assertInertia(
+            fn (Assert $page) => $page
+                ->where('calendarDays.0.dayLabel', '01.01.2027')
+                ->where('calendarDays.0.weekdayLabel', 'Freitag')
+        );
+});
+
+it('assigns shifts to the matching calendar day', function (): void {
+    $pdl = createRosterHttpUser('PDL');
+    $location = Location::factory()->create();
+    $employee = createRosterHttpEmployee($location);
+    $roster = createRosterHttpRoster($location, $pdl);
+    $shiftTemplate = createRosterHttpShiftTemplate($location);
+
+    createRosterHttpShift($roster, $employee, $shiftTemplate, '2027-01-10');
+
+    $this->actingAs($pdl)
+        ->get("/rosters/{$roster->id}")
+        ->assertOk()
+        ->assertInertia(
+            fn (Assert $page) => $page
+                ->where('calendarDays.9.date', '2027-01-10')
+                ->where('calendarDays.9.shifts.0.employeeName', $employee->name)
+                ->where('calendarDays.9.shifts.0.shiftTemplateName', 'Frühdienst')
+                ->where('calendarDays.0.shifts', [])
+        );
+});
+
+it('sorts shifts within a calendar day by start time', function (): void {
+    $pdl = createRosterHttpUser('PDL');
+    $location = Location::factory()->create();
+    $employee = createRosterHttpEmployee($location);
+    $roster = createRosterHttpRoster($location, $pdl);
+    $earlyShiftTemplate = createRosterHttpShiftTemplate($location);
+    $lateShiftTemplate = createRosterHttpShiftTemplate($location, [
+        'name' => 'Spätdienst',
+        'code' => 'late',
+        'starts_at' => '14:00',
+        'ends_at' => '22:00',
+        'color' => '#3B82F6',
+    ]);
+
+    createRosterHttpShift($roster, $employee, $lateShiftTemplate, '2027-01-10');
+    createRosterHttpShift($roster, $employee, $earlyShiftTemplate, '2027-01-10');
+
+    $this->actingAs($pdl)
+        ->get("/rosters/{$roster->id}")
+        ->assertOk()
+        ->assertInertia(
+            fn (Assert $page) => $page
+                ->where('calendarDays.9.shifts.0.shiftTemplateCode', 'early')
+                ->where('calendarDays.9.shifts.1.shiftTemplateCode', 'late')
+        );
+});
+
+it('passes empty shifts arrays for calendar days without shifts', function (): void {
+    $pdl = createRosterHttpUser('PDL');
+    $location = Location::factory()->create();
+    $roster = createRosterHttpRoster($location, $pdl);
+
+    $this->actingAs($pdl)
+        ->get("/rosters/{$roster->id}")
+        ->assertOk()
+        ->assertInertia(
+            fn (Assert $page) => $page
+                ->where('calendarDays.0.date', '2027-01-01')
+                ->where('calendarDays.0.shifts', [])
+        );
+});
+
 it('passes roster validation flash results to the roster detail page', function (): void {
     $pdl = createRosterHttpUser('PDL');
     $location = Location::factory()->create();

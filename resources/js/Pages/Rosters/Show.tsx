@@ -50,6 +50,13 @@ type RosterValidationResult = {
     warnings: ValidationEntry[];
 };
 
+type CalendarDay = {
+    date: string;
+    dayLabel: string;
+    weekdayLabel: string;
+    shifts: ShiftItem[];
+};
+
 type RosterItem = {
     id: string;
     locationId: string;
@@ -72,6 +79,7 @@ type Props = {
     roster: RosterItem;
     employees: EmployeeOption[];
     shiftTemplates: ShiftTemplateOption[];
+    calendarDays: CalendarDay[];
     rosterValidationResult: RosterValidationResult | null;
 };
 
@@ -83,6 +91,17 @@ function formatDateTime(value: string | null): string {
     return new Intl.DateTimeFormat('de-DE', {
         dateStyle: 'medium',
         timeStyle: 'short',
+    }).format(new Date(value));
+}
+
+function formatTime(value: string | null): string {
+    if (value === null) {
+        return '-';
+    }
+
+    return new Intl.DateTimeFormat('de-DE', {
+        hour: '2-digit',
+        minute: '2-digit',
     }).format(new Date(value));
 }
 
@@ -104,6 +123,46 @@ function statusClass(status: string): string {
     }
 
     return 'bg-gray-100 text-gray-700';
+}
+
+function MonthOverview({ calendarDays }: { calendarDays: CalendarDay[] }) {
+    return (
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {calendarDays.map((day) => (
+                <div key={day.date} className="rounded-md border border-gray-200 p-4">
+                    <div className="flex items-baseline justify-between gap-3">
+                        <h4 className="font-semibold text-gray-900">{day.dayLabel}</h4>
+                        <span className="text-sm text-gray-500">{day.weekdayLabel}</span>
+                    </div>
+
+                    {day.shifts.length === 0 ? (
+                        <p className="mt-3 text-sm text-gray-500">Keine Dienste</p>
+                    ) : (
+                        <ul className="mt-3 space-y-3">
+                            {day.shifts.map((shift) => (
+                                <li key={shift.id} className="text-sm text-gray-700">
+                                    <div className="font-medium text-gray-900">
+                                        {shift.shiftTemplateName ?? 'Unbekannte Schicht'}{' '}
+                                        {shift.shiftTemplateCode
+                                            ? `(${shift.shiftTemplateCode})`
+                                            : ''}
+                                    </div>
+                                    <div>{shift.employeeName ?? 'Unbekannt'}</div>
+                                    <div className="text-gray-500">
+                                        {formatTime(shift.startsAt)} bis{' '}
+                                        {formatTime(shift.endsAt)}
+                                    </div>
+                                    {shift.note && (
+                                        <div className="mt-1 text-gray-500">{shift.note}</div>
+                                    )}
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+            ))}
+        </div>
+    );
 }
 
 function RosterActions({ roster }: { roster: RosterItem }) {
@@ -380,6 +439,7 @@ export default function RosterShow({
     roster,
     employees,
     shiftTemplates,
+    calendarDays,
     rosterValidationResult,
 }: Props) {
     return (
@@ -465,6 +525,17 @@ export default function RosterShow({
                             employees={employees}
                             shiftTemplates={shiftTemplates}
                         />
+                    </div>
+
+                    <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
+                        <div className="border-b border-gray-200 p-6">
+                            <h3 className="text-lg font-semibold text-gray-900">
+                                Monatsübersicht
+                            </h3>
+                        </div>
+                        <div className="p-6">
+                            <MonthOverview calendarDays={calendarDays} />
+                        </div>
                     </div>
 
                     <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">

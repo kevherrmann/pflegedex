@@ -10,6 +10,7 @@ use App\Models\ShiftTemplate;
 use App\Models\User;
 use App\Services\Rosters\RosterService;
 use App\Services\Rosters\RosterValidator;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
@@ -54,6 +55,7 @@ class RosterController extends Controller
             'roster' => $this->mapRoster($roster),
             'employees' => $this->employeesForRoster($roster),
             'shiftTemplates' => $this->shiftTemplatesForRoster($roster),
+            'calendarDays' => $this->calendarDaysForRoster($roster),
             'rosterValidationResult' => $request->session()->get('rosterValidationResult'),
         ]);
     }
@@ -177,17 +179,59 @@ class RosterController extends Controller
     {
         return $roster->shifts
             ->sortBy(fn (Shift $shift): string => $shift->date->toDateString() . ' ' . $shift->starts_at->toDateTimeString())
-            ->map(fn (Shift $shift): array => [
-                'id' => $shift->id,
-                'date' => $shift->date->toDateString(),
-                'startsAt' => $shift->starts_at->toDateTimeString(),
-                'endsAt' => $shift->ends_at->toDateTimeString(),
-                'employeeName' => $shift->user?->name,
-                'shiftTemplateName' => $shift->shiftTemplate?->name,
-                'shiftTemplateCode' => $shift->shiftTemplate?->code,
-                'note' => $shift->note,
-            ])
+            ->map(fn (Shift $shift): array => $this->mapShift($shift, includeDate: true))
             ->values();
+    }
+
+    private function mapShift(Shift $shift, bool $includeDate = false): array
+    {
+        $mapped = [
+            'id' => $shift->id,
+            'startsAt' => $shift->starts_at->toDateTimeString(),
+            'endsAt' => $shift->ends_at->toDateTimeString(),
+            'employeeName' => $shift->user?->name,
+            'shiftTemplateName' => $shift->shiftTemplate?->name,
+            'shiftTemplateCode' => $shift->shiftTemplate?->code,
+            'note' => $shift->note,
+        ];
+
+        if ($includeDate) {
+            $mapped = ['date' => $shift->date->toDateString()] + $mapped;
+        }
+
+        return $mapped;
+    }
+
+    private function calendarDaysForRoster(Roster $roster): Collection
+    {
+        $weekdayLabels = [
+            1 => 'Montag',
+            2 => 'Dienstag',
+            3 => 'Mittwoch',
+            4 => 'Donnerstag',
+            5 => 'Freitag',
+            6 => 'Samstag',
+            7 => 'Sonntag',
+        ];
+        $firstDay = CarbonImmutable::create($roster->year, $roster->month, 1)->startOfDay();
+        $days = collect();
+
+        for ($date = $firstDay; $date->month === $roster->month; $date = $date->addDay()) {
+            $dayShifts = $roster->shifts
+                ->filter(fn (Shift $shift): bool => $shift->date->toDateString() === $date->toDateString())
+                ->sortBy(fn (Shift $shift): string => $shift->starts_at->toDateTimeString())
+                ->map(fn (Shift $shift): array => $this->mapShift($shift))
+                ->values();
+
+            $days->push([
+                'date' => $date->toDateString(),
+                'dayLabel' => $date->format('d.m.Y'),
+                'weekdayLabel' => $weekdayLabels[$date->dayOfWeekIso],
+                'shifts' => $dayShifts,
+            ]);
+        }
+
+        return $days;
     }
 
     private function employeesForRoster(Roster $roster): Collection
