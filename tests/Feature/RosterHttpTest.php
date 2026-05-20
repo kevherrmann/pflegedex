@@ -672,10 +672,11 @@ it('blocks non PDL users from validating rosters', function (): void {
 it('flashes green status for a green validation result', function (): void {
     $pdl = createRosterHttpUser('PDL');
     $location = Location::factory()->create();
-    $employee = createRosterHttpEmployee($location, [
-        'is_nursing_specialist' => true,
-        'weekly_hours' => 80.00,
-    ]);
+    $employees = collect(range(1, 7))
+        ->map(fn (): User => createRosterHttpEmployee($location, [
+            'is_nursing_specialist' => true,
+            'weekly_hours' => 80.00,
+        ]));
     $roster = createRosterHttpRoster($location, $pdl);
     $shiftTemplate = createRosterHttpShiftTemplate($location);
 
@@ -684,7 +685,9 @@ it('flashes green status for a green validation result', function (): void {
         'required_specialists' => 0,
     ]);
 
-    foreach (rosterHttpJanuary2027Dates() as $date) {
+    foreach (rosterHttpJanuary2027Dates() as $index => $date) {
+        $employee = $employees[$index % $employees->count()];
+
         createRosterHttpShift($roster, $employee, $shiftTemplate, $date);
     }
 

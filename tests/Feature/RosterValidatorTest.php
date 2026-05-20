@@ -144,10 +144,11 @@ function rosterValidatorCodes(array $entries): array
 it('is green when every shift in the month meets staffing and specialist requirements', function (): void {
     $location = Location::factory()->create();
     $createdBy = User::factory()->create();
-    $specialist = createRosterValidatorEmployee($location, [
-        'is_nursing_specialist' => true,
-        'weekly_hours' => 80.00,
-    ]);
+    $specialists = collect(range(1, 7))
+        ->map(fn (): User => createRosterValidatorEmployee($location, [
+            'is_nursing_specialist' => true,
+            'weekly_hours' => 80.00,
+        ]));
     $roster = createRosterValidatorRoster($location, $createdBy);
     $shiftTemplate = createRosterValidatorShiftTemplate($location);
 
@@ -156,7 +157,9 @@ it('is green when every shift in the month meets staffing and specialist require
         'required_specialists' => 1,
     ]);
 
-    foreach (rosterValidatorDatesForJanuary2027() as $date) {
+    foreach (rosterValidatorDatesForJanuary2027() as $index => $date) {
+        $specialist = $specialists[$index % $specialists->count()];
+
         createRosterValidatorShift($roster, $specialist, $shiftTemplate, $date);
     }
 
@@ -471,4 +474,119 @@ it('ignores planned working hours for employees without employee profiles', func
     $result = app(RosterValidator::class)->validate($roster);
 
     expect(rosterValidatorCodes($result->warnings))->not->toContain('employee_over_planned_hours');
+});
+
+it('adds a too many consecutive work days warning for seven planned days in a row', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createRosterValidatorEmployee($location, ['weekly_hours' => 80.00]);
+    $roster = createRosterValidatorRoster($location, $createdBy);
+    $shiftTemplate = createRosterValidatorShiftTemplate($location, ['active' => false]);
+
+    foreach (range(1, 7) as $day) {
+        createRosterValidatorShift($roster, $employee, $shiftTemplate, sprintf('2027-01-%02d', $day));
+    }
+
+    $result = app(RosterValidator::class)->validate($roster);
+    $warning = collect($result->warnings)->first(
+        fn (array $warning): bool => $warning['code'] === 'employee_too_many_consecutive_work_days',
+    );
+
+    expect($warning)->not->toBeNull()
+        ->and($warning['context']['userId'])->toBe($employee->id)
+        ->and($warning['context']['consecutiveDays'])->toBe(7)
+        ->and($warning['context']['maxAllowedConsecutiveDays'])->toBe(6)
+        ->and($warning['context']['startsOn'])->toBe('2027-01-01')
+        ->and($warning['context']['endsOn'])->toBe('2027-01-07')
+        ->and($warning['context']['month'])->toBe(1)
+        ->and($warning['context']['year'])->toBe(2027);
+});
+
+it('does not add a too many consecutive work days warning for six planned days in a row', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createRosterValidatorEmployee($location, ['weekly_hours' => 80.00]);
+    $roster = createRosterValidatorRoster($location, $createdBy);
+    $shiftTemplate = createRosterValidatorShiftTemplate($location, ['active' => false]);
+
+    foreach (range(1, 6) as $day) {
+        createRosterValidatorShift($roster, $employee, $shiftTemplate, sprintf('2027-01-%02d', $day));
+    }
+
+    $result = app(RosterValidator::class)->validate($roster);
+
+    expect(rosterValidatorCodes($result->warnings))->not->toContain('employee_too_many_consecutive_work_days');
+});
+
+it('counts multiple shifts on the same date as one consecutive work day', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createRosterValidatorEmployee($location, ['weekly_hours' => 80.00]);
+    $roster = createRosterValidatorRoster($location, $createdBy);
+    $earlyShiftTemplate = createRosterValidatorShiftTemplate($location, [
+        'active' => false,
+        'starts_at' => '06:00',
+        'ends_at' => '07:00',
+        'duration_minutes' => 60,
+    ]);
+    $lateShiftTemplate = createRosterValidatorShiftTemplate($location, [
+        'name' => 'Spätdienst',
+        'code' => 'late',
+        'active' => false,
+        'starts_at' => '18:00',
+        'ends_at' => '19:00',
+        'duration_minutes' => 60,
+    ]);
+
+    createRosterValidatorShift($roster, $employee, $earlyShiftTemplate, '2027-01-01');
+    createRosterValidatorShift($roster, $employee, $lateShiftTemplate, '2027-01-01');
+
+    foreach (range(2, 6) as $day) {
+        createRosterValidatorShift($roster, $employee, $earlyShiftTemplate, sprintf('2027-01-%02d', $day));
+    }
+
+    $result = app(RosterValidator::class)->validate($roster);
+
+    expect(rosterValidatorCodes($result->warnings))->not->toContain('employee_too_many_consecutive_work_days');
+});
+
+it('adds separate warnings for separate too long consecutive work day sequences', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createRosterValidatorEmployee($location, ['weekly_hours' => 80.00]);
+    $roster = createRosterValidatorRoster($location, $createdBy);
+    $shiftTemplate = createRosterValidatorShiftTemplate($location, ['active' => false]);
+
+    foreach ([...range(1, 7), ...range(9, 15)] as $day) {
+        createRosterValidatorShift($roster, $employee, $shiftTemplate, sprintf('2027-01-%02d', $day));
+    }
+
+    $result = app(RosterValidator::class)->validate($roster);
+    $warnings = collect($result->warnings)
+        ->filter(fn (array $warning): bool => $warning['code'] === 'employee_too_many_consecutive_work_days')
+        ->values();
+
+    expect($warnings)->toHaveCount(2)
+        ->and($warnings[0]['context']['startsOn'])->toBe('2027-01-01')
+        ->and($warnings[0]['context']['endsOn'])->toBe('2027-01-07')
+        ->and($warnings[1]['context']['startsOn'])->toBe('2027-01-09')
+        ->and($warnings[1]['context']['endsOn'])->toBe('2027-01-15');
+});
+
+it('reports too many consecutive work days as warning without errors', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createRosterValidatorEmployee($location, ['weekly_hours' => 80.00]);
+    $roster = createRosterValidatorRoster($location, $createdBy);
+    $shiftTemplate = createRosterValidatorShiftTemplate($location, ['active' => false]);
+
+    foreach (range(1, 7) as $day) {
+        createRosterValidatorShift($roster, $employee, $shiftTemplate, sprintf('2027-01-%02d', $day));
+    }
+
+    $result = app(RosterValidator::class)->validate($roster);
+
+    expect($result->errors)->toBeEmpty()
+        ->and(rosterValidatorCodes($result->warnings))->toContain('employee_too_many_consecutive_work_days')
+        ->and($result->isYellow())->toBeTrue();
 });

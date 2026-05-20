@@ -16,6 +16,7 @@ class RosterValidator
 {
     private const REQUIRED_REST_MINUTES = 660;
     private const PLANNED_WORKING_HOURS_TOLERANCE_MINUTES = 60;
+    private const MAX_ALLOWED_CONSECUTIVE_WORK_DAYS = 6;
 
     public function validate(Roster $roster): RosterValidationResult
     {
@@ -37,6 +38,7 @@ class RosterValidator
         $this->validateStaffing($roster, $shiftTemplates, $result);
         $this->validateAbsenceConflicts($roster, $result);
         $this->validatePlannedWorkingHours($roster, $result);
+        $this->validateConsecutiveWorkDays($roster, $result);
         $this->validateRestPeriods($roster, $result);
 
         return $result;
@@ -163,6 +165,85 @@ class RosterValidator
                     }
                 }
             });
+    }
+
+    private function validateConsecutiveWorkDays(Roster $roster, RosterValidationResult $result): void
+    {
+        $roster->shifts
+            ->groupBy('user_id')
+            ->each(function (Collection $shifts, string $userId) use ($roster, $result): void {
+                $workDates = $shifts
+                    ->map(fn (Shift $shift): string => $shift->date->toDateString())
+                    ->unique()
+                    ->sort()
+                    ->values();
+
+                if ($workDates->isEmpty()) {
+                    return;
+                }
+
+                $sequenceStart = CarbonImmutable::parse($workDates->first())->startOfDay();
+                $previousDate = $sequenceStart;
+                $consecutiveDays = 1;
+
+                for ($index = 1; $index < $workDates->count(); $index++) {
+                    $currentDate = CarbonImmutable::parse($workDates[$index])->startOfDay();
+
+                    if ($currentDate->isSameDay($previousDate->addDay())) {
+                        $consecutiveDays++;
+                    } else {
+                        $this->addConsecutiveWorkDaysWarning(
+                            $result,
+                            $userId,
+                            $roster,
+                            $sequenceStart,
+                            $previousDate,
+                            $consecutiveDays,
+                        );
+
+                        $sequenceStart = $currentDate;
+                        $consecutiveDays = 1;
+                    }
+
+                    $previousDate = $currentDate;
+                }
+
+                $this->addConsecutiveWorkDaysWarning(
+                    $result,
+                    $userId,
+                    $roster,
+                    $sequenceStart,
+                    $previousDate,
+                    $consecutiveDays,
+                );
+            });
+    }
+
+    private function addConsecutiveWorkDaysWarning(
+        RosterValidationResult $result,
+        string $userId,
+        Roster $roster,
+        CarbonImmutable $startsOn,
+        CarbonImmutable $endsOn,
+        int $consecutiveDays,
+    ): void {
+        if ($consecutiveDays <= self::MAX_ALLOWED_CONSECUTIVE_WORK_DAYS) {
+            return;
+        }
+
+        $result->addWarning(
+            'employee_too_many_consecutive_work_days',
+            'Der Mitarbeiter ist an zu vielen Tagen am Stück eingeplant.',
+            [
+                'userId' => $userId,
+                'consecutiveDays' => $consecutiveDays,
+                'maxAllowedConsecutiveDays' => self::MAX_ALLOWED_CONSECUTIVE_WORK_DAYS,
+                'startsOn' => $startsOn->toDateString(),
+                'endsOn' => $endsOn->toDateString(),
+                'month' => $roster->month,
+                'year' => $roster->year,
+            ],
+        );
     }
 
     private function validateAbsenceConflicts(Roster $roster, RosterValidationResult $result): void
