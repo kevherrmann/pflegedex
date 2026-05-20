@@ -144,7 +144,10 @@ function rosterValidatorCodes(array $entries): array
 it('is green when every shift in the month meets staffing and specialist requirements', function (): void {
     $location = Location::factory()->create();
     $createdBy = User::factory()->create();
-    $specialist = createRosterValidatorEmployee($location, ['is_nursing_specialist' => true]);
+    $specialist = createRosterValidatorEmployee($location, [
+        'is_nursing_specialist' => true,
+        'weekly_hours' => 80.00,
+    ]);
     $roster = createRosterValidatorRoster($location, $createdBy);
     $shiftTemplate = createRosterValidatorShiftTemplate($location);
 
@@ -397,4 +400,75 @@ it('detects employee absent errors for night shifts when absence is on the follo
     expect($absenceError)->not->toBeNull()
         ->and($absenceError['context']['shiftId'])->toBe($shift->id)
         ->and($absenceError['context']['absenceStartsOn'])->toBe('2027-01-11');
+});
+
+it('adds an employee over planned hours warning when planned minutes exceed target plus tolerance', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createRosterValidatorEmployee($location, ['weekly_hours' => 1.00]);
+    $roster = createRosterValidatorRoster($location, $createdBy);
+    $shiftTemplate = createRosterValidatorShiftTemplate($location, ['active' => false]);
+
+    createRosterValidatorShift($roster, $employee, $shiftTemplate, '2027-01-10');
+    createRosterValidatorShift($roster, $employee, $shiftTemplate, '2027-01-11');
+
+    $result = app(RosterValidator::class)->validate($roster);
+    $warning = collect($result->warnings)->first(
+        fn (array $warning): bool => $warning['code'] === 'employee_over_planned_hours',
+    );
+
+    expect($warning)->not->toBeNull()
+        ->and($warning['context']['userId'])->toBe($employee->id)
+        ->and($warning['context']['plannedMinutes'])->toBe(960)
+        ->and($warning['context']['targetMinutes'])->toBe(266)
+        ->and($warning['context']['overtimeMinutes'])->toBe(694)
+        ->and($warning['context']['weeklyHours'])->toBe(1.0)
+        ->and($warning['context']['month'])->toBe(1)
+        ->and($warning['context']['year'])->toBe(2027);
+});
+
+it('does not add an employee over planned hours warning within target plus tolerance', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createRosterValidatorEmployee($location, ['weekly_hours' => 40.00]);
+    $roster = createRosterValidatorRoster($location, $createdBy);
+    $shiftTemplate = createRosterValidatorShiftTemplate($location, ['active' => false]);
+
+    createRosterValidatorShift($roster, $employee, $shiftTemplate, '2027-01-10');
+
+    $result = app(RosterValidator::class)->validate($roster);
+
+    expect(rosterValidatorCodes($result->warnings))->not->toContain('employee_over_planned_hours');
+});
+
+it('reports over planned working hours as warning without errors', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createRosterValidatorEmployee($location, ['weekly_hours' => 1.00]);
+    $roster = createRosterValidatorRoster($location, $createdBy);
+    $shiftTemplate = createRosterValidatorShiftTemplate($location, ['active' => false]);
+
+    createRosterValidatorShift($roster, $employee, $shiftTemplate, '2027-01-10');
+    createRosterValidatorShift($roster, $employee, $shiftTemplate, '2027-01-11');
+
+    $result = app(RosterValidator::class)->validate($roster);
+
+    expect($result->errors)->toBeEmpty()
+        ->and(rosterValidatorCodes($result->warnings))->toContain('employee_over_planned_hours')
+        ->and($result->isYellow())->toBeTrue();
+});
+
+it('ignores planned working hours for employees without employee profiles', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = User::factory()->for($location)->create();
+    $roster = createRosterValidatorRoster($location, $createdBy);
+    $shiftTemplate = createRosterValidatorShiftTemplate($location, ['active' => false]);
+
+    createRosterValidatorShift($roster, $employee, $shiftTemplate, '2027-01-10');
+    createRosterValidatorShift($roster, $employee, $shiftTemplate, '2027-01-11');
+
+    $result = app(RosterValidator::class)->validate($roster);
+
+    expect(rosterValidatorCodes($result->warnings))->not->toContain('employee_over_planned_hours');
 });

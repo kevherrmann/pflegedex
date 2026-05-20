@@ -497,7 +497,7 @@ it('blocks PDL users from publishing a roster with validator errors through http
 it('lets PDL users publish a green roster through http', function (): void {
     $pdl = createRosterHttpUser('PDL');
     $location = Location::factory()->create();
-    $employee = createRosterHttpEmployee($location);
+    $employee = createRosterHttpEmployee($location, ['weekly_hours' => 80.00]);
     $roster = createRosterHttpRoster($location, $pdl);
     $shiftTemplate = createRosterHttpShiftTemplate($location);
 
@@ -672,7 +672,10 @@ it('blocks non PDL users from validating rosters', function (): void {
 it('flashes green status for a green validation result', function (): void {
     $pdl = createRosterHttpUser('PDL');
     $location = Location::factory()->create();
-    $employee = createRosterHttpEmployee($location, ['is_nursing_specialist' => true]);
+    $employee = createRosterHttpEmployee($location, [
+        'is_nursing_specialist' => true,
+        'weekly_hours' => 80.00,
+    ]);
     $roster = createRosterHttpRoster($location, $pdl);
     $shiftTemplate = createRosterHttpShiftTemplate($location);
 

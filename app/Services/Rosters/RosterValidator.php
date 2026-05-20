@@ -15,6 +15,7 @@ use Illuminate\Support\Collection;
 class RosterValidator
 {
     private const REQUIRED_REST_MINUTES = 660;
+    private const PLANNED_WORKING_HOURS_TOLERANCE_MINUTES = 60;
 
     public function validate(Roster $roster): RosterValidationResult
     {
@@ -35,6 +36,7 @@ class RosterValidator
 
         $this->validateStaffing($roster, $shiftTemplates, $result);
         $this->validateAbsenceConflicts($roster, $result);
+        $this->validatePlannedWorkingHours($roster, $result);
         $this->validateRestPeriods($roster, $result);
 
         return $result;
@@ -211,6 +213,47 @@ class RosterValidator
                 ],
             );
         }
+    }
+
+    private function validatePlannedWorkingHours(Roster $roster, RosterValidationResult $result): void
+    {
+        $daysInMonth = CarbonImmutable::create($roster->year, $roster->month, 1)->daysInMonth;
+
+        $roster->shifts
+            ->groupBy('user_id')
+            ->each(function (Collection $shifts, string $userId) use ($daysInMonth, $roster, $result): void {
+                /** @var Shift|null $firstShift */
+                $firstShift = $shifts->first();
+                $employeeProfile = $firstShift?->user?->employeeProfile;
+
+                if ($employeeProfile === null || $employeeProfile->weekly_hours === null) {
+                    return;
+                }
+
+                $plannedMinutes = (int) $shifts->sum(
+                    fn (Shift $shift): int => (int) $shift->starts_at->diffInMinutes($shift->ends_at),
+                );
+                $weeklyHours = (float) $employeeProfile->weekly_hours;
+                $targetMinutes = (int) round($weeklyHours * 60 / 7 * $daysInMonth);
+
+                if ($plannedMinutes <= $targetMinutes + self::PLANNED_WORKING_HOURS_TOLERANCE_MINUTES) {
+                    return;
+                }
+
+                $result->addWarning(
+                    'employee_over_planned_hours',
+                    'Der Mitarbeiter ist über seiner Soll-Arbeitszeit geplant.',
+                    [
+                        'userId' => $userId,
+                        'plannedMinutes' => $plannedMinutes,
+                        'targetMinutes' => $targetMinutes,
+                        'overtimeMinutes' => $plannedMinutes - $targetMinutes,
+                        'weeklyHours' => $weeklyHours,
+                        'month' => $roster->month,
+                        'year' => $roster->year,
+                    ],
+                );
+            });
     }
 
     /**
