@@ -782,3 +782,117 @@ it('reports no free day in month as warning without errors', function (): void {
         ->and(rosterValidatorCodes($result->warnings))->toContain('employee_has_no_free_day_in_month')
         ->and($result->isYellow())->toBeTrue();
 });
+
+it('adds a missing sunday compensation rest day warning when no known free day exists in the window', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createRosterValidatorEmployee($location, ['weekly_hours' => 300.00]);
+    $roster = createRosterValidatorRoster($location, $createdBy);
+    $shiftTemplate = createRosterValidatorShiftTemplate($location, ['active' => false]);
+
+    foreach (range(4, 17) as $day) {
+        createRosterValidatorShift($roster, $employee, $shiftTemplate, sprintf('2027-01-%02d', $day));
+    }
+
+    $result = app(RosterValidator::class)->validate($roster);
+    $warning = collect($result->warnings)->first(
+        fn (array $warning): bool => $warning['code'] === 'missing_sunday_compensation_rest_day'
+            && $warning['context']['sunday'] === '2027-01-10',
+    );
+
+    expect($warning)->not->toBeNull()
+        ->and($warning['context']['userId'])->toBe($employee->id)
+        ->and($warning['context']['compensationWindowStartsOn'])->toBe('2027-01-04')
+        ->and($warning['context']['compensationWindowEndsOn'])->toBe('2027-01-17')
+        ->and($warning['context']['month'])->toBe(1)
+        ->and($warning['context']['year'])->toBe(2027);
+});
+
+it('does not add a missing sunday compensation rest day warning when a known free day exists in the window', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createRosterValidatorEmployee($location, ['weekly_hours' => 300.00]);
+    $roster = createRosterValidatorRoster($location, $createdBy);
+    $shiftTemplate = createRosterValidatorShiftTemplate($location, ['active' => false]);
+
+    foreach (range(4, 17) as $day) {
+        if ($day === 13) {
+            continue;
+        }
+
+        createRosterValidatorShift($roster, $employee, $shiftTemplate, sprintf('2027-01-%02d', $day));
+    }
+
+    $result = app(RosterValidator::class)->validate($roster);
+
+    expect(rosterValidatorCodes($result->warnings))->not->toContain('missing_sunday_compensation_rest_day');
+});
+
+it('adds only one missing sunday compensation rest day warning for multiple shifts on the same sunday', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createRosterValidatorEmployee($location, ['weekly_hours' => 300.00]);
+    $roster = createRosterValidatorRoster($location, $createdBy);
+    $earlyShiftTemplate = createRosterValidatorShiftTemplate($location, [
+        'active' => false,
+        'starts_at' => '06:00',
+        'ends_at' => '07:00',
+        'duration_minutes' => 60,
+    ]);
+    $lateShiftTemplate = createRosterValidatorShiftTemplate($location, [
+        'name' => 'Spätdienst',
+        'code' => 'late',
+        'active' => false,
+        'starts_at' => '18:00',
+        'ends_at' => '19:00',
+        'duration_minutes' => 60,
+    ]);
+
+    foreach (range(4, 17) as $day) {
+        createRosterValidatorShift($roster, $employee, $earlyShiftTemplate, sprintf('2027-01-%02d', $day));
+    }
+
+    createRosterValidatorShift($roster, $employee, $lateShiftTemplate, '2027-01-10');
+
+    $result = app(RosterValidator::class)->validate($roster);
+    $warnings = collect($result->warnings)
+        ->filter(fn (array $warning): bool => $warning['code'] === 'missing_sunday_compensation_rest_day'
+            && $warning['context']['sunday'] === '2027-01-10')
+        ->values();
+
+    expect($warnings)->toHaveCount(1);
+});
+
+it('does not run sunday compensation checks for weekdays', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createRosterValidatorEmployee($location, ['weekly_hours' => 300.00]);
+    $roster = createRosterValidatorRoster($location, $createdBy);
+    $shiftTemplate = createRosterValidatorShiftTemplate($location, ['active' => false]);
+
+    foreach (range(4, 9) as $day) {
+        createRosterValidatorShift($roster, $employee, $shiftTemplate, sprintf('2027-01-%02d', $day));
+    }
+
+    $result = app(RosterValidator::class)->validate($roster);
+
+    expect(rosterValidatorCodes($result->warnings))->not->toContain('missing_sunday_compensation_rest_day');
+});
+
+it('reports missing sunday compensation rest days as warning without errors', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createRosterValidatorEmployee($location, ['weekly_hours' => 300.00]);
+    $roster = createRosterValidatorRoster($location, $createdBy);
+    $shiftTemplate = createRosterValidatorShiftTemplate($location, ['active' => false]);
+
+    foreach (range(4, 17) as $day) {
+        createRosterValidatorShift($roster, $employee, $shiftTemplate, sprintf('2027-01-%02d', $day));
+    }
+
+    $result = app(RosterValidator::class)->validate($roster);
+
+    expect($result->errors)->toBeEmpty()
+        ->and(rosterValidatorCodes($result->warnings))->toContain('missing_sunday_compensation_rest_day')
+        ->and($result->isYellow())->toBeTrue();
+});

@@ -42,6 +42,7 @@ class RosterValidator
         $this->validateConsecutiveWorkDays($roster, $result);
         $this->validateWeekendLoad($roster, $result);
         $this->validateMonthlyFreeDays($roster, $result);
+        $this->validateSundayCompensationRestDays($roster, $result);
         $this->validateRestPeriods($roster, $result);
 
         return $result;
@@ -323,6 +324,55 @@ class RosterValidator
                         'year' => $roster->year,
                     ],
                 );
+            });
+    }
+
+    private function validateSundayCompensationRestDays(Roster $roster, RosterValidationResult $result): void
+    {
+        $monthDates = collect($this->datesForRosterMonth($roster))
+            ->map(fn (CarbonImmutable $date): string => $date->toDateString())
+            ->values();
+
+        $roster->shifts
+            ->groupBy('user_id')
+            ->each(function (Collection $shifts, string $userId) use ($monthDates, $roster, $result): void {
+                $workedDays = $shifts
+                    ->map(fn (Shift $shift): string => $shift->date->toDateString())
+                    ->unique()
+                    ->values();
+                $workedSundays = $workedDays
+                    ->filter(fn (string $date): bool => CarbonImmutable::parse($date)->dayOfWeekIso === 7)
+                    ->values();
+
+                foreach ($workedSundays as $sunday) {
+                    $sundayDate = CarbonImmutable::parse($sunday)->startOfDay();
+                    $windowStartsOn = $sundayDate->subDays(6);
+                    $windowEndsOn = $sundayDate->addDays(7);
+
+                    $knownWindowDates = $monthDates
+                        ->filter(fn (string $date): bool => $date >= $windowStartsOn->toDateString()
+                            && $date <= $windowEndsOn->toDateString())
+                        ->values();
+                    $hasKnownFreeDay = $knownWindowDates
+                        ->contains(fn (string $date): bool => ! $workedDays->contains($date));
+
+                    if ($hasKnownFreeDay) {
+                        continue;
+                    }
+
+                    $result->addWarning(
+                        'missing_sunday_compensation_rest_day',
+                        'Für Sonntagsarbeit fehlt ein Ersatzruhetag im Ausgleichszeitraum.',
+                        [
+                            'userId' => $userId,
+                            'sunday' => $sundayDate->toDateString(),
+                            'compensationWindowStartsOn' => $windowStartsOn->toDateString(),
+                            'compensationWindowEndsOn' => $windowEndsOn->toDateString(),
+                            'month' => $roster->month,
+                            'year' => $roster->year,
+                        ],
+                    );
+                }
             });
     }
 
