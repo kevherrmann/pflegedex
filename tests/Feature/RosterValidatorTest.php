@@ -144,11 +144,6 @@ function rosterValidatorCodes(array $entries): array
 it('is green when every shift in the month meets staffing and specialist requirements', function (): void {
     $location = Location::factory()->create();
     $createdBy = User::factory()->create();
-    $specialists = collect(range(1, 7))
-        ->map(fn (): User => createRosterValidatorEmployee($location, [
-            'is_nursing_specialist' => true,
-            'weekly_hours' => 80.00,
-        ]));
     $roster = createRosterValidatorRoster($location, $createdBy);
     $shiftTemplate = createRosterValidatorShiftTemplate($location);
 
@@ -157,8 +152,11 @@ it('is green when every shift in the month meets staffing and specialist require
         'required_specialists' => 1,
     ]);
 
-    foreach (rosterValidatorDatesForJanuary2027() as $index => $date) {
-        $specialist = $specialists[$index % $specialists->count()];
+    foreach (rosterValidatorDatesForJanuary2027() as $date) {
+        $specialist = createRosterValidatorEmployee($location, [
+            'is_nursing_specialist' => true,
+            'weekly_hours' => 80.00,
+        ]);
 
         createRosterValidatorShift($roster, $specialist, $shiftTemplate, $date);
     }
@@ -588,5 +586,109 @@ it('reports too many consecutive work days as warning without errors', function 
 
     expect($result->errors)->toBeEmpty()
         ->and(rosterValidatorCodes($result->warnings))->toContain('employee_too_many_consecutive_work_days')
+        ->and($result->isYellow())->toBeTrue();
+});
+
+it('adds a too many weekends warning when an employee works three weekends', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createRosterValidatorEmployee($location, ['weekly_hours' => 120.00]);
+    $roster = createRosterValidatorRoster($location, $createdBy);
+    $shiftTemplate = createRosterValidatorShiftTemplate($location, ['active' => false]);
+
+    foreach (['2027-01-02', '2027-01-09', '2027-01-16'] as $date) {
+        createRosterValidatorShift($roster, $employee, $shiftTemplate, $date);
+    }
+
+    $result = app(RosterValidator::class)->validate($roster);
+    $warning = collect($result->warnings)->first(
+        fn (array $warning): bool => $warning['code'] === 'employee_too_many_weekends',
+    );
+
+    expect($warning)->not->toBeNull()
+        ->and($warning['context']['userId'])->toBe($employee->id)
+        ->and($warning['context']['workedWeekends'])->toBe(3)
+        ->and($warning['context']['maxAllowedWeekends'])->toBe(2)
+        ->and($warning['context']['weekendStartsOn'])->toBe([
+            '2027-01-02',
+            '2027-01-09',
+            '2027-01-16',
+        ])
+        ->and($warning['context']['month'])->toBe(1)
+        ->and($warning['context']['year'])->toBe(2027);
+});
+
+it('does not add a too many weekends warning when an employee works two weekends', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createRosterValidatorEmployee($location, ['weekly_hours' => 120.00]);
+    $roster = createRosterValidatorRoster($location, $createdBy);
+    $shiftTemplate = createRosterValidatorShiftTemplate($location, ['active' => false]);
+
+    foreach (['2027-01-02', '2027-01-09'] as $date) {
+        createRosterValidatorShift($roster, $employee, $shiftTemplate, $date);
+    }
+
+    $result = app(RosterValidator::class)->validate($roster);
+
+    expect(rosterValidatorCodes($result->warnings))->not->toContain('employee_too_many_weekends');
+});
+
+it('counts Saturday and Sunday of the same weekend once', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createRosterValidatorEmployee($location, ['weekly_hours' => 120.00]);
+    $roster = createRosterValidatorRoster($location, $createdBy);
+    $shiftTemplate = createRosterValidatorShiftTemplate($location, ['active' => false]);
+
+    foreach (['2027-01-02', '2027-01-03', '2027-01-09', '2027-01-16'] as $date) {
+        createRosterValidatorShift($roster, $employee, $shiftTemplate, $date);
+    }
+
+    $result = app(RosterValidator::class)->validate($roster);
+    $warning = collect($result->warnings)->first(
+        fn (array $warning): bool => $warning['code'] === 'employee_too_many_weekends',
+    );
+
+    expect($warning)->not->toBeNull()
+        ->and($warning['context']['workedWeekends'])->toBe(3)
+        ->and($warning['context']['weekendStartsOn'])->toBe([
+            '2027-01-02',
+            '2027-01-09',
+            '2027-01-16',
+        ]);
+});
+
+it('does not count regular weekdays as worked weekends', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createRosterValidatorEmployee($location, ['weekly_hours' => 120.00]);
+    $roster = createRosterValidatorRoster($location, $createdBy);
+    $shiftTemplate = createRosterValidatorShiftTemplate($location, ['active' => false]);
+
+    foreach (['2027-01-04', '2027-01-05', '2027-01-06', '2027-01-07', '2027-01-08'] as $date) {
+        createRosterValidatorShift($roster, $employee, $shiftTemplate, $date);
+    }
+
+    $result = app(RosterValidator::class)->validate($roster);
+
+    expect(rosterValidatorCodes($result->warnings))->not->toContain('employee_too_many_weekends');
+});
+
+it('reports too many weekends as warning without errors', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $employee = createRosterValidatorEmployee($location, ['weekly_hours' => 120.00]);
+    $roster = createRosterValidatorRoster($location, $createdBy);
+    $shiftTemplate = createRosterValidatorShiftTemplate($location, ['active' => false]);
+
+    foreach (['2027-01-02', '2027-01-09', '2027-01-16'] as $date) {
+        createRosterValidatorShift($roster, $employee, $shiftTemplate, $date);
+    }
+
+    $result = app(RosterValidator::class)->validate($roster);
+
+    expect($result->errors)->toBeEmpty()
+        ->and(rosterValidatorCodes($result->warnings))->toContain('employee_too_many_weekends')
         ->and($result->isYellow())->toBeTrue();
 });

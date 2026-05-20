@@ -17,6 +17,7 @@ class RosterValidator
     private const REQUIRED_REST_MINUTES = 660;
     private const PLANNED_WORKING_HOURS_TOLERANCE_MINUTES = 60;
     private const MAX_ALLOWED_CONSECUTIVE_WORK_DAYS = 6;
+    private const MAX_ALLOWED_WEEKENDS = 2;
 
     public function validate(Roster $roster): RosterValidationResult
     {
@@ -39,6 +40,7 @@ class RosterValidator
         $this->validateAbsenceConflicts($roster, $result);
         $this->validatePlannedWorkingHours($roster, $result);
         $this->validateConsecutiveWorkDays($roster, $result);
+        $this->validateWeekendLoad($roster, $result);
         $this->validateRestPeriods($roster, $result);
 
         return $result;
@@ -244,6 +246,49 @@ class RosterValidator
                 'year' => $roster->year,
             ],
         );
+    }
+
+    private function validateWeekendLoad(Roster $roster, RosterValidationResult $result): void
+    {
+        $roster->shifts
+            ->groupBy('user_id')
+            ->each(function (Collection $shifts, string $userId) use ($roster, $result): void {
+                $weekendStartsOn = $shifts
+                    ->map(function (Shift $shift): ?string {
+                        $date = CarbonImmutable::parse($shift->date)->startOfDay();
+
+                        if ($date->dayOfWeekIso === 6) {
+                            return $date->toDateString();
+                        }
+
+                        if ($date->dayOfWeekIso === 7) {
+                            return $date->subDay()->toDateString();
+                        }
+
+                        return null;
+                    })
+                    ->filter()
+                    ->unique()
+                    ->sort()
+                    ->values();
+
+                if ($weekendStartsOn->count() <= self::MAX_ALLOWED_WEEKENDS) {
+                    return;
+                }
+
+                $result->addWarning(
+                    'employee_too_many_weekends',
+                    'Der Mitarbeiter ist an zu vielen Wochenenden eingeplant.',
+                    [
+                        'userId' => $userId,
+                        'workedWeekends' => $weekendStartsOn->count(),
+                        'maxAllowedWeekends' => self::MAX_ALLOWED_WEEKENDS,
+                        'weekendStartsOn' => $weekendStartsOn->all(),
+                        'month' => $roster->month,
+                        'year' => $roster->year,
+                    ],
+                );
+            });
     }
 
     private function validateAbsenceConflicts(Roster $roster, RosterValidationResult $result): void
