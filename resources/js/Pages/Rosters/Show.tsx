@@ -129,42 +129,108 @@ function statusClass(status: string): string {
     return 'bg-gray-100 text-gray-700';
 }
 
+function isWeekend(day: CalendarDay): boolean {
+    return day.weekdayLabel === 'Samstag' || day.weekdayLabel === 'Sonntag';
+}
+
+function shiftBadgeClass(code: string | null): string {
+    if (code === 'early') {
+        return 'border-amber-200 bg-amber-50 text-amber-900';
+    }
+
+    if (code === 'late') {
+        return 'border-blue-200 bg-blue-50 text-blue-900';
+    }
+
+    if (code === 'night') {
+        return 'border-indigo-200 bg-indigo-50 text-indigo-900';
+    }
+
+    return 'border-gray-200 bg-gray-50 text-gray-800';
+}
+
 function MonthOverview({ calendarDays }: { calendarDays: CalendarDay[] }) {
     return (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {calendarDays.map((day) => (
-                <div key={day.date} className="rounded-md border border-gray-200 p-4">
-                    <div className="flex items-baseline justify-between gap-3">
-                        <h4 className="font-semibold text-gray-900">{day.dayLabel}</h4>
-                        <span className="text-sm text-gray-500">{day.weekdayLabel}</span>
-                    </div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {calendarDays.map((day) => {
+                const hasShifts = day.shifts.length > 0;
+                const weekend = isWeekend(day);
 
-                    {day.shifts.length === 0 ? (
-                        <p className="mt-3 text-sm text-gray-500">Keine Dienste</p>
-                    ) : (
-                        <ul className="mt-3 space-y-3">
-                            {day.shifts.map((shift) => (
-                                <li key={shift.id} className="text-sm text-gray-700">
-                                    <div className="font-medium text-gray-900">
-                                        {shift.shiftTemplateName ?? 'Unbekannte Schicht'}{' '}
-                                        {shift.shiftTemplateCode
-                                            ? `(${shift.shiftTemplateCode})`
-                                            : ''}
-                                    </div>
-                                    <div>{shift.employeeName ?? 'Unbekannt'}</div>
-                                    <div className="text-gray-500">
-                                        {formatTime(shift.startsAt)} bis{' '}
-                                        {formatTime(shift.endsAt)}
-                                    </div>
-                                    {shift.note && (
-                                        <div className="mt-1 text-gray-500">{shift.note}</div>
-                                    )}
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </div>
-            ))}
+                return (
+                    <div
+                        key={day.date}
+                        className={`rounded-md border p-3 transition ${
+                            hasShifts
+                                ? 'border-gray-300 bg-white shadow-sm'
+                                : 'border-gray-100 bg-gray-50/70 text-gray-500'
+                        } ${weekend ? 'ring-1 ring-[#9B1C3B]/15' : ''}`}
+                    >
+                        <div className="flex items-start justify-between gap-3">
+                            <div>
+                                <h4
+                                    className={`text-sm font-semibold ${
+                                        hasShifts ? 'text-gray-900' : 'text-gray-500'
+                                    }`}
+                                >
+                                    {day.dayLabel}
+                                </h4>
+                                <span
+                                    className={`mt-0.5 inline-flex text-xs ${
+                                        weekend ? 'font-semibold text-[#9B1C3B]' : 'text-gray-500'
+                                    }`}
+                                >
+                                    {day.weekdayLabel}
+                                </span>
+                            </div>
+                            {hasShifts && (
+                                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                                    {day.shifts.length}
+                                </span>
+                            )}
+                        </div>
+
+                        {hasShifts ? (
+                            <ul className="mt-3 space-y-2">
+                                {day.shifts.map((shift) => (
+                                    <li
+                                        key={shift.id}
+                                        className={`rounded-md border px-2.5 py-2 text-xs ${shiftBadgeClass(
+                                            shift.shiftTemplateCode,
+                                        )}`}
+                                    >
+                                        <div className="flex items-start justify-between gap-2">
+                                            <span className="font-semibold">
+                                                {shift.shiftTemplateName ??
+                                                    shift.shiftTemplateCode ??
+                                                    'Unbekannte Schicht'}
+                                            </span>
+                                            {shift.shiftTemplateCode && (
+                                                <span className="shrink-0 rounded bg-white/60 px-1.5 py-0.5 font-mono text-[0.65rem] uppercase">
+                                                    {shift.shiftTemplateCode}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="mt-1 font-medium">
+                                            {formatTime(shift.startsAt)} bis{' '}
+                                            {formatTime(shift.endsAt)}
+                                        </div>
+                                        <div className="mt-1">
+                                            {shift.employeeName ?? 'Unbekannt'}
+                                        </div>
+                                        {shift.note && (
+                                            <div className="mt-1 border-t border-current/10 pt-1 opacity-80">
+                                                {shift.note}
+                                            </div>
+                                        )}
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="mt-3 text-xs">Keine Dienste</p>
+                        )}
+                    </div>
+                );
+            })}
         </div>
     );
 }
@@ -402,12 +468,21 @@ function ShiftForm({
     const rosterEmployees = employees.filter(
         (employee) => employee.locationId === null || employee.locationId === roster.locationId,
     );
+
     const form = useForm({
         user_id: rosterEmployees[0]?.id ?? '',
         shift_template_id: shiftTemplates[0]?.id ?? '',
         date: '',
         note: '',
     });
+
+    if (!roster.isEditable) {
+        return (
+            <div className="p-6 text-sm text-gray-600">
+                Dieser Dienstplan ist nicht mehr bearbeitbar.
+            </div>
+        );
+    }
 
     const submit: FormEventHandler = (event) => {
         event.preventDefault();
