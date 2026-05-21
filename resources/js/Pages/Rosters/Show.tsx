@@ -68,7 +68,7 @@ type MonthOverviewFilter =
     | 'weekends'
     | 'with-validation';
 
-type ValidationDayIndexEntry = {
+type ValidationIndexEntry = {
     hasErrors: boolean;
     hasWarnings: boolean;
     entries: ValidationEntry[];
@@ -321,12 +321,12 @@ function validationDatesFromContext(context: Record<string, unknown>): string[] 
 function buildValidationDayIndex(
     validationResult: RosterValidationResult | null,
     rosterId: string,
-): Record<string, ValidationDayIndexEntry> {
+): Record<string, ValidationIndexEntry> {
     if (validationResult === null || validationResult.rosterId !== rosterId) {
         return {};
     }
 
-    const dayIndex: Record<string, ValidationDayIndexEntry> = {};
+    const dayIndex: Record<string, ValidationIndexEntry> = {};
 
     const addEntry = (entry: ValidationEntry, hasError: boolean) => {
         validationDatesFromContext(entry.context).forEach((date) => {
@@ -350,6 +350,44 @@ function buildValidationDayIndex(
     validationResult.warnings.forEach((entry) => addEntry(entry, false));
 
     return dayIndex;
+}
+
+function buildValidationUserIndex(
+    validationResult: RosterValidationResult | null,
+    rosterId: string,
+): Record<string, ValidationIndexEntry> {
+    if (validationResult === null || validationResult.rosterId !== rosterId) {
+        return {};
+    }
+
+    const userIndex: Record<string, ValidationIndexEntry> = {};
+
+    const addEntry = (entry: ValidationEntry, hasError: boolean) => {
+        const userId = entry.context.userId;
+
+        if (typeof userId !== 'string') {
+            return;
+        }
+
+        userIndex[userId] ??= {
+            hasErrors: false,
+            hasWarnings: false,
+            entries: [],
+        };
+
+        if (hasError) {
+            userIndex[userId].hasErrors = true;
+        } else {
+            userIndex[userId].hasWarnings = true;
+        }
+
+        userIndex[userId].entries.push(entry);
+    };
+
+    validationResult.errors.forEach((entry) => addEntry(entry, true));
+    validationResult.warnings.forEach((entry) => addEntry(entry, false));
+
+    return userIndex;
 }
 
 function MonthOverview({
@@ -807,8 +845,17 @@ function EntryList({ title, entries }: { title: string; entries: ValidationEntry
     );
 }
 
-function EmployeeWorkloadOverview({ roster }: { roster: RosterItem }) {
+function EmployeeWorkloadOverview({
+    roster,
+    validationResult,
+    rosterId,
+}: {
+    roster: RosterItem;
+    validationResult: RosterValidationResult | null;
+    rosterId: string;
+}) {
     const workload = buildEmployeeWorkload(roster.shifts);
+    const validationUserIndex = buildValidationUserIndex(validationResult, rosterId);
 
     return (
         <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
@@ -833,29 +880,101 @@ function EmployeeWorkloadOverview({ roster }: { roster: RosterItem }) {
                                     <th className="px-4 py-3">Arbeitstage</th>
                                     <th className="px-4 py-3">Wochenenden</th>
                                     <th className="px-4 py-3">Schichten</th>
+                                    <th className="px-4 py-3">Prüfung</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 bg-white text-gray-700">
-                                {workload.map((item) => (
-                                    <tr key={item.userId}>
-                                        <td className="px-4 py-3 font-medium text-gray-900">
-                                            {item.employeeName}
-                                        </td>
-                                        <td className="px-4 py-3">{item.shiftsCount}</td>
-                                        <td className="px-4 py-3">
-                                            {formatMinutesAsHours(item.plannedMinutes)}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            {item.workedDays.length}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            {item.workedWeekendStartsOn.length}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            {shiftCountsLabel(item)}
-                                        </td>
-                                    </tr>
-                                ))}
+                                {workload.map((item) => {
+                                    const userValidation = validationUserIndex[item.userId];
+                                    const hasValidationError =
+                                        userValidation?.hasErrors === true;
+                                    const hasValidationWarning =
+                                        !hasValidationError &&
+                                        userValidation?.hasWarnings === true;
+                                    const validationEntries = userValidation?.entries ?? [];
+                                    const visibleValidationEntries = validationEntries.slice(
+                                        0,
+                                        2,
+                                    );
+                                    const hiddenValidationEntriesCount = Math.max(
+                                        validationEntries.length -
+                                            visibleValidationEntries.length,
+                                        0,
+                                    );
+
+                                    return (
+                                        <tr
+                                            key={item.userId}
+                                            className={
+                                                hasValidationError
+                                                    ? 'bg-red-50/40'
+                                                    : hasValidationWarning
+                                                      ? 'bg-amber-50/40'
+                                                      : undefined
+                                            }
+                                        >
+                                            <td className="px-4 py-3 font-medium text-gray-900">
+                                                {item.employeeName}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                {item.shiftsCount}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                {formatMinutesAsHours(item.plannedMinutes)}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                {item.workedDays.length}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                {item.workedWeekendStartsOn.length}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                {shiftCountsLabel(item)}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                {userValidation ? (
+                                                    <div className="space-y-1">
+                                                        <span
+                                                            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                                                hasValidationError
+                                                                    ? 'bg-red-100 text-red-800'
+                                                                    : 'bg-amber-100 text-amber-800'
+                                                            }`}
+                                                        >
+                                                            {hasValidationError
+                                                                ? 'Fehler'
+                                                                : 'Hinweise'}
+                                                        </span>
+                                                        <ul className="space-y-0.5 text-xs text-gray-600">
+                                                            {visibleValidationEntries.map(
+                                                                (entry, index) => (
+                                                                    <li
+                                                                        key={`${entry.code}-${index}`}
+                                                                    >
+                                                                        {entry.title ??
+                                                                            entry.message}
+                                                                    </li>
+                                                                ),
+                                                            )}
+                                                            {hiddenValidationEntriesCount >
+                                                                0 && (
+                                                                <li className="font-medium">
+                                                                    +{' '}
+                                                                    {hiddenValidationEntriesCount}{' '}
+                                                                    weitere
+                                                                </li>
+                                                            )}
+                                                        </ul>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-xs text-gray-400">
+                                                        OK
+                                                    </span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>
@@ -1254,7 +1373,11 @@ export default function RosterShow({
                         validationResult={rosterValidationResult}
                     />
 
-                    <EmployeeWorkloadOverview roster={roster} />
+                    <EmployeeWorkloadOverview
+                        roster={roster}
+                        validationResult={rosterValidationResult}
+                        rosterId={roster.id}
+                    />
 
                     <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
                         <div className="border-b border-gray-200 p-6">
