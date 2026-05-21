@@ -267,6 +267,103 @@ function ValidationResult({
     );
 }
 
+
+const validationContextLabels: Array<[string, string]> = [
+    ['employeeName', 'Mitarbeiter'],
+    ['shiftTemplateName', 'Schicht'],
+    ['previousShiftTemplateName', 'Vorherige Schicht'],
+    ['nextShiftTemplateName', 'Nächste Schicht'],
+    ['date', 'Datum'],
+    ['previousShiftDate', 'Vorheriges Datum'],
+    ['nextShiftDate', 'Nächstes Datum'],
+    ['previousShiftEndsAt', 'Vorheriger Dienst endet'],
+    ['nextShiftStartsAt', 'Nächster Dienst beginnt'],
+    ['absenceStartsOn', 'Abwesenheit von'],
+    ['absenceEndsOn', 'Abwesenheit bis'],
+    ['plannedMinutes', 'Geplante Minuten'],
+    ['targetMinutes', 'Soll-Minuten'],
+    ['overtimeMinutes', 'Über Soll'],
+    ['restMinutes', 'Ruhezeit Minuten'],
+    ['requiredRestMinutes', 'Erforderliche Ruhezeit Minuten'],
+    ['workedWeekends', 'Geplante Wochenenden'],
+    ['maxAllowedWeekends', 'Empfohlene maximale Wochenenden'],
+    ['consecutiveDays', 'Tage am Stück'],
+    ['maxAllowedConsecutiveDays', 'Empfohlene maximale Tage am Stück'],
+    ['workedDays', 'Gearbeitete Tage'],
+    ['daysInMonth', 'Tage im Monat'],
+    ['startsOn', 'Start'],
+    ['endsOn', 'Ende'],
+    ['sunday', 'Sonntag'],
+    ['compensationWindowStartsOn', 'Ausgleichszeitraum von'],
+    ['compensationWindowEndsOn', 'Ausgleichszeitraum bis'],
+];
+
+function formatValidationContextValue(value: unknown): string {
+    if (typeof value === 'string' || typeof value === 'number') {
+        return String(value);
+    }
+
+    if (typeof value === 'boolean') {
+        return value ? 'Ja' : 'Nein';
+    }
+
+    if (Array.isArray(value)) {
+        if (
+            value.every(
+                (item) => typeof item === 'string' || typeof item === 'number',
+            )
+        ) {
+            return value.join(', ');
+        }
+
+        return JSON.stringify(value);
+    }
+
+    return JSON.stringify(value);
+}
+
+function ValidationContextSummary({ context }: { context: Record<string, unknown> }) {
+    const entries = validationContextLabels
+        .filter(([key]) => context[key] !== undefined && context[key] !== null)
+        .map(([key, label]) => ({
+            key,
+            label,
+            value: formatValidationContextValue(context[key]),
+        }));
+
+    const weekendStartsOn = context.weekendStartsOn;
+
+    if (Array.isArray(weekendStartsOn)) {
+        const weekends = weekendStartsOn.filter(
+            (item): item is string | number =>
+                typeof item === 'string' || typeof item === 'number',
+        );
+
+        if (weekends.length > 0) {
+            entries.push({
+                key: 'weekendStartsOn',
+                label: 'Wochenenden',
+                value: weekends.join(', '),
+            });
+        }
+    }
+
+    if (entries.length === 0) {
+        return null;
+    }
+
+    return (
+        <dl className="mt-3 grid gap-2 rounded bg-white/50 p-3 text-xs sm:grid-cols-2">
+            {entries.map((entry) => (
+                <div key={entry.key}>
+                    <dt className="font-semibold opacity-75">{entry.label}</dt>
+                    <dd className="mt-0.5 break-words">{entry.value}</dd>
+                </div>
+            ))}
+        </dl>
+    );
+}
+
 function EntryList({ title, entries }: { title: string; entries: ValidationEntry[] }) {
     return (
         <div>
@@ -277,6 +374,7 @@ function EntryList({ title, entries }: { title: string; entries: ValidationEntry
                         <p className="font-semibold">{entry.title ?? entry.message}</p>
                         <p className="mt-1">{entry.details ?? entry.message}</p>
                         <p className="mt-2 text-xs opacity-75">Code: {entry.code}</p>
+                        <ValidationContextSummary context={entry.context} />
                         <details className="mt-2">
                             <summary className="cursor-pointer text-xs font-medium opacity-75">
                                 Technische Details anzeigen
