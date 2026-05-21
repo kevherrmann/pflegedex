@@ -61,6 +61,8 @@ type CalendarDay = {
     shifts: ShiftItem[];
 };
 
+type MonthOverviewFilter = 'all' | 'with-shifts' | 'without-shifts' | 'weekends';
+
 type RosterItem = {
     id: string;
     locationId: string;
@@ -150,87 +152,163 @@ function shiftBadgeClass(code: string | null): string {
 }
 
 function MonthOverview({ calendarDays }: { calendarDays: CalendarDay[] }) {
+    const [filter, setFilter] = useState<MonthOverviewFilter>('all');
+
+    const filterOptions: Array<{
+        value: MonthOverviewFilter;
+        label: string;
+        count: number;
+    }> = [
+        {
+            value: 'all',
+            label: 'Alle Tage',
+            count: calendarDays.length,
+        },
+        {
+            value: 'with-shifts',
+            label: 'Mit Diensten',
+            count: calendarDays.filter((day) => day.shifts.length > 0).length,
+        },
+        {
+            value: 'without-shifts',
+            label: 'Ohne Dienste',
+            count: calendarDays.filter((day) => day.shifts.length === 0).length,
+        },
+        {
+            value: 'weekends',
+            label: 'Wochenenden',
+            count: calendarDays.filter((day) => isWeekend(day)).length,
+        },
+    ];
+
+    const filteredDays = calendarDays.filter((day) => {
+        if (filter === 'with-shifts') {
+            return day.shifts.length > 0;
+        }
+
+        if (filter === 'without-shifts') {
+            return day.shifts.length === 0;
+        }
+
+        if (filter === 'weekends') {
+            return isWeekend(day);
+        }
+
+        return true;
+    });
+
     return (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {calendarDays.map((day) => {
-                const hasShifts = day.shifts.length > 0;
-                const weekend = isWeekend(day);
+        <div>
+            <div className="mb-4 flex flex-wrap gap-2">
+                {filterOptions.map((option) => {
+                    const active = filter === option.value;
 
-                return (
-                    <div
-                        key={day.date}
-                        className={`rounded-md border p-3 transition ${
-                            hasShifts
-                                ? 'border-gray-300 bg-white shadow-sm'
-                                : 'border-gray-100 bg-gray-50/70 text-gray-500'
-                        } ${weekend ? 'ring-1 ring-[#9B1C3B]/15' : ''}`}
-                    >
-                        <div className="flex items-start justify-between gap-3">
-                            <div>
-                                <h4
-                                    className={`text-sm font-semibold ${
-                                        hasShifts ? 'text-gray-900' : 'text-gray-500'
-                                    }`}
-                                >
-                                    {day.dayLabel}
-                                </h4>
-                                <span
-                                    className={`mt-0.5 inline-flex text-xs ${
-                                        weekend ? 'font-semibold text-[#9B1C3B]' : 'text-gray-500'
-                                    }`}
-                                >
-                                    {day.weekdayLabel}
-                                </span>
+                    return (
+                        <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => setFilter(option.value)}
+                            className={`rounded-md border px-3 py-1.5 text-sm font-semibold transition ${
+                                active
+                                    ? 'border-[#9B1C3B] bg-[#9B1C3B] text-white shadow-sm'
+                                    : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                            }`}
+                        >
+                            {option.label} ({option.count})
+                        </button>
+                    );
+                })}
+            </div>
+
+            {filteredDays.length === 0 ? (
+                <div className="rounded-md border border-dashed border-gray-300 bg-gray-50 p-6 text-sm text-gray-600">
+                    Für diesen Filter gibt es keine Tage.
+                </div>
+            ) : (
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    {filteredDays.map((day) => {
+                        const hasShifts = day.shifts.length > 0;
+                        const weekend = isWeekend(day);
+
+                        return (
+                            <div
+                                key={day.date}
+                                className={`rounded-md border p-3 transition ${
+                                    hasShifts
+                                        ? 'border-gray-300 bg-white shadow-sm'
+                                        : 'border-gray-100 bg-gray-50/70 text-gray-500'
+                                } ${weekend ? 'ring-1 ring-[#9B1C3B]/15' : ''}`}
+                            >
+                                <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                        <h4
+                                            className={`text-sm font-semibold ${
+                                                hasShifts ? 'text-gray-900' : 'text-gray-500'
+                                            }`}
+                                        >
+                                            {day.dayLabel}
+                                        </h4>
+                                        <span
+                                            className={`mt-0.5 inline-flex text-xs ${
+                                                weekend
+                                                    ? 'font-semibold text-[#9B1C3B]'
+                                                    : 'text-gray-500'
+                                            }`}
+                                        >
+                                            {day.weekdayLabel}
+                                        </span>
+                                    </div>
+                                    {hasShifts && (
+                                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                                            {day.shifts.length}
+                                        </span>
+                                    )}
+                                </div>
+
+                                {hasShifts ? (
+                                    <ul className="mt-3 space-y-2">
+                                        {day.shifts.map((shift) => (
+                                            <li
+                                                key={shift.id}
+                                                className={`rounded-md border px-2.5 py-2 text-xs ${shiftBadgeClass(
+                                                    shift.shiftTemplateCode,
+                                                )}`}
+                                            >
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <span className="font-semibold">
+                                                        {shift.shiftTemplateName ??
+                                                            shift.shiftTemplateCode ??
+                                                            'Unbekannte Schicht'}
+                                                    </span>
+                                                    {shift.shiftTemplateCode && (
+                                                        <span className="shrink-0 rounded bg-white/60 px-1.5 py-0.5 font-mono text-[0.65rem] uppercase">
+                                                            {shift.shiftTemplateCode}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="mt-1 font-medium">
+                                                    {formatTime(shift.startsAt)} bis{' '}
+                                                    {formatTime(shift.endsAt)}
+                                                </div>
+                                                <div className="mt-1">
+                                                    {shift.employeeName ?? 'Unbekannt'}
+                                                </div>
+                                                {shift.note && (
+                                                    <div className="mt-1 border-t border-current/10 pt-1 opacity-80">
+                                                        {shift.note}
+                                                    </div>
+                                                )}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : (
+                                    <p className="mt-3 text-xs">Keine Dienste</p>
+                                )}
                             </div>
-                            {hasShifts && (
-                                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
-                                    {day.shifts.length}
-                                </span>
-                            )}
-                        </div>
-
-                        {hasShifts ? (
-                            <ul className="mt-3 space-y-2">
-                                {day.shifts.map((shift) => (
-                                    <li
-                                        key={shift.id}
-                                        className={`rounded-md border px-2.5 py-2 text-xs ${shiftBadgeClass(
-                                            shift.shiftTemplateCode,
-                                        )}`}
-                                    >
-                                        <div className="flex items-start justify-between gap-2">
-                                            <span className="font-semibold">
-                                                {shift.shiftTemplateName ??
-                                                    shift.shiftTemplateCode ??
-                                                    'Unbekannte Schicht'}
-                                            </span>
-                                            {shift.shiftTemplateCode && (
-                                                <span className="shrink-0 rounded bg-white/60 px-1.5 py-0.5 font-mono text-[0.65rem] uppercase">
-                                                    {shift.shiftTemplateCode}
-                                                </span>
-                                            )}
-                                        </div>
-                                        <div className="mt-1 font-medium">
-                                            {formatTime(shift.startsAt)} bis{' '}
-                                            {formatTime(shift.endsAt)}
-                                        </div>
-                                        <div className="mt-1">
-                                            {shift.employeeName ?? 'Unbekannt'}
-                                        </div>
-                                        {shift.note && (
-                                            <div className="mt-1 border-t border-current/10 pt-1 opacity-80">
-                                                {shift.note}
-                                            </div>
-                                        )}
-                                    </li>
-                                ))}
-                            </ul>
-                        ) : (
-                            <p className="mt-3 text-xs">Keine Dienste</p>
-                        )}
-                    </div>
-                );
-            })}
+                        );
+                    })}
+                </div>
+            )}
         </div>
     );
 }
