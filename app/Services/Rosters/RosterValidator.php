@@ -67,6 +67,7 @@ class RosterValidator
                         [
                             'date' => $date->toDateString(),
                             'shiftTemplateId' => $shiftTemplate->id,
+                            'shiftTemplateName' => $shiftTemplate->name,
                             'shiftTemplateCode' => $shiftTemplate->code,
                         ],
                         'Mindestbesetzung fehlt',
@@ -86,6 +87,7 @@ class RosterValidator
                         [
                             'date' => $date->toDateString(),
                             'shiftTemplateId' => $shiftTemplate->id,
+                            'shiftTemplateName' => $shiftTemplate->name,
                             'shiftTemplateCode' => $shiftTemplate->code,
                             'requiredTotalStaff' => $staffingRule->required_total_staff,
                             'actualTotalStaff' => $actualTotalStaff,
@@ -107,6 +109,7 @@ class RosterValidator
                         [
                             'date' => $date->toDateString(),
                             'shiftTemplateId' => $shiftTemplate->id,
+                            'shiftTemplateName' => $shiftTemplate->name,
                             'shiftTemplateCode' => $shiftTemplate->code,
                             'requiredSpecialists' => $staffingRule->required_specialists,
                             'actualSpecialists' => $actualSpecialists,
@@ -166,8 +169,15 @@ class RosterValidator
                             'Die Ruhezeit zwischen zwei Diensten ist zu kurz.',
                             [
                                 'userId' => $userId,
+                                'employeeName' => $previousShift->user?->name,
                                 'previousShiftId' => $previousShift->id,
+                                'previousShiftDate' => $previousShift->date->toDateString(),
+                                'previousShiftTemplateName' => $previousShift->shiftTemplate?->name,
+                                'previousShiftEndsAt' => $previousShift->ends_at->toDateTimeString(),
                                 'nextShiftId' => $nextShift->id,
+                                'nextShiftDate' => $nextShift->date->toDateString(),
+                                'nextShiftTemplateName' => $nextShift->shiftTemplate?->name,
+                                'nextShiftStartsAt' => $nextShift->starts_at->toDateTimeString(),
                                 'restMinutes' => $restMinutes,
                                 'requiredRestMinutes' => self::REQUIRED_REST_MINUTES,
                             ],
@@ -207,6 +217,7 @@ class RosterValidator
                         $this->addConsecutiveWorkDaysWarning(
                             $result,
                             $userId,
+                            $shifts->first()?->user?->name,
                             $roster,
                             $sequenceStart,
                             $previousDate,
@@ -223,6 +234,7 @@ class RosterValidator
                 $this->addConsecutiveWorkDaysWarning(
                     $result,
                     $userId,
+                    $shifts->first()?->user?->name,
                     $roster,
                     $sequenceStart,
                     $previousDate,
@@ -234,6 +246,7 @@ class RosterValidator
     private function addConsecutiveWorkDaysWarning(
         RosterValidationResult $result,
         string $userId,
+        ?string $employeeName,
         Roster $roster,
         CarbonImmutable $startsOn,
         CarbonImmutable $endsOn,
@@ -248,6 +261,7 @@ class RosterValidator
             'Der Mitarbeiter ist an zu vielen Tagen am Stück eingeplant.',
             [
                 'userId' => $userId,
+                'employeeName' => $employeeName,
                 'consecutiveDays' => $consecutiveDays,
                 'maxAllowedConsecutiveDays' => self::MAX_ALLOWED_CONSECUTIVE_WORK_DAYS,
                 'startsOn' => $startsOn->toDateString(),
@@ -293,6 +307,7 @@ class RosterValidator
                     'Der Mitarbeiter ist an zu vielen Wochenenden eingeplant.',
                     [
                         'userId' => $userId,
+                        'employeeName' => $shifts->first()?->user?->name,
                         'workedWeekends' => $weekendStartsOn->count(),
                         'maxAllowedWeekends' => self::MAX_ALLOWED_WEEKENDS,
                         'weekendStartsOn' => $weekendStartsOn->all(),
@@ -330,6 +345,7 @@ class RosterValidator
                     'Der Mitarbeiter hat im Dienstplanmonat keinen freien Tag.',
                     [
                         'userId' => $userId,
+                        'employeeName' => $shifts->first()?->user?->name,
                         'workedDays' => $workedDays,
                         'daysInMonth' => $daysInMonth,
                         'month' => $roster->month,
@@ -379,6 +395,7 @@ class RosterValidator
                         'Für Sonntagsarbeit fehlt ein Ersatzruhetag im Ausgleichszeitraum.',
                         [
                             'userId' => $userId,
+                            'employeeName' => $shifts->first()?->user?->name,
                             'sunday' => $sundayDate->toDateString(),
                             'compensationWindowStartsOn' => $windowStartsOn->toDateString(),
                             'compensationWindowEndsOn' => $windowEndsOn->toDateString(),
@@ -431,7 +448,9 @@ class RosterValidator
                 'Der Mitarbeiter ist während dieser Schicht abwesend.',
                 [
                     'userId' => $shift->user_id,
+                    'employeeName' => $shift->user?->name,
                     'shiftId' => $shift->id,
+                    'shiftTemplateName' => $shift->shiftTemplate?->name,
                     'date' => $shift->date->toDateString(),
                     'absenceRequestId' => $absenceRequest->id,
                     'absenceType' => $absenceRequest->type->value,
@@ -474,6 +493,7 @@ class RosterValidator
                     'Der Mitarbeiter ist über seiner Soll-Arbeitszeit geplant.',
                     [
                         'userId' => $userId,
+                        'employeeName' => $firstShift?->user?->name,
                         'plannedMinutes' => $plannedMinutes,
                         'targetMinutes' => $targetMinutes,
                         'overtimeMinutes' => $plannedMinutes - $targetMinutes,

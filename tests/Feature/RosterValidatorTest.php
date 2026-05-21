@@ -196,8 +196,12 @@ it('adds an understaffed shift error', function (): void {
     createRosterValidatorShift($roster, $employee, $shiftTemplate, '2027-01-10');
 
     $result = app(RosterValidator::class)->validate($roster);
+    $error = collect($result->errors)->first(
+        fn (array $error): bool => $error['code'] === 'understaffed_shift',
+    );
 
-    expect(rosterValidatorCodes($result->errors))->toContain('understaffed_shift')
+    expect($error)->not->toBeNull()
+        ->and($error['context']['shiftTemplateName'])->toBe('Frühdienst')
         ->and($result->isRed())->toBeTrue();
 });
 
@@ -280,8 +284,15 @@ it('detects rest period violations', function (): void {
     );
 
     expect($restError)->not->toBeNull()
+        ->and($restError['context']['employeeName'])->toBe($employee->name)
         ->and($restError['context']['previousShiftId'])->toBe($previousShift->id)
+        ->and($restError['context']['previousShiftDate'])->toBe('2027-01-10')
+        ->and($restError['context']['previousShiftTemplateName'])->toBe('Spätdienst')
+        ->and($restError['context']['previousShiftEndsAt'])->toBe('2027-01-10 22:00:00')
         ->and($restError['context']['nextShiftId'])->toBe($nextShift->id)
+        ->and($restError['context']['nextShiftDate'])->toBe('2027-01-11')
+        ->and($restError['context']['nextShiftTemplateName'])->toBe('Frühdienst')
+        ->and($restError['context']['nextShiftStartsAt'])->toBe('2027-01-11 06:00:00')
         ->and($restError['context']['restMinutes'])->toBe(480)
         ->and($restError['context']['requiredRestMinutes'])->toBe(660);
 });
@@ -393,7 +404,9 @@ it('adds an employee absent error when a shift overlaps approved absence', funct
 
     expect($absenceError)->not->toBeNull()
         ->and($absenceError['context']['userId'])->toBe($employee->id)
+        ->and($absenceError['context']['employeeName'])->toBe($employee->name)
         ->and($absenceError['context']['shiftId'])->toBe($shift->id)
+        ->and($absenceError['context']['shiftTemplateName'])->toBe('Frühdienst')
         ->and($absenceError['context']['date'])->toBe('2027-01-10')
         ->and($absenceError['context']['absenceRequestId'])->toBe($absenceRequest->id)
         ->and($absenceError['context']['absenceType'])->toBe(AbsenceRequestType::Vacation->value)
@@ -659,6 +672,7 @@ it('adds a too many weekends warning when an employee works three weekends', fun
 
     expect($warning)->not->toBeNull()
         ->and($warning['context']['userId'])->toBe($employee->id)
+        ->and($warning['context']['employeeName'])->toBe($employee->name)
         ->and($warning['context']['workedWeekends'])->toBe(3)
         ->and($warning['context']['maxAllowedWeekends'])->toBe(2)
         ->and($warning['context']['weekendStartsOn'])->toBe([
