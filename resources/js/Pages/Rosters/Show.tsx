@@ -63,6 +63,12 @@ type CalendarDay = {
 
 type MonthOverviewFilter = 'all' | 'with-shifts' | 'without-shifts' | 'weekends';
 
+type ValidationDayIndexEntry = {
+    hasErrors: boolean;
+    hasWarnings: boolean;
+    entries: ValidationEntry[];
+};
+
 type RosterItem = {
     id: string;
     locationId: string;
@@ -151,8 +157,78 @@ function shiftBadgeClass(code: string | null): string {
     return 'border-gray-200 bg-gray-50 text-gray-800';
 }
 
-function MonthOverview({ calendarDays }: { calendarDays: CalendarDay[] }) {
+const validationDateContextKeys = [
+    'date',
+    'previousShiftDate',
+    'nextShiftDate',
+    'startsOn',
+    'endsOn',
+    'sunday',
+    'absenceStartsOn',
+    'absenceEndsOn',
+    'compensationWindowStartsOn',
+    'compensationWindowEndsOn',
+];
+
+function validationDatesFromContext(context: Record<string, unknown>): string[] {
+    const dates = new Set<string>();
+
+    validationDateContextKeys.forEach((key) => {
+        const value = context[key];
+
+        if (typeof value === 'string') {
+            dates.add(value);
+        }
+    });
+
+    return Array.from(dates);
+}
+
+function buildValidationDayIndex(
+    validationResult: RosterValidationResult | null,
+    rosterId: string,
+): Record<string, ValidationDayIndexEntry> {
+    if (validationResult === null || validationResult.rosterId !== rosterId) {
+        return {};
+    }
+
+    const dayIndex: Record<string, ValidationDayIndexEntry> = {};
+
+    const addEntry = (entry: ValidationEntry, hasError: boolean) => {
+        validationDatesFromContext(entry.context).forEach((date) => {
+            dayIndex[date] ??= {
+                hasErrors: false,
+                hasWarnings: false,
+                entries: [],
+            };
+
+            if (hasError) {
+                dayIndex[date].hasErrors = true;
+            } else {
+                dayIndex[date].hasWarnings = true;
+            }
+
+            dayIndex[date].entries.push(entry);
+        });
+    };
+
+    validationResult.errors.forEach((entry) => addEntry(entry, true));
+    validationResult.warnings.forEach((entry) => addEntry(entry, false));
+
+    return dayIndex;
+}
+
+function MonthOverview({
+    calendarDays,
+    validationResult,
+    rosterId,
+}: {
+    calendarDays: CalendarDay[];
+    validationResult: RosterValidationResult | null;
+    rosterId: string;
+}) {
     const [filter, setFilter] = useState<MonthOverviewFilter>('all');
+    const validationDayIndex = buildValidationDayIndex(validationResult, rosterId);
 
     const filterOptions: Array<{
         value: MonthOverviewFilter;
@@ -229,21 +305,40 @@ function MonthOverview({ calendarDays }: { calendarDays: CalendarDay[] }) {
                     {filteredDays.map((day) => {
                         const hasShifts = day.shifts.length > 0;
                         const weekend = isWeekend(day);
+                        const dayValidation = validationDayIndex[day.date];
+                        const hasValidationError = dayValidation?.hasErrors === true;
+                        const hasValidationWarning =
+                            !hasValidationError && dayValidation?.hasWarnings === true;
+                        const validationEntries = dayValidation?.entries ?? [];
+                        const visibleValidationEntries = validationEntries.slice(0, 3);
+                        const hiddenValidationEntriesCount = Math.max(
+                            validationEntries.length - visibleValidationEntries.length,
+                            0,
+                        );
+                        const cardClassName = hasValidationError
+                            ? 'border-red-300 bg-red-50/50 text-gray-900 ring-1 ring-red-200 shadow-sm'
+                            : hasValidationWarning
+                              ? 'border-amber-300 bg-amber-50/50 text-gray-900 ring-1 ring-amber-200 shadow-sm'
+                              : hasShifts
+                                ? 'border-gray-300 bg-white shadow-sm'
+                                : 'border-gray-100 bg-gray-50/70 text-gray-500';
 
                         return (
                             <div
                                 key={day.date}
-                                className={`rounded-md border p-3 transition ${
-                                    hasShifts
-                                        ? 'border-gray-300 bg-white shadow-sm'
-                                        : 'border-gray-100 bg-gray-50/70 text-gray-500'
-                                } ${weekend ? 'ring-1 ring-[#9B1C3B]/15' : ''}`}
+                                className={`rounded-md border p-3 transition ${cardClassName} ${
+                                    weekend && !hasValidationError && !hasValidationWarning
+                                        ? 'ring-1 ring-[#9B1C3B]/15'
+                                        : ''
+                                }`}
                             >
                                 <div className="flex items-start justify-between gap-3">
                                     <div>
                                         <h4
                                             className={`text-sm font-semibold ${
-                                                hasShifts ? 'text-gray-900' : 'text-gray-500'
+                                                hasShifts || dayValidation
+                                                    ? 'text-gray-900'
+                                                    : 'text-gray-500'
                                             }`}
                                         >
                                             {day.dayLabel}
@@ -258,12 +353,46 @@ function MonthOverview({ calendarDays }: { calendarDays: CalendarDay[] }) {
                                             {day.weekdayLabel}
                                         </span>
                                     </div>
-                                    {hasShifts && (
-                                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
-                                            {day.shifts.length}
-                                        </span>
-                                    )}
+                                    <div className="flex flex-col items-end gap-1">
+                                        {hasValidationError && (
+                                            <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800">
+                                                Fehler
+                                            </span>
+                                        )}
+                                        {hasValidationWarning && (
+                                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                                                Hinweis
+                                            </span>
+                                        )}
+                                        {hasShifts && (
+                                            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                                                {day.shifts.length}
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
+
+                                {dayValidation && (
+                                    <ul className="mt-3 space-y-1 rounded-md bg-white/70 p-2 text-xs">
+                                        {visibleValidationEntries.map((entry, index) => (
+                                            <li
+                                                key={`${entry.code}-${index}`}
+                                                className={
+                                                    hasValidationError
+                                                        ? 'text-red-900'
+                                                        : 'text-amber-900'
+                                                }
+                                            >
+                                                {entry.title ?? entry.message}
+                                            </li>
+                                        ))}
+                                        {hiddenValidationEntriesCount > 0 && (
+                                            <li className="font-medium text-gray-600">
+                                                + {hiddenValidationEntriesCount} weitere
+                                            </li>
+                                        )}
+                                    </ul>
+                                )}
 
                                 {hasShifts ? (
                                     <ul className="mt-3 space-y-2">
@@ -943,7 +1072,11 @@ export default function RosterShow({
                             </h3>
                         </div>
                         <div className="p-6">
-                            <MonthOverview calendarDays={calendarDays} />
+                            <MonthOverview
+                                calendarDays={calendarDays}
+                                validationResult={rosterValidationResult}
+                                rosterId={roster.id}
+                            />
                         </div>
                     </div>
 
