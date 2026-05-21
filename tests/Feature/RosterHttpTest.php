@@ -22,9 +22,15 @@ beforeEach(function (): void {
     Role::findOrCreate('Pflegekraft');
 });
 
-function createRosterHttpUser(string $role): User
+function createRosterHttpUser(string $role, ?Location $location = null): User
 {
-    $user = User::factory()->create();
+    $factory = User::factory();
+
+    if ($location !== null) {
+        $factory = $factory->for($location);
+    }
+
+    $user = $factory->create();
     $user->assignRole($role);
 
     return $user;
@@ -32,6 +38,10 @@ function createRosterHttpUser(string $role): User
 
 function createRosterHttpRoster(Location $location, User $createdBy, array $attributes = []): Roster
 {
+    if ($createdBy->hasRole('PDL') && $createdBy->location_id === null) {
+        $createdBy->forceFill(['location_id' => $location->id])->save();
+    }
+
     return Roster::query()->create([
         'location_id' => $location->id,
         'year' => $attributes['year'] ?? 2027,
@@ -129,7 +139,8 @@ function rosterHttpJanuary2027Dates(): array
 }
 
 it('shows the rosters page to PDL users', function (): void {
-    $pdl = createRosterHttpUser('PDL');
+    $location = Location::factory()->create();
+    $pdl = createRosterHttpUser('PDL', $location);
 
     $this->actingAs($pdl)
         ->get('/rosters')
@@ -374,10 +385,10 @@ it('passes roster validation flash results to the roster detail page', function 
 });
 
 it('passes locations and rosters to inertia', function (): void {
-    $pdl = createRosterHttpUser('PDL');
     $location = Location::factory()->create([
         'name' => 'Wohnbereich A',
     ]);
+    $pdl = createRosterHttpUser('PDL', $location);
     $createdBy = User::factory()->create([
         'name' => 'PDL Beispiel',
     ]);
@@ -413,8 +424,8 @@ it('passes locations and rosters to inertia', function (): void {
 });
 
 it('lets PDL users create a monthly roster', function (): void {
-    $pdl = createRosterHttpUser('PDL');
     $location = Location::factory()->create();
+    $pdl = createRosterHttpUser('PDL', $location);
 
     $this->actingAs($pdl)
         ->from('/rosters')
@@ -608,8 +619,8 @@ it('blocks non PDL users from changing roster status', function (): void {
 });
 
 it('returns a session error for invalid months', function (): void {
-    $pdl = createRosterHttpUser('PDL');
     $location = Location::factory()->create();
+    $pdl = createRosterHttpUser('PDL', $location);
 
     $this->actingAs($pdl)
         ->from('/rosters')
@@ -623,8 +634,8 @@ it('returns a session error for invalid months', function (): void {
 });
 
 it('returns a session error for invalid years', function (): void {
-    $pdl = createRosterHttpUser('PDL');
     $location = Location::factory()->create();
+    $pdl = createRosterHttpUser('PDL', $location);
 
     $this->actingAs($pdl)
         ->from('/rosters')
@@ -732,4 +743,85 @@ it('flashes red status for a validation result with errors', function (): void {
         ->assertRedirect('/rosters')
         ->assertSessionHas('rosterValidationResult', fn (array $result): bool => $result['status'] === 'red'
             && count($result['errors']) > 0);
+});
+
+
+it('shows only rosters from the PDL Wohnbereich', function (): void {
+    $location = Location::factory()->create(['name' => 'Wohnbereich A']);
+    $otherLocation = Location::factory()->create(['name' => 'Wohnbereich B']);
+    $pdl = createRosterHttpUser('PDL', $location);
+    $ownRoster = createRosterHttpRoster($location, $pdl, ['month' => 6]);
+    createRosterHttpRoster($otherLocation, User::factory()->create(), ['month' => 7]);
+
+    $this->actingAs($pdl)
+        ->get('/rosters')
+        ->assertOk()
+        ->assertInertia(
+            fn (Assert $page) => $page
+                ->component('Rosters/Index')
+                ->has('locations', 1)
+                ->where('locations.0.id', $location->id)
+                ->has('rosters', 1)
+                ->where('rosters.0.id', $ownRoster->id)
+        );
+});
+
+it('blocks PDL users from viewing rosters from another Wohnbereich', function (): void {
+    $location = Location::factory()->create();
+    $otherLocation = Location::factory()->create();
+    $pdl = createRosterHttpUser('PDL', $location);
+    $foreignRoster = createRosterHttpRoster($otherLocation, User::factory()->create());
+
+    $this->actingAs($pdl)
+        ->get("/rosters/{$foreignRoster->id}")
+        ->assertForbidden();
+});
+
+it('blocks PDL users from creating rosters for another Wohnbereich', function (): void {
+    $location = Location::factory()->create();
+    $otherLocation = Location::factory()->create();
+    $pdl = createRosterHttpUser('PDL', $location);
+
+    $this->actingAs($pdl)
+        ->from('/rosters')
+        ->post('/rosters', [
+            'location_id' => $otherLocation->id,
+            'year' => 2027,
+            'month' => 8,
+        ])
+        ->assertForbidden();
+
+    expect(Roster::query()->count())->toBe(0);
+});
+
+it('blocks PDL users from changing or validating rosters from another Wohnbereich', function (): void {
+    $location = Location::factory()->create();
+    $otherLocation = Location::factory()->create();
+    $pdl = createRosterHttpUser('PDL', $location);
+    $draftRoster = createRosterHttpRoster($otherLocation, User::factory()->create(), [
+        'month' => 8,
+        'status' => RosterStatus::Draft,
+    ]);
+    $publishedRoster = createRosterHttpRoster($otherLocation, User::factory()->create(), [
+        'month' => 9,
+        'status' => RosterStatus::Published,
+        'published_at' => now(),
+    ]);
+    $reopenRoster = createRosterHttpRoster($otherLocation, User::factory()->create(), [
+        'month' => 10,
+        'status' => RosterStatus::Published,
+        'published_at' => now(),
+    ]);
+    $validateRoster = createRosterHttpRoster($otherLocation, User::factory()->create(), [
+        'month' => 11,
+    ]);
+
+    $this->actingAs($pdl)->patch("/rosters/{$draftRoster->id}/publish")->assertForbidden();
+    $this->actingAs($pdl)->patch("/rosters/{$publishedRoster->id}/lock")->assertForbidden();
+    $this->actingAs($pdl)->patch("/rosters/{$reopenRoster->id}/reopen")->assertForbidden();
+    $this->actingAs($pdl)->post("/rosters/{$validateRoster->id}/validate")->assertForbidden();
+
+    expect($draftRoster->refresh()->status)->toBe(RosterStatus::Draft)
+        ->and($publishedRoster->refresh()->status)->toBe(RosterStatus::Published)
+        ->and($reopenRoster->refresh()->status)->toBe(RosterStatus::Published);
 });

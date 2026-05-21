@@ -16,10 +16,7 @@ class ShiftController extends Controller
 {
     public function store(Request $request, Roster $roster, ShiftService $shiftService): RedirectResponse
     {
-        abort_unless(
-            $request->user()?->hasRole('PDL'),
-            HttpResponse::HTTP_FORBIDDEN,
-        );
+        $this->ensurePdlCanAccessLocation($request, $roster->location_id);
 
         $validated = $request->validate([
             'user_id' => ['required', 'exists:users,id'],
@@ -30,6 +27,8 @@ class ShiftController extends Controller
 
         $employee = User::query()->findOrFail($validated['user_id']);
         $shiftTemplate = ShiftTemplate::query()->findOrFail($validated['shift_template_id']);
+        $this->ensureEmployeeBelongsToRoster($employee, $roster);
+        $this->ensureShiftTemplateBelongsToRoster($shiftTemplate, $roster);
 
         $shiftService->assignManualShift(
             $roster,
@@ -44,10 +43,7 @@ class ShiftController extends Controller
 
     public function update(Request $request, Roster $roster, Shift $shift, ShiftService $shiftService): RedirectResponse
     {
-        abort_unless(
-            $request->user()?->hasRole('PDL'),
-            HttpResponse::HTTP_FORBIDDEN,
-        );
+        $this->ensurePdlCanAccessLocation($request, $roster->location_id);
 
         abort_unless($shift->roster_id === $roster->id, HttpResponse::HTTP_NOT_FOUND);
 
@@ -60,6 +56,8 @@ class ShiftController extends Controller
 
         $employee = User::query()->findOrFail($validated['user_id']);
         $shiftTemplate = ShiftTemplate::query()->findOrFail($validated['shift_template_id']);
+        $this->ensureEmployeeBelongsToRoster($employee, $roster);
+        $this->ensureShiftTemplateBelongsToRoster($shiftTemplate, $roster);
 
         $shiftService->updateManualShift(
             $shift,
@@ -74,10 +72,7 @@ class ShiftController extends Controller
 
     public function destroy(Request $request, Roster $roster, Shift $shift): RedirectResponse
     {
-        abort_unless(
-            $request->user()?->hasRole('PDL'),
-            HttpResponse::HTTP_FORBIDDEN,
-        );
+        $this->ensurePdlCanAccessLocation($request, $roster->location_id);
 
         abort_unless($shift->roster_id === $roster->id, HttpResponse::HTTP_NOT_FOUND);
 
@@ -90,5 +85,33 @@ class ShiftController extends Controller
         $shift->delete();
 
         return back()->with('status', 'shift-deleted');
+    }
+
+    private function ensurePdlCanAccessLocation(Request $request, string $locationId): void
+    {
+        $user = $request->user();
+
+        abort_unless(
+            $user?->hasRole('PDL') && $user->location_id === $locationId,
+            HttpResponse::HTTP_FORBIDDEN,
+        );
+    }
+
+    private function ensureEmployeeBelongsToRoster(User $employee, Roster $roster): void
+    {
+        if ($employee->location_id !== $roster->location_id) {
+            throw ValidationException::withMessages([
+                'user_id' => 'Der Mitarbeiter gehört nicht zum Wohnbereich dieses Dienstplans.',
+            ]);
+        }
+    }
+
+    private function ensureShiftTemplateBelongsToRoster(ShiftTemplate $shiftTemplate, Roster $roster): void
+    {
+        if ($shiftTemplate->location_id !== $roster->location_id) {
+            throw ValidationException::withMessages([
+                'shift_template_id' => 'Die Schichtvorlage gehört nicht zum Wohnbereich dieses Dienstplans.',
+            ]);
+        }
     }
 }

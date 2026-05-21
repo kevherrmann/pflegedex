@@ -15,13 +15,11 @@ class ShiftTemplateController extends Controller
 {
     public function index(Request $request): Response
     {
-        abort_unless(
-            $request->user()?->hasRole('PDL'),
-            HttpResponse::HTTP_FORBIDDEN,
-        );
+        $locationId = $this->ensurePdlHasLocation($request);
 
         return Inertia::render('ShiftTemplates/Index', [
             'locations' => Location::query()
+                ->whereKey($locationId)
                 ->orderBy('name')
                 ->get(['id', 'name'])
                 ->map(fn (Location $location): array => [
@@ -31,6 +29,7 @@ class ShiftTemplateController extends Controller
                 ->values(),
             'shiftTemplates' => ShiftTemplate::query()
                 ->with(['location', 'staffingRules'])
+                ->where('location_id', $locationId)
                 ->orderBy('location_id')
                 ->orderBy('starts_at')
                 ->get()
@@ -64,10 +63,7 @@ class ShiftTemplateController extends Controller
 
     public function update(Request $request, ShiftTemplate $shiftTemplate): RedirectResponse
     {
-        abort_unless(
-            $request->user()?->hasRole('PDL'),
-            HttpResponse::HTTP_FORBIDDEN,
-        );
+        $this->ensurePdlCanAccessLocation($request, $shiftTemplate->location_id);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -94,10 +90,7 @@ class ShiftTemplateController extends Controller
 
     public function updateStaffingRule(Request $request, ShiftTemplate $shiftTemplate): RedirectResponse
     {
-        abort_unless(
-            $request->user()?->hasRole('PDL'),
-            HttpResponse::HTTP_FORBIDDEN,
-        );
+        $this->ensurePdlCanAccessLocation($request, $shiftTemplate->location_id);
 
         $validated = $request->validate([
             'required_total_staff' => ['required', 'integer', 'min:1', 'max:50'],
@@ -124,5 +117,25 @@ class ShiftTemplateController extends Controller
         }
 
         return back()->with('status', 'shift-staffing-rule-updated');
+    }
+
+    private function ensurePdlHasLocation(Request $request): string
+    {
+        $user = $request->user();
+
+        abort_unless(
+            $user?->hasRole('PDL') && $user->location_id !== null,
+            HttpResponse::HTTP_FORBIDDEN,
+        );
+
+        return $user->location_id;
+    }
+
+    private function ensurePdlCanAccessLocation(Request $request, string $locationId): void
+    {
+        abort_unless(
+            $this->ensurePdlHasLocation($request) === $locationId,
+            HttpResponse::HTTP_FORBIDDEN,
+        );
     }
 }

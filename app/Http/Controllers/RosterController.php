@@ -22,16 +22,14 @@ class RosterController extends Controller
 {
     public function index(Request $request): Response
     {
-        abort_unless(
-            $request->user()?->hasRole('PDL'),
-            HttpResponse::HTTP_FORBIDDEN,
-        );
+        $locationId = $this->ensurePdlHasLocation($request);
 
         return Inertia::render('Rosters/Index', [
-            'locations' => $this->locations(),
+            'locations' => $this->locations($locationId),
             'rosters' => Roster::query()
                 ->with(['location', 'createdBy'])
                 ->withCount('shifts')
+                ->where('location_id', $locationId)
                 ->orderByDesc('year')
                 ->orderByDesc('month')
                 ->orderBy('location_id')
@@ -43,10 +41,7 @@ class RosterController extends Controller
 
     public function show(Request $request, Roster $roster): Response
     {
-        abort_unless(
-            $request->user()?->hasRole('PDL'),
-            HttpResponse::HTTP_FORBIDDEN,
-        );
+        $this->ensurePdlCanAccessLocation($request, $roster->location_id);
 
         $roster->load(['location', 'createdBy', 'shifts.user', 'shifts.shiftTemplate']);
         $roster->loadCount('shifts');
@@ -62,10 +57,7 @@ class RosterController extends Controller
 
     public function store(Request $request, RosterService $rosterService): RedirectResponse
     {
-        abort_unless(
-            $request->user()?->hasRole('PDL'),
-            HttpResponse::HTTP_FORBIDDEN,
-        );
+        $this->ensurePdlHasLocation($request);
 
         $validated = $request->validate([
             'location_id' => ['required', 'exists:locations,id'],
@@ -74,6 +66,7 @@ class RosterController extends Controller
         ]);
 
         $location = Location::query()->findOrFail($validated['location_id']);
+        $this->ensurePdlCanAccessLocation($request, $location->id);
 
         $rosterService->createOrGetDraft(
             $location,
@@ -87,10 +80,7 @@ class RosterController extends Controller
 
     public function publish(Request $request, Roster $roster, RosterService $rosterService): RedirectResponse
     {
-        abort_unless(
-            $request->user()?->hasRole('PDL'),
-            HttpResponse::HTTP_FORBIDDEN,
-        );
+        $this->ensurePdlCanAccessLocation($request, $roster->location_id);
 
         $rosterService->publish($roster);
 
@@ -99,10 +89,7 @@ class RosterController extends Controller
 
     public function lock(Request $request, Roster $roster, RosterService $rosterService): RedirectResponse
     {
-        abort_unless(
-            $request->user()?->hasRole('PDL'),
-            HttpResponse::HTTP_FORBIDDEN,
-        );
+        $this->ensurePdlCanAccessLocation($request, $roster->location_id);
 
         $rosterService->lock($roster);
 
@@ -111,10 +98,7 @@ class RosterController extends Controller
 
     public function reopen(Request $request, Roster $roster, RosterService $rosterService): RedirectResponse
     {
-        abort_unless(
-            $request->user()?->hasRole('PDL'),
-            HttpResponse::HTTP_FORBIDDEN,
-        );
+        $this->ensurePdlCanAccessLocation($request, $roster->location_id);
 
         $rosterService->reopen($roster);
 
@@ -123,10 +107,7 @@ class RosterController extends Controller
 
     public function validateRoster(Request $request, Roster $roster, RosterValidator $rosterValidator): RedirectResponse
     {
-        abort_unless(
-            $request->user()?->hasRole('PDL'),
-            HttpResponse::HTTP_FORBIDDEN,
-        );
+        $this->ensurePdlCanAccessLocation($request, $roster->location_id);
 
         $result = $rosterValidator->validate($roster);
 
@@ -142,9 +123,30 @@ class RosterController extends Controller
             ]);
     }
 
-    private function locations(): Collection
+    private function ensurePdlHasLocation(Request $request): string
+    {
+        $user = $request->user();
+
+        abort_unless(
+            $user?->hasRole('PDL') && $user->location_id !== null,
+            HttpResponse::HTTP_FORBIDDEN,
+        );
+
+        return $user->location_id;
+    }
+
+    private function ensurePdlCanAccessLocation(Request $request, string $locationId): void
+    {
+        abort_unless(
+            $this->ensurePdlHasLocation($request) === $locationId,
+            HttpResponse::HTTP_FORBIDDEN,
+        );
+    }
+
+    private function locations(string $locationId): Collection
     {
         return Location::query()
+            ->whereKey($locationId)
             ->orderBy('name')
             ->get(['id', 'name'])
             ->map(fn (Location $location): array => [
@@ -240,6 +242,7 @@ class RosterController extends Controller
     {
         return User::query()
             ->with('employeeProfile')
+            ->where('location_id', $roster->location_id)
             ->whereHas('employeeProfile', fn ($query) => $query
                 ->where('active', true)
                 ->where('employment_area', EmploymentArea::Nursing->value))

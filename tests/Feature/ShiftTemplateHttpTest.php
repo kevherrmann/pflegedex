@@ -16,9 +16,15 @@ beforeEach(function (): void {
     Role::findOrCreate('Pflegekraft');
 });
 
-function createShiftTemplateHttpUser(string $role): User
+function createShiftTemplateHttpUser(string $role, ?Location $location = null): User
 {
-    $user = User::factory()->create();
+    $factory = User::factory();
+
+    if ($location !== null) {
+        $factory = $factory->for($location);
+    }
+
+    $user = $factory->create();
     $user->assignRole($role);
 
     return $user;
@@ -35,7 +41,8 @@ function createShiftTemplateHttpShift(Location $location): ShiftTemplate
 }
 
 it('shows the shift templates page to PDL users', function (): void {
-    $pdl = createShiftTemplateHttpUser('PDL');
+    $location = Location::factory()->create();
+    $pdl = createShiftTemplateHttpUser('PDL', $location);
 
     $this->actingAs($pdl)
         ->get('/shift-templates')
@@ -55,10 +62,10 @@ it('blocks non PDL users from viewing the shift templates page', function (): vo
 });
 
 it('passes locations and shift templates to inertia', function (): void {
-    $pdl = createShiftTemplateHttpUser('PDL');
     $location = Location::factory()->create([
         'name' => 'Wohnbereich A',
     ]);
+    $pdl = createShiftTemplateHttpUser('PDL', $location);
     $shiftTemplate = createShiftTemplateHttpShift($location);
 
     $this->actingAs($pdl)
@@ -85,8 +92,8 @@ it('passes locations and shift templates to inertia', function (): void {
 });
 
 it('lets PDL users update shift templates', function (): void {
-    $pdl = createShiftTemplateHttpUser('PDL');
     $location = Location::factory()->create();
+    $pdl = createShiftTemplateHttpUser('PDL', $location);
     $shiftTemplate = createShiftTemplateHttpShift($location);
 
     $this->actingAs($pdl)
@@ -115,8 +122,8 @@ it('lets PDL users update shift templates', function (): void {
 });
 
 it('lets PDL users update the default staffing rule', function (): void {
-    $pdl = createShiftTemplateHttpUser('PDL');
     $location = Location::factory()->create();
+    $pdl = createShiftTemplateHttpUser('PDL', $location);
     $shiftTemplate = createShiftTemplateHttpShift($location);
 
     $this->actingAs($pdl)
@@ -138,8 +145,8 @@ it('lets PDL users update the default staffing rule', function (): void {
 });
 
 it('lets PDL users create the default staffing rule when none exists', function (): void {
-    $pdl = createShiftTemplateHttpUser('PDL');
     $location = Location::factory()->create();
+    $pdl = createShiftTemplateHttpUser('PDL', $location);
 
     $shiftTemplate = ShiftTemplate::query()->create([
         'location_id' => $location->id,
@@ -171,8 +178,8 @@ it('lets PDL users create the default staffing rule when none exists', function 
 });
 
 it('rejects staffing rules where required specialists exceed total staff', function (): void {
-    $pdl = createShiftTemplateHttpUser('PDL');
     $location = Location::factory()->create();
+    $pdl = createShiftTemplateHttpUser('PDL', $location);
     $shiftTemplate = createShiftTemplateHttpShift($location);
 
     $this->actingAs($pdl)
@@ -210,6 +217,73 @@ it('blocks non PDL users from updating staffing rules', function (): void {
     $shiftTemplate = createShiftTemplateHttpShift($location);
 
     $this->actingAs($user)
+        ->patch("/shift-templates/{$shiftTemplate->id}/staffing-rule", [
+            'required_total_staff' => 7,
+            'required_specialists' => 2,
+        ])
+        ->assertForbidden();
+
+    $defaultRule = $shiftTemplate
+        ->staffingRules()
+        ->whereNull('weekday')
+        ->firstOrFail();
+
+    expect($defaultRule->required_total_staff)->toBe(5)
+        ->and($defaultRule->required_specialists)->toBe(1);
+});
+
+
+it('shows only shift templates from the PDL Wohnbereich', function (): void {
+    $location = Location::factory()->create(['name' => 'Wohnbereich A']);
+    $otherLocation = Location::factory()->create(['name' => 'Wohnbereich B']);
+    $pdl = createShiftTemplateHttpUser('PDL', $location);
+    $shiftTemplate = createShiftTemplateHttpShift($location);
+    createShiftTemplateHttpShift($otherLocation);
+
+    $this->actingAs($pdl)
+        ->get('/shift-templates')
+        ->assertOk()
+        ->assertInertia(
+            fn (Assert $page) => $page
+                ->component('ShiftTemplates/Index')
+                ->has('locations', 1)
+                ->where('locations.0.id', $location->id)
+                ->has('shiftTemplates', 3)
+                ->where('shiftTemplates.0.locationId', $location->id)
+                ->where('shiftTemplates.1.locationId', $location->id)
+                ->where('shiftTemplates.2.locationId', $location->id)
+        );
+
+    expect($shiftTemplate->location_id)->toBe($location->id);
+});
+
+it('blocks PDL users from updating shift templates from another Wohnbereich', function (): void {
+    $location = Location::factory()->create();
+    $otherLocation = Location::factory()->create();
+    $pdl = createShiftTemplateHttpUser('PDL', $location);
+    $shiftTemplate = createShiftTemplateHttpShift($otherLocation);
+
+    $this->actingAs($pdl)
+        ->patch("/shift-templates/{$shiftTemplate->id}", [
+            'name' => 'Nicht erlaubt',
+            'starts_at' => '05:30',
+            'ends_at' => '13:30',
+            'duration_minutes' => 480,
+            'color' => '#111827',
+            'active' => true,
+        ])
+        ->assertForbidden();
+
+    expect($shiftTemplate->refresh()->name)->toBe('Frühdienst');
+});
+
+it('blocks PDL users from updating staffing rules from another Wohnbereich', function (): void {
+    $location = Location::factory()->create();
+    $otherLocation = Location::factory()->create();
+    $pdl = createShiftTemplateHttpUser('PDL', $location);
+    $shiftTemplate = createShiftTemplateHttpShift($otherLocation);
+
+    $this->actingAs($pdl)
         ->patch("/shift-templates/{$shiftTemplate->id}/staffing-rule", [
             'required_total_staff' => 7,
             'required_specialists' => 2,

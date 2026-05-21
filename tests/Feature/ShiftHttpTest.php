@@ -24,9 +24,15 @@ beforeEach(function (): void {
     Role::findOrCreate('Pflegekraft');
 });
 
-function createShiftHttpUser(string $role): User
+function createShiftHttpUser(string $role, ?Location $location = null): User
 {
-    $user = User::factory()->create();
+    $factory = User::factory();
+
+    if ($location !== null) {
+        $factory = $factory->for($location);
+    }
+
+    $user = $factory->create();
     $user->assignRole($role);
 
     return $user;
@@ -34,6 +40,10 @@ function createShiftHttpUser(string $role): User
 
 function createShiftHttpRoster(Location $location, User $createdBy, array $attributes = []): Roster
 {
+    if ($createdBy->hasRole('PDL') && $createdBy->location_id === null) {
+        $createdBy->forceFill(['location_id' => $location->id])->save();
+    }
+
     return Roster::query()->create([
         'location_id' => $location->id,
         'year' => $attributes['year'] ?? 2027,
@@ -426,7 +436,7 @@ it('does not delete a shift through the wrong roster URL', function (): void {
 
     $this->actingAs($pdl)
         ->delete("/rosters/{$otherRoster->id}/shifts/{$shift->id}")
-        ->assertNotFound();
+        ->assertForbidden();
 
     $this->assertDatabaseHas('shifts', [
         'id' => $shift->id,
@@ -438,6 +448,7 @@ it('does not delete shifts from published or locked rosters', function (): void 
 
     foreach ([RosterStatus::Published, RosterStatus::Locked] as $index => $status) {
         $location = Location::factory()->create();
+        $pdl->forceFill(['location_id' => $location->id])->save();
         $employee = createShiftHttpEmployee($location);
         $roster = createShiftHttpRoster($location, $pdl, [
             'month' => $index + 1,
@@ -564,7 +575,7 @@ it('does not update a shift through the wrong roster URL', function (): void {
             'date' => '2027-01-11',
             'note' => 'Falsch',
         ])
-        ->assertNotFound();
+        ->assertForbidden();
 
     expect($shift->refresh()->note)->toBe('Alt');
 });
@@ -574,6 +585,7 @@ it('does not update shifts from published or locked rosters', function (): void 
 
     foreach ([RosterStatus::Published, RosterStatus::Locked] as $index => $status) {
         $location = Location::factory()->create();
+        $pdl->forceFill(['location_id' => $location->id])->save();
         $employee = createShiftHttpEmployee($location);
         $roster = createShiftHttpRoster($location, $pdl, [
             'month' => $index + 1,
@@ -759,4 +771,45 @@ it('calculates night shift end time on the following day when updating through h
 
     expect($shift->starts_at->format('Y-m-d H:i:s'))->toBe('2027-01-12 22:00:00')
         ->and($shift->ends_at->format('Y-m-d H:i:s'))->toBe('2027-01-13 06:00:00');
+});
+
+
+it('returns a user error when assigning an employee from another Wohnbereich', function (): void {
+    $location = Location::factory()->create();
+    $otherLocation = Location::factory()->create();
+    $pdl = createShiftHttpUser('PDL', $location);
+    $employee = createShiftHttpEmployee($otherLocation);
+    $roster = createShiftHttpRoster($location, $pdl);
+    $shiftTemplate = createShiftHttpShiftTemplate($location);
+
+    $this->actingAs($pdl)
+        ->from('/rosters')
+        ->post("/rosters/{$roster->id}/shifts", [
+            'user_id' => $employee->id,
+            'shift_template_id' => $shiftTemplate->id,
+            'date' => '2027-01-10',
+        ])
+        ->assertRedirect('/rosters')
+        ->assertSessionHasErrors('user_id');
+
+    expect(Shift::query()->count())->toBe(0);
+});
+
+it('blocks PDL users from adding shifts to rosters from another Wohnbereich', function (): void {
+    $location = Location::factory()->create();
+    $otherLocation = Location::factory()->create();
+    $pdl = createShiftHttpUser('PDL', $location);
+    $employee = createShiftHttpEmployee($otherLocation);
+    $roster = createShiftHttpRoster($otherLocation, User::factory()->create());
+    $shiftTemplate = createShiftHttpShiftTemplate($otherLocation);
+
+    $this->actingAs($pdl)
+        ->post("/rosters/{$roster->id}/shifts", [
+            'user_id' => $employee->id,
+            'shift_template_id' => $shiftTemplate->id,
+            'date' => '2027-01-10',
+        ])
+        ->assertForbidden();
+
+    expect(Shift::query()->count())->toBe(0);
 });
