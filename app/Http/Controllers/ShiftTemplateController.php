@@ -5,17 +5,17 @@ namespace App\Http\Controllers;
 use App\Models\Location;
 use App\Models\ShiftStaffingRule;
 use App\Models\ShiftTemplate;
+use App\Services\Rosters\PdlRosterAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response as HttpResponse;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class ShiftTemplateController extends Controller
 {
-    public function index(Request $request): Response
+    public function index(Request $request, PdlRosterAccess $pdlRosterAccess): Response
     {
-        $locationId = $this->ensurePdlHasLocation($request);
+        $locationId = $pdlRosterAccess->ensurePdlHasLocation($request);
 
         return Inertia::render('ShiftTemplates/Index', [
             'locations' => Location::query()
@@ -61,9 +61,9 @@ class ShiftTemplateController extends Controller
         ]);
     }
 
-    public function update(Request $request, ShiftTemplate $shiftTemplate): RedirectResponse
+    public function update(Request $request, ShiftTemplate $shiftTemplate, PdlRosterAccess $pdlRosterAccess): RedirectResponse
     {
-        $this->ensurePdlCanAccessLocation($request, $shiftTemplate->location_id);
+        $pdlRosterAccess->ensurePdlCanAccessLocation($request, $shiftTemplate->location_id);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -88,9 +88,9 @@ class ShiftTemplateController extends Controller
         return back()->with('status', 'shift-template-updated');
     }
 
-    public function updateStaffingRule(Request $request, ShiftTemplate $shiftTemplate): RedirectResponse
+    public function updateStaffingRule(Request $request, ShiftTemplate $shiftTemplate, PdlRosterAccess $pdlRosterAccess): RedirectResponse
     {
-        $this->ensurePdlCanAccessLocation($request, $shiftTemplate->location_id);
+        $pdlRosterAccess->ensurePdlCanAccessLocation($request, $shiftTemplate->location_id);
 
         $validated = $request->validate([
             'required_total_staff' => ['required', 'integer', 'min:1', 'max:50'],
@@ -117,25 +117,5 @@ class ShiftTemplateController extends Controller
         }
 
         return back()->with('status', 'shift-staffing-rule-updated');
-    }
-
-    private function ensurePdlHasLocation(Request $request): string
-    {
-        $user = $request->user();
-
-        abort_unless(
-            $user?->hasRole('PDL') && $user->location_id !== null,
-            HttpResponse::HTTP_FORBIDDEN,
-        );
-
-        return $user->location_id;
-    }
-
-    private function ensurePdlCanAccessLocation(Request $request, string $locationId): void
-    {
-        abort_unless(
-            $this->ensurePdlHasLocation($request) === $locationId,
-            HttpResponse::HTTP_FORBIDDEN,
-        );
     }
 }

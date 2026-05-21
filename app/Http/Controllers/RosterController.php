@@ -8,21 +8,21 @@ use App\Models\Roster;
 use App\Models\Shift;
 use App\Models\ShiftTemplate;
 use App\Models\User;
+use App\Services\Rosters\PdlRosterAccess;
 use App\Services\Rosters\RosterService;
 use App\Services\Rosters\RosterValidator;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response as HttpResponse;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class RosterController extends Controller
 {
-    public function index(Request $request): Response
+    public function index(Request $request, PdlRosterAccess $pdlRosterAccess): Response
     {
-        $locationId = $this->ensurePdlHasLocation($request);
+        $locationId = $pdlRosterAccess->ensurePdlHasLocation($request);
 
         return Inertia::render('Rosters/Index', [
             'locations' => $this->locations($locationId),
@@ -39,9 +39,9 @@ class RosterController extends Controller
         ]);
     }
 
-    public function show(Request $request, Roster $roster): Response
+    public function show(Request $request, Roster $roster, PdlRosterAccess $pdlRosterAccess): Response
     {
-        $this->ensurePdlCanAccessLocation($request, $roster->location_id);
+        $pdlRosterAccess->ensurePdlCanAccessLocation($request, $roster->location_id);
 
         $roster->load(['location', 'createdBy', 'shifts.user', 'shifts.shiftTemplate']);
         $roster->loadCount('shifts');
@@ -55,9 +55,9 @@ class RosterController extends Controller
         ]);
     }
 
-    public function store(Request $request, RosterService $rosterService): RedirectResponse
+    public function store(Request $request, RosterService $rosterService, PdlRosterAccess $pdlRosterAccess): RedirectResponse
     {
-        $this->ensurePdlHasLocation($request);
+        $pdlRosterAccess->ensurePdlHasLocation($request);
 
         $validated = $request->validate([
             'location_id' => ['required', 'exists:locations,id'],
@@ -66,7 +66,7 @@ class RosterController extends Controller
         ]);
 
         $location = Location::query()->findOrFail($validated['location_id']);
-        $this->ensurePdlCanAccessLocation($request, $location->id);
+        $pdlRosterAccess->ensurePdlCanAccessLocation($request, $location->id);
 
         $rosterService->createOrGetDraft(
             $location,
@@ -78,36 +78,36 @@ class RosterController extends Controller
         return back()->with('status', 'roster-created');
     }
 
-    public function publish(Request $request, Roster $roster, RosterService $rosterService): RedirectResponse
+    public function publish(Request $request, Roster $roster, RosterService $rosterService, PdlRosterAccess $pdlRosterAccess): RedirectResponse
     {
-        $this->ensurePdlCanAccessLocation($request, $roster->location_id);
+        $pdlRosterAccess->ensurePdlCanAccessLocation($request, $roster->location_id);
 
         $rosterService->publish($roster);
 
         return back()->with('status', 'roster-published');
     }
 
-    public function lock(Request $request, Roster $roster, RosterService $rosterService): RedirectResponse
+    public function lock(Request $request, Roster $roster, RosterService $rosterService, PdlRosterAccess $pdlRosterAccess): RedirectResponse
     {
-        $this->ensurePdlCanAccessLocation($request, $roster->location_id);
+        $pdlRosterAccess->ensurePdlCanAccessLocation($request, $roster->location_id);
 
         $rosterService->lock($roster);
 
         return back()->with('status', 'roster-locked');
     }
 
-    public function reopen(Request $request, Roster $roster, RosterService $rosterService): RedirectResponse
+    public function reopen(Request $request, Roster $roster, RosterService $rosterService, PdlRosterAccess $pdlRosterAccess): RedirectResponse
     {
-        $this->ensurePdlCanAccessLocation($request, $roster->location_id);
+        $pdlRosterAccess->ensurePdlCanAccessLocation($request, $roster->location_id);
 
         $rosterService->reopen($roster);
 
         return back()->with('status', 'roster-reopened');
     }
 
-    public function validateRoster(Request $request, Roster $roster, RosterValidator $rosterValidator): RedirectResponse
+    public function validateRoster(Request $request, Roster $roster, RosterValidator $rosterValidator, PdlRosterAccess $pdlRosterAccess): RedirectResponse
     {
-        $this->ensurePdlCanAccessLocation($request, $roster->location_id);
+        $pdlRosterAccess->ensurePdlCanAccessLocation($request, $roster->location_id);
 
         $result = $rosterValidator->validate($roster);
 
@@ -121,26 +121,6 @@ class RosterController extends Controller
                 'errors' => $result->errors,
                 'warnings' => $result->warnings,
             ]);
-    }
-
-    private function ensurePdlHasLocation(Request $request): string
-    {
-        $user = $request->user();
-
-        abort_unless(
-            $user?->hasRole('PDL') && $user->location_id !== null,
-            HttpResponse::HTTP_FORBIDDEN,
-        );
-
-        return $user->location_id;
-    }
-
-    private function ensurePdlCanAccessLocation(Request $request, string $locationId): void
-    {
-        abort_unless(
-            $this->ensurePdlHasLocation($request) === $locationId,
-            HttpResponse::HTTP_FORBIDDEN,
-        );
     }
 
     private function locations(string $locationId): Collection
