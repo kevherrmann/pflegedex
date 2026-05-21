@@ -14,6 +14,10 @@ use Illuminate\Support\Collection;
 
 class RosterValidator
 {
+    public function __construct(private readonly RosterDateService $rosterDateService)
+    {
+    }
+
     private const REQUIRED_REST_MINUTES = 660;
     private const PLANNED_WORKING_HOURS_TOLERANCE_MINUTES = 60;
     private const MAX_ALLOWED_CONSECUTIVE_WORK_DAYS = 6;
@@ -56,7 +60,7 @@ class RosterValidator
         EloquentCollection $shiftTemplates,
         RosterValidationResult $result,
     ): void {
-        foreach ($this->datesForRosterMonth($roster) as $date) {
+        foreach ($this->rosterDateService->datesForRosterMonth($roster) as $date) {
             foreach ($shiftTemplates as $shiftTemplate) {
                 $staffingRule = $this->findStaffingRule($shiftTemplate, $date);
 
@@ -322,7 +326,7 @@ class RosterValidator
 
     private function validateMonthlyFreeDays(Roster $roster, RosterValidationResult $result): void
     {
-        $monthDates = collect($this->datesForRosterMonth($roster))
+        $monthDates = collect($this->rosterDateService->datesForRosterMonth($roster))
             ->map(fn (CarbonImmutable $date): string => $date->toDateString())
             ->values();
         $daysInMonth = $monthDates->count();
@@ -359,7 +363,7 @@ class RosterValidator
 
     private function validateSundayCompensationRestDays(Roster $roster, RosterValidationResult $result): void
     {
-        $monthDates = collect($this->datesForRosterMonth($roster))
+        $monthDates = collect($this->rosterDateService->datesForRosterMonth($roster))
             ->map(fn (CarbonImmutable $date): string => $date->toDateString())
             ->values();
 
@@ -505,20 +509,5 @@ class RosterValidator
                     'Der Mitarbeiter ist über seiner monatlichen Soll-Arbeitszeit geplant.',
                 );
             });
-    }
-
-    /**
-     * @return array<int, CarbonImmutable>
-     */
-    private function datesForRosterMonth(Roster $roster): array
-    {
-        $firstDay = CarbonImmutable::create($roster->year, $roster->month, 1)->startOfDay();
-        $days = [];
-
-        for ($date = $firstDay; $date->month === $roster->month; $date = $date->addDay()) {
-            $days[] = $date;
-        }
-
-        return $days;
     }
 }

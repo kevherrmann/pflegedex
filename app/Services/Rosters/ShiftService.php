@@ -16,6 +16,10 @@ use Illuminate\Validation\ValidationException;
 
 class ShiftService
 {
+    public function __construct(private readonly RosterDateService $rosterDateService)
+    {
+    }
+
     public function assignManualShift(
         Roster $roster,
         User $employee,
@@ -36,7 +40,7 @@ class ShiftService
         $this->ensureShiftTemplateMatchesRoster($roster, $shiftTemplate);
 
         $shiftDate = $this->parseDateForRoster($roster, $date);
-        [$startsAt, $endsAt] = $this->buildShiftTimes($shiftDate, $shiftTemplate);
+        [$startsAt, $endsAt] = $this->rosterDateService->buildShiftTimes($shiftDate, $shiftTemplate);
 
         $this->ensureEmployeeCanWorkShiftTemplate($employeeProfile, $shiftTemplate);
         $this->ensureNoApprovedAbsenceOverlap($employee, $startsAt, $endsAt);
@@ -78,7 +82,7 @@ class ShiftService
         $this->ensureShiftTemplateMatchesRoster($roster, $shiftTemplate);
 
         $shiftDate = $this->parseDateForRoster($roster, $date);
-        [$startsAt, $endsAt] = $this->buildShiftTimes($shiftDate, $shiftTemplate);
+        [$startsAt, $endsAt] = $this->rosterDateService->buildShiftTimes($shiftDate, $shiftTemplate);
 
         $this->ensureEmployeeCanWorkShiftTemplate($employeeProfile, $shiftTemplate);
         $this->ensureNoApprovedAbsenceOverlap($employee, $startsAt, $endsAt);
@@ -132,7 +136,7 @@ class ShiftService
             ]);
         }
 
-        if ($shiftDate->year !== $roster->year || $shiftDate->month !== $roster->month) {
+        if (! $this->rosterDateService->isDateInRosterMonth($roster, $shiftDate)) {
             throw ValidationException::withMessages([
                 'date' => 'Das Datum muss im Monat des Dienstplans liegen.',
             ]);
@@ -199,20 +203,5 @@ class ShiftService
                 'user_id' => 'Der Mitarbeiter ist an diesem Tag bereits für diese Schicht eingetragen.',
             ]);
         }
-    }
-
-    /**
-     * @return array{0: CarbonImmutable, 1: CarbonImmutable}
-     */
-    private function buildShiftTimes(CarbonImmutable $shiftDate, ShiftTemplate $shiftTemplate): array
-    {
-        $startsAt = CarbonImmutable::parse($shiftDate->toDateString() . ' ' . $shiftTemplate->starts_at);
-        $endsAt = CarbonImmutable::parse($shiftDate->toDateString() . ' ' . $shiftTemplate->ends_at);
-
-        if ($endsAt->lessThanOrEqualTo($startsAt)) {
-            $endsAt = $endsAt->addDay();
-        }
-
-        return [$startsAt, $endsAt];
     }
 }
