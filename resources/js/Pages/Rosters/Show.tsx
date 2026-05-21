@@ -74,6 +74,19 @@ type ValidationDayIndexEntry = {
     entries: ValidationEntry[];
 };
 
+type EmployeeWorkloadItem = {
+    userId: string;
+    employeeName: string;
+    shiftsCount: number;
+    plannedMinutes: number;
+    workedDays: string[];
+    workedWeekendStartsOn: string[];
+    earlyCount: number;
+    lateCount: number;
+    nightCount: number;
+    otherCount: number;
+};
+
 type RosterItem = {
     id: string;
     locationId: string;
@@ -160,6 +173,122 @@ function shiftBadgeClass(code: string | null): string {
     }
 
     return 'border-gray-200 bg-gray-50 text-gray-800';
+}
+
+function minutesBetween(start: string, end: string): number {
+    const startsAt = new Date(start);
+    const endsAt = new Date(end);
+    const diff = endsAt.getTime() - startsAt.getTime();
+
+    if (Number.isNaN(diff) || diff <= 0) {
+        return 0;
+    }
+
+    return Math.round(diff / 60000);
+}
+
+function formatMinutesAsHours(minutes: number): string {
+    return `${(minutes / 60).toFixed(1).replace('.', ',')} h`;
+}
+
+function formatDateOnly(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+}
+
+function weekendStartsOnForDate(date: string): string | null {
+    const shiftDate = new Date(`${date}T00:00:00`);
+
+    if (Number.isNaN(shiftDate.getTime())) {
+        return null;
+    }
+
+    if (shiftDate.getDay() === 6) {
+        return date;
+    }
+
+    if (shiftDate.getDay() === 0) {
+        const saturday = new Date(shiftDate);
+        saturday.setDate(shiftDate.getDate() - 1);
+
+        return formatDateOnly(saturday);
+    }
+
+    return null;
+}
+
+function buildEmployeeWorkload(shifts: ShiftItem[]): EmployeeWorkloadItem[] {
+    const workloadByUser = new Map<
+        string,
+        Omit<EmployeeWorkloadItem, 'workedDays' | 'workedWeekendStartsOn'> & {
+            workedDays: Set<string>;
+            workedWeekendStartsOn: Set<string>;
+        }
+    >();
+
+    shifts.forEach((shift) => {
+        const current = workloadByUser.get(shift.userId) ?? {
+            userId: shift.userId,
+            employeeName: shift.employeeName ?? 'Unbekannt',
+            shiftsCount: 0,
+            plannedMinutes: 0,
+            workedDays: new Set<string>(),
+            workedWeekendStartsOn: new Set<string>(),
+            earlyCount: 0,
+            lateCount: 0,
+            nightCount: 0,
+            otherCount: 0,
+        };
+
+        current.shiftsCount += 1;
+        current.plannedMinutes += minutesBetween(shift.startsAt, shift.endsAt);
+        current.workedDays.add(shift.date);
+
+        const weekendStartsOn = weekendStartsOnForDate(shift.date);
+
+        if (weekendStartsOn !== null) {
+            current.workedWeekendStartsOn.add(weekendStartsOn);
+        }
+
+        if (shift.shiftTemplateCode === 'early') {
+            current.earlyCount += 1;
+        } else if (shift.shiftTemplateCode === 'late') {
+            current.lateCount += 1;
+        } else if (shift.shiftTemplateCode === 'night') {
+            current.nightCount += 1;
+        } else {
+            current.otherCount += 1;
+        }
+
+        workloadByUser.set(shift.userId, current);
+    });
+
+    return Array.from(workloadByUser.values())
+        .map((item) => ({
+            ...item,
+            workedDays: Array.from(item.workedDays).sort(),
+            workedWeekendStartsOn: Array.from(item.workedWeekendStartsOn).sort(),
+        }))
+        .sort((a, b) => {
+            if (b.plannedMinutes !== a.plannedMinutes) {
+                return b.plannedMinutes - a.plannedMinutes;
+            }
+
+            return a.employeeName.localeCompare(b.employeeName, 'de');
+        });
+}
+
+function shiftCountsLabel(item: EmployeeWorkloadItem): string {
+    const parts = [`F: ${item.earlyCount}`, `S: ${item.lateCount}`, `N: ${item.nightCount}`];
+
+    if (item.otherCount > 0) {
+        parts.push(`Sonstige: ${item.otherCount}`);
+    }
+
+    return parts.join(' · ');
 }
 
 const validationDateContextKeys = [
@@ -678,6 +807,64 @@ function EntryList({ title, entries }: { title: string; entries: ValidationEntry
     );
 }
 
+function EmployeeWorkloadOverview({ roster }: { roster: RosterItem }) {
+    const workload = buildEmployeeWorkload(roster.shifts);
+
+    return (
+        <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
+            <div className="border-b border-gray-200 p-6">
+                <h3 className="text-lg font-semibold text-gray-900">
+                    Mitarbeiter-Auslastung
+                </h3>
+            </div>
+            <div className="p-6">
+                {workload.length === 0 ? (
+                    <p className="text-sm text-gray-600">
+                        Noch keine Auslastung vorhanden.
+                    </p>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200 text-sm">
+                            <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                <tr>
+                                    <th className="px-4 py-3">Mitarbeiter</th>
+                                    <th className="px-4 py-3">Dienste</th>
+                                    <th className="px-4 py-3">Stunden</th>
+                                    <th className="px-4 py-3">Arbeitstage</th>
+                                    <th className="px-4 py-3">Wochenenden</th>
+                                    <th className="px-4 py-3">Schichten</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 bg-white text-gray-700">
+                                {workload.map((item) => (
+                                    <tr key={item.userId}>
+                                        <td className="px-4 py-3 font-medium text-gray-900">
+                                            {item.employeeName}
+                                        </td>
+                                        <td className="px-4 py-3">{item.shiftsCount}</td>
+                                        <td className="px-4 py-3">
+                                            {formatMinutesAsHours(item.plannedMinutes)}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            {item.workedDays.length}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            {item.workedWeekendStartsOn.length}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            {shiftCountsLabel(item)}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
 function ShiftForm({
     roster,
     employees,
@@ -1066,6 +1253,8 @@ export default function RosterShow({
                         roster={roster}
                         validationResult={rosterValidationResult}
                     />
+
+                    <EmployeeWorkloadOverview roster={roster} />
 
                     <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
                         <div className="border-b border-gray-200 p-6">
