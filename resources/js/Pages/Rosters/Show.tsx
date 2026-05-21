@@ -61,7 +61,12 @@ type CalendarDay = {
     shifts: ShiftItem[];
 };
 
-type MonthOverviewFilter = 'all' | 'with-shifts' | 'without-shifts' | 'weekends';
+type MonthOverviewFilter =
+    | 'all'
+    | 'with-shifts'
+    | 'without-shifts'
+    | 'weekends'
+    | 'with-validation';
 
 type ValidationDayIndexEntry = {
     hasErrors: boolean;
@@ -255,6 +260,12 @@ function MonthOverview({
             label: 'Wochenenden',
             count: calendarDays.filter((day) => isWeekend(day)).length,
         },
+        {
+            value: 'with-validation',
+            label: 'Mit Problemen',
+            count: calendarDays.filter((day) => Boolean(validationDayIndex[day.date]))
+                .length,
+        },
     ];
 
     const filteredDays = calendarDays.filter((day) => {
@@ -268,6 +279,10 @@ function MonthOverview({
 
         if (filter === 'weekends') {
             return isWeekend(day);
+        }
+
+        if (filter === 'with-validation') {
+            return Boolean(validationDayIndex[day.date]);
         }
 
         return true;
