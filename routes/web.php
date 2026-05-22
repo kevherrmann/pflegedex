@@ -151,6 +151,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/rosters/{roster}/generate', [RosterController::class, 'generate'])
         ->name('rosters.generate');
 
+    Route::delete('/rosters/{roster}/auto-shifts', [RosterController::class, 'deleteAutoShifts'])
+        ->name('rosters.auto-shifts.destroy');
+
     Route::post('/rosters/{roster}/shifts', [ShiftController::class, 'store'])
         ->name('rosters.shifts.store');
 

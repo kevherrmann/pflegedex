@@ -80,6 +80,27 @@ class RosterGeneratorService
         return $result;
     }
 
+
+    public function deleteAutoShifts(Roster $roster): RosterGenerationResult
+    {
+        if (! $roster->isEditable()) {
+            throw ValidationException::withMessages([
+                'status' => 'Nur bearbeitbare Dienstpläne können automatisch geplante Dienste zurücksetzen.',
+            ]);
+        }
+
+        $result = new RosterGenerationResult();
+
+        $deletedAutoShifts = Shift::query()
+            ->where('roster_id', $roster->id)
+            ->where('source', ShiftSource::Auto->value)
+            ->delete();
+
+        $result->addDeletedAutoShifts($deletedAutoShifts);
+
+        return $result;
+    }
+
     private function fillMissingSpecialists(
         Collection $employees,
         Roster $roster,

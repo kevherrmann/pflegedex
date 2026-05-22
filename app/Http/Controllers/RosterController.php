@@ -144,6 +144,25 @@ class RosterController extends Controller
             ]);
     }
 
+    public function deleteAutoShifts(
+        Request $request,
+        Roster $roster,
+        PdlRosterAccess $pdlRosterAccess,
+        RosterGeneratorService $generator,
+    ): RedirectResponse {
+        $pdlRosterAccess->ensurePdlCanAccessLocation($request, $roster->location_id);
+
+        $result = $generator->deleteAutoShifts($roster);
+
+        return back()
+            ->with('status', 'roster-auto-shifts-deleted')
+            ->with('rosterGenerationResult', [
+                'createdShifts' => $result->createdShifts,
+                'deletedAutoShifts' => $result->deletedAutoShifts,
+                'skipped' => $result->skipped,
+            ]);
+    }
+
     private function locations(string $locationId): Collection
     {
         return Location::query()

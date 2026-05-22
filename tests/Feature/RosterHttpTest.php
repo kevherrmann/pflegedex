@@ -906,3 +906,62 @@ it('passes roster generation flash results to the roster detail page', function 
                 ->where('rosterGenerationResult.skipped.0.code', 'no_candidate')
         );
 });
+
+it('lets PDL users delete auto shifts in their own roster', function (): void {
+    $location = Location::factory()->create();
+    $pdl = createRosterHttpUser('PDL', $location);
+    $employee = createRosterHttpEmployee($location);
+    $roster = createRosterHttpRoster($location, $pdl);
+    $shiftTemplate = createRosterHttpShiftTemplate($location);
+    $manualShift = createRosterHttpShift($roster, $employee, $shiftTemplate, '2027-01-01');
+    $autoShift = createRosterHttpShift($roster, $employee, $shiftTemplate, '2027-01-02');
+    $autoShift->update(['source' => ShiftSource::Auto]);
+
+    $this->actingAs($pdl)
+        ->from("/rosters/{$roster->id}")
+        ->delete("/rosters/{$roster->id}/auto-shifts")
+        ->assertRedirect("/rosters/{$roster->id}")
+        ->assertSessionHas('status', 'roster-auto-shifts-deleted')
+        ->assertSessionHas('rosterGenerationResult', fn (array $result): bool => $result['createdShifts'] === 0
+            && $result['deletedAutoShifts'] === 1
+            && $result['skipped'] === []);
+
+    expect(Shift::query()->whereKey($manualShift->id)->exists())->toBeTrue()
+        ->and(Shift::query()->whereKey($autoShift->id)->exists())->toBeFalse()
+        ->and($manualShift->refresh()->source)->toBe(ShiftSource::Manual);
+});
+
+it('blocks PDL users from deleting auto shifts in another Wohnbereich', function (): void {
+    $location = Location::factory()->create();
+    $otherLocation = Location::factory()->create();
+    $pdl = createRosterHttpUser('PDL', $location);
+    $foreignRoster = createRosterHttpRoster($otherLocation, User::factory()->create());
+
+    $this->actingAs($pdl)
+        ->delete("/rosters/{$foreignRoster->id}/auto-shifts")
+        ->assertForbidden();
+});
+
+it('returns a session error when deleting auto shifts from published or locked rosters', function (RosterStatus $status, int $month): void {
+    $location = Location::factory()->create();
+    $pdl = createRosterHttpUser('PDL', $location);
+    $employee = createRosterHttpEmployee($location);
+    $roster = createRosterHttpRoster($location, $pdl, [
+        'month' => $month,
+        'status' => $status,
+    ]);
+    $shiftTemplate = createRosterHttpShiftTemplate($location);
+    $autoShift = createRosterHttpShift($roster, $employee, $shiftTemplate, '2027-01-01');
+    $autoShift->update(['source' => ShiftSource::Auto]);
+
+    $this->actingAs($pdl)
+        ->from("/rosters/{$roster->id}")
+        ->delete("/rosters/{$roster->id}/auto-shifts")
+        ->assertRedirect("/rosters/{$roster->id}")
+        ->assertSessionHasErrors('status');
+
+    expect(Shift::query()->whereKey($autoShift->id)->exists())->toBeTrue();
+})->with([
+    [RosterStatus::Published, 4],
+    [RosterStatus::Locked, 5],
+]);

@@ -290,3 +290,51 @@ it('roughly distributes by current shift count', function (): void {
 
     expect($firstDayShift->user_id)->toBe($lessPlanned->id);
 });
+
+it('delete auto shifts deletes only auto shifts and keeps manual shifts', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $employee = createRosterGeneratorEmployee($location);
+    $roster = createRosterGeneratorRoster($location, $pdl);
+    $shiftTemplate = createRosterGeneratorShiftTemplate($location);
+    $manualShift = createRosterGeneratorShift($roster, $employee, $shiftTemplate, '2027-01-01');
+    $autoShift = createRosterGeneratorShift($roster, $employee, $shiftTemplate, '2027-01-02', ShiftSource::Auto);
+
+    $result = app(RosterGeneratorService::class)->deleteAutoShifts($roster);
+
+    expect($result->createdShifts)->toBe(0)
+        ->and($result->deletedAutoShifts)->toBe(1)
+        ->and($result->skipped)->toBe([])
+        ->and(Shift::query()->whereKey($manualShift->id)->exists())->toBeTrue()
+        ->and(Shift::query()->whereKey($autoShift->id)->exists())->toBeFalse()
+        ->and($manualShift->refresh()->source)->toBe(ShiftSource::Manual);
+});
+
+it('delete auto shifts returns the deleted auto shift count', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $employee = createRosterGeneratorEmployee($location);
+    $roster = createRosterGeneratorRoster($location, $pdl);
+    $shiftTemplate = createRosterGeneratorShiftTemplate($location);
+
+    createRosterGeneratorShift($roster, $employee, $shiftTemplate, '2027-01-01', ShiftSource::Auto);
+    createRosterGeneratorShift($roster, $employee, $shiftTemplate, '2027-01-02', ShiftSource::Auto);
+
+    $result = app(RosterGeneratorService::class)->deleteAutoShifts($roster);
+
+    expect($result->deletedAutoShifts)->toBe(2)
+        ->and($result->createdShifts)->toBe(0)
+        ->and($result->skipped)->toBe([])
+        ->and(Shift::query()->where('roster_id', $roster->id)->count())->toBe(0);
+});
+
+it('delete auto shifts blocks published or locked rosters', function (RosterStatus $status): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $roster = createRosterGeneratorRoster($location, $pdl, ['status' => $status]);
+
+    assertRosterGeneratorValidationField(
+        fn () => app(RosterGeneratorService::class)->deleteAutoShifts($roster),
+        'status',
+    );
+})->with([RosterStatus::Published, RosterStatus::Locked]);
