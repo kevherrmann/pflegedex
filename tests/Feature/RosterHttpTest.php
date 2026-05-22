@@ -825,3 +825,84 @@ it('blocks PDL users from changing or validating rosters from another Wohnbereic
         ->and($publishedRoster->refresh()->status)->toBe(RosterStatus::Published)
         ->and($reopenRoster->refresh()->status)->toBe(RosterStatus::Published);
 });
+
+it('lets PDL users generate their own roster', function (): void {
+    $location = Location::factory()->create();
+    $pdl = createRosterHttpUser('PDL', $location);
+    createRosterHttpEmployee($location);
+    $roster = createRosterHttpRoster($location, $pdl);
+    $shiftTemplate = createRosterHttpShiftTemplate($location);
+    createRosterHttpStaffingRule($shiftTemplate);
+
+    $this->actingAs($pdl)
+        ->from("/rosters/{$roster->id}")
+        ->post("/rosters/{$roster->id}/generate")
+        ->assertRedirect("/rosters/{$roster->id}")
+        ->assertSessionHas('status', 'roster-generated')
+        ->assertSessionHas('rosterGenerationResult', fn (array $result): bool => $result['createdShifts'] === 31
+            && $result['deletedAutoShifts'] === 0
+            && $result['skipped'] === []);
+
+    expect(Shift::query()->where('roster_id', $roster->id)->count())->toBe(31)
+        ->and(Shift::query()->where('source', ShiftSource::Auto->value)->count())->toBe(31);
+});
+
+it('blocks PDL users from generating rosters from another Wohnbereich', function (): void {
+    $location = Location::factory()->create();
+    $otherLocation = Location::factory()->create();
+    $pdl = createRosterHttpUser('PDL', $location);
+    $foreignRoster = createRosterHttpRoster($otherLocation, User::factory()->create());
+
+    $this->actingAs($pdl)
+        ->post("/rosters/{$foreignRoster->id}/generate")
+        ->assertForbidden();
+});
+
+it('returns a session error when generating published or locked rosters', function (RosterStatus $status, int $month): void {
+    $location = Location::factory()->create();
+    $pdl = createRosterHttpUser('PDL', $location);
+    $roster = createRosterHttpRoster($location, $pdl, [
+        'month' => $month,
+        'status' => $status,
+    ]);
+
+    $this->actingAs($pdl)
+        ->from("/rosters/{$roster->id}")
+        ->post("/rosters/{$roster->id}/generate")
+        ->assertRedirect("/rosters/{$roster->id}")
+        ->assertSessionHasErrors('status');
+
+    expect(Shift::query()->where('roster_id', $roster->id)->count())->toBe(0);
+})->with([
+    [RosterStatus::Published, 2],
+    [RosterStatus::Locked, 3],
+]);
+
+it('passes roster generation flash results to the roster detail page', function (): void {
+    $location = Location::factory()->create();
+    $pdl = createRosterHttpUser('PDL', $location);
+    $roster = createRosterHttpRoster($location, $pdl);
+
+    $this->actingAs($pdl)
+        ->withSession([
+            'rosterGenerationResult' => [
+                'createdShifts' => 3,
+                'deletedAutoShifts' => 2,
+                'skipped' => [
+                    [
+                        'code' => 'no_candidate',
+                        'message' => 'Hinweis',
+                        'context' => ['date' => '2027-01-01'],
+                    ],
+                ],
+            ],
+        ])
+        ->get("/rosters/{$roster->id}")
+        ->assertOk()
+        ->assertInertia(
+            fn (Assert $page) => $page
+                ->where('rosterGenerationResult.createdShifts', 3)
+                ->where('rosterGenerationResult.deletedAutoShifts', 2)
+                ->where('rosterGenerationResult.skipped.0.code', 'no_candidate')
+        );
+});

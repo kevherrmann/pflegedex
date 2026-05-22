@@ -54,6 +54,16 @@ type RosterValidationResult = {
     warnings: ValidationEntry[];
 };
 
+type RosterGenerationResult = {
+    createdShifts: number;
+    deletedAutoShifts: number;
+    skipped: Array<{
+        code: string;
+        message: string;
+        context: Record<string, unknown>;
+    }>;
+};
+
 type CalendarDay = {
     date: string;
     dayLabel: string;
@@ -111,6 +121,7 @@ type Props = {
     shiftTemplates: ShiftTemplateOption[];
     calendarDays: CalendarDay[];
     rosterValidationResult: RosterValidationResult | null;
+    rosterGenerationResult: RosterGenerationResult | null;
 };
 
 function formatDateTime(value: string | null): string {
@@ -633,6 +644,16 @@ function RosterActions({ roster }: { roster: RosterItem }) {
         router.post(route('rosters.validate', roster.id), {}, { preserveScroll: true });
     };
 
+    const generate = () => {
+        if (
+            window.confirm(
+                'Automatisch erzeugte Dienste werden ersetzt. Manuelle Dienste bleiben erhalten. Fortfahren?',
+            )
+        ) {
+            router.post(route('rosters.generate', roster.id), {}, { preserveScroll: true });
+        }
+    };
+
     return (
         <div className="flex flex-wrap gap-2">
             <button
@@ -644,13 +665,22 @@ function RosterActions({ roster }: { roster: RosterItem }) {
             </button>
 
             {roster.isEditable && (
-                <button
-                    type="button"
-                    onClick={() => patch('rosters.publish')}
-                    className="rounded-md border border-transparent bg-[#9B1C3B] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#7f1730]"
-                >
-                    Veröffentlichen
-                </button>
+                <>
+                    <button
+                        type="button"
+                        onClick={generate}
+                        className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800 transition hover:bg-blue-100"
+                    >
+                        Automatisch planen
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => patch('rosters.publish')}
+                        className="rounded-md border border-transparent bg-[#9B1C3B] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#7f1730]"
+                    >
+                        Veröffentlichen
+                    </button>
+                </>
             )}
 
             {roster.status === 'published' && (
@@ -674,6 +704,39 @@ function RosterActions({ roster }: { roster: RosterItem }) {
 
             {roster.status === 'locked' && (
                 <span className="py-2 text-sm text-gray-500">Gesperrt</span>
+            )}
+        </div>
+    );
+}
+
+function GenerationResult({ result }: { result: RosterGenerationResult | null }) {
+    if (result === null) {
+        return null;
+    }
+
+    const visibleSkipped = result.skipped.slice(0, 5);
+    const hiddenSkippedCount = Math.max(result.skipped.length - visibleSkipped.length, 0);
+
+    return (
+        <div className="rounded-md border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950">
+            <p className="font-semibold">Automatische Planung abgeschlossen</p>
+            <div className="mt-2 space-y-1">
+                <p>Erstellt: {result.createdShifts} Dienste</p>
+                <p>Ersetzte Auto-Dienste: {result.deletedAutoShifts}</p>
+            </div>
+
+            {result.skipped.length > 0 && (
+                <div className="mt-3 border-t border-blue-200 pt-3">
+                    <p className="font-medium">
+                        Einige Dienste konnten nicht vollständig besetzt werden.
+                    </p>
+                    <ul className="mt-2 list-disc space-y-1 pl-5">
+                        {visibleSkipped.map((entry, index) => (
+                            <li key={`${entry.code}-${index}`}>{entry.message}</li>
+                        ))}
+                        {hiddenSkippedCount > 0 && <li>+ {hiddenSkippedCount} weitere</li>}
+                    </ul>
+                </div>
             )}
         </div>
     );
@@ -1300,6 +1363,7 @@ export default function RosterShow({
     shiftTemplates,
     calendarDays,
     rosterValidationResult,
+    rosterGenerationResult,
 }: Props) {
     return (
         <AuthenticatedLayout
@@ -1367,6 +1431,8 @@ export default function RosterShow({
                             </div>
                         </div>
                     </div>
+
+                    <GenerationResult result={rosterGenerationResult} />
 
                     <ValidationResult
                         roster={roster}

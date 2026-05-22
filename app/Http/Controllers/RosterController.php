@@ -9,6 +9,7 @@ use App\Models\Shift;
 use App\Models\ShiftTemplate;
 use App\Models\User;
 use App\Services\Rosters\PdlRosterAccess;
+use App\Services\Rosters\RosterGeneratorService;
 use App\Services\Rosters\RosterService;
 use App\Services\Rosters\RosterValidator;
 use Carbon\CarbonImmutable;
@@ -52,6 +53,7 @@ class RosterController extends Controller
             'shiftTemplates' => $this->shiftTemplatesForRoster($roster),
             'calendarDays' => $this->calendarDaysForRoster($roster),
             'rosterValidationResult' => $request->session()->get('rosterValidationResult'),
+            'rosterGenerationResult' => $request->session()->get('rosterGenerationResult'),
         ]);
     }
 
@@ -120,6 +122,25 @@ class RosterController extends Controller
                     : ($result->isYellow() ? 'yellow' : 'green'),
                 'errors' => $result->errors,
                 'warnings' => $result->warnings,
+            ]);
+    }
+
+    public function generate(
+        Request $request,
+        Roster $roster,
+        PdlRosterAccess $pdlRosterAccess,
+        RosterGeneratorService $generator,
+    ): RedirectResponse {
+        $pdlRosterAccess->ensurePdlCanAccessLocation($request, $roster->location_id);
+
+        $result = $generator->generate($roster);
+
+        return back()
+            ->with('status', 'roster-generated')
+            ->with('rosterGenerationResult', [
+                'createdShifts' => $result->createdShifts,
+                'deletedAutoShifts' => $result->deletedAutoShifts,
+                'skipped' => $result->skipped,
             ]);
     }
 

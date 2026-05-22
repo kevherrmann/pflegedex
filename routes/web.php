@@ -148,6 +148,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/rosters/{roster}/validate', [RosterController::class, 'validateRoster'])
         ->name('rosters.validate');
 
+    Route::post('/rosters/{roster}/generate', [RosterController::class, 'generate'])
+        ->name('rosters.generate');
+
     Route::post('/rosters/{roster}/shifts', [ShiftController::class, 'store'])
         ->name('rosters.shifts.store');
 
