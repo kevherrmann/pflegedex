@@ -830,6 +830,7 @@ it('lets PDL users generate their own roster', function (): void {
     $pdl = createRosterHttpUser('PDL', $location);
     createRosterHttpEmployee($location, [], ['name' => 'Anna Pflege']);
     createRosterHttpEmployee($location, [], ['name' => 'Berta Pflege']);
+    createRosterHttpEmployee($location, [], ['name' => 'Clara Pflege']);
     $roster = createRosterHttpRoster($location, $pdl);
     $shiftTemplate = createRosterHttpShiftTemplate($location);
     createRosterHttpStaffingRule($shiftTemplate);

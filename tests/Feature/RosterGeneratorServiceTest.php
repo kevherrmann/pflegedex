@@ -144,6 +144,7 @@ it('generates auto shifts for simple staffing requirements', function (): void {
     $pdl = User::factory()->for($location)->create();
     $firstEmployee = createRosterGeneratorEmployee($location, [], ['name' => 'Anna Pflege']);
     $secondEmployee = createRosterGeneratorEmployee($location, [], ['name' => 'Berta Pflege']);
+    $thirdEmployee = createRosterGeneratorEmployee($location, [], ['name' => 'Clara Pflege']);
     $roster = createRosterGeneratorRoster($location, $pdl);
     $shiftTemplate = createRosterGeneratorShiftTemplate($location);
     createRosterGeneratorStaffingRule($shiftTemplate);
@@ -152,14 +153,16 @@ it('generates auto shifts for simple staffing requirements', function (): void {
 
     $firstEmployeeShiftCount = Shift::query()->where('user_id', $firstEmployee->id)->count();
     $secondEmployeeShiftCount = Shift::query()->where('user_id', $secondEmployee->id)->count();
+    $thirdEmployeeShiftCount = Shift::query()->where('user_id', $thirdEmployee->id)->count();
 
     expect($result->createdShifts)->toBe(31)
         ->and($result->deletedAutoShifts)->toBe(0)
         ->and(Shift::query()->count())->toBe(31)
         ->and(Shift::query()->where('source', ShiftSource::Auto->value)->count())->toBe(31)
-        ->and($firstEmployeeShiftCount + $secondEmployeeShiftCount)->toBe(31)
+        ->and($firstEmployeeShiftCount + $secondEmployeeShiftCount + $thirdEmployeeShiftCount)->toBe(31)
         ->and($firstEmployeeShiftCount)->toBeGreaterThan(0)
-        ->and($secondEmployeeShiftCount)->toBeGreaterThan(0);
+        ->and($secondEmployeeShiftCount)->toBeGreaterThan(0)
+        ->and($thirdEmployeeShiftCount)->toBeGreaterThan(0);
 });
 
 it('deletes old auto shifts and keeps manual shifts', function (): void {
@@ -167,6 +170,9 @@ it('deletes old auto shifts and keeps manual shifts', function (): void {
     $pdl = User::factory()->for($location)->create();
     $employee = createRosterGeneratorEmployee($location);
     createRosterGeneratorEmployee($location, [], ['name' => 'Berta Pflege']);
+    createRosterGeneratorEmployee($location, [], ['name' => 'Clara Pflege']);
+    createRosterGeneratorEmployee($location, [], ['name' => 'Dora Pflege']);
+    createRosterGeneratorEmployee($location, [], ['name' => 'Eva Pflege']);
     $roster = createRosterGeneratorRoster($location, $pdl);
     $shiftTemplate = createRosterGeneratorShiftTemplate($location);
     createRosterGeneratorStaffingRule($shiftTemplate);
@@ -200,6 +206,9 @@ it('respects can work night', function (): void {
     $cannotWorkNight = createRosterGeneratorEmployee($location, ['can_work_night' => false], ['name' => 'Anna Tag']);
     $firstCanWorkNight = createRosterGeneratorEmployee($location, ['can_work_night' => true], ['name' => 'Berta Nacht']);
     $secondCanWorkNight = createRosterGeneratorEmployee($location, ['can_work_night' => true], ['name' => 'Clara Nacht']);
+    $thirdCanWorkNight = createRosterGeneratorEmployee($location, ['can_work_night' => true], ['name' => 'Dora Nacht']);
+    $fourthCanWorkNight = createRosterGeneratorEmployee($location, ['can_work_night' => true], ['name' => 'Eva Nacht']);
+    $fifthCanWorkNight = createRosterGeneratorEmployee($location, ['can_work_night' => true], ['name' => 'Franka Nacht']);
     $roster = createRosterGeneratorRoster($location, $pdl);
     $nightShiftTemplate = createRosterGeneratorShiftTemplate($location, [
         'name' => 'Nachtdienst',
@@ -213,11 +222,15 @@ it('respects can work night', function (): void {
 
     $firstNightShiftCount = Shift::query()->where('user_id', $firstCanWorkNight->id)->count();
     $secondNightShiftCount = Shift::query()->where('user_id', $secondCanWorkNight->id)->count();
+    $thirdNightShiftCount = Shift::query()->where('user_id', $thirdCanWorkNight->id)->count();
+    $fourthNightShiftCount = Shift::query()->where('user_id', $fourthCanWorkNight->id)->count();
+    $fifthNightShiftCount = Shift::query()->where('user_id', $fifthCanWorkNight->id)->count();
 
     expect(Shift::query()->where('user_id', $cannotWorkNight->id)->count())->toBe(0)
-        ->and($firstNightShiftCount + $secondNightShiftCount)->toBe(31)
+        ->and($firstNightShiftCount + $secondNightShiftCount + $thirdNightShiftCount + $fourthNightShiftCount + $fifthNightShiftCount)->toBe(31)
         ->and($firstNightShiftCount)->toBeGreaterThan(0)
-        ->and($secondNightShiftCount)->toBeGreaterThan(0);
+        ->and($secondNightShiftCount)->toBeGreaterThan(0)
+        ->and($thirdNightShiftCount)->toBeGreaterThan(0);
 });
 
 it('respects approved absences', function (): void {
@@ -226,6 +239,9 @@ it('respects approved absences', function (): void {
     $absentEmployee = createRosterGeneratorEmployee($location, [], ['name' => 'Anna Abwesend']);
     $firstAvailableEmployee = createRosterGeneratorEmployee($location, [], ['name' => 'Berta Verfuegbar']);
     $secondAvailableEmployee = createRosterGeneratorEmployee($location, [], ['name' => 'Clara Verfuegbar']);
+    $thirdAvailableEmployee = createRosterGeneratorEmployee($location, [], ['name' => 'Dora Verfuegbar']);
+    $fourthAvailableEmployee = createRosterGeneratorEmployee($location, [], ['name' => 'Eva Verfuegbar']);
+    $fifthAvailableEmployee = createRosterGeneratorEmployee($location, [], ['name' => 'Franka Verfuegbar']);
     $roster = createRosterGeneratorRoster($location, $pdl);
     $shiftTemplate = createRosterGeneratorShiftTemplate($location);
     createRosterGeneratorStaffingRule($shiftTemplate);
@@ -238,11 +254,15 @@ it('respects approved absences', function (): void {
 
     $firstAvailableShiftCount = Shift::query()->where('user_id', $firstAvailableEmployee->id)->count();
     $secondAvailableShiftCount = Shift::query()->where('user_id', $secondAvailableEmployee->id)->count();
+    $thirdAvailableShiftCount = Shift::query()->where('user_id', $thirdAvailableEmployee->id)->count();
+    $fourthAvailableShiftCount = Shift::query()->where('user_id', $fourthAvailableEmployee->id)->count();
+    $fifthAvailableShiftCount = Shift::query()->where('user_id', $fifthAvailableEmployee->id)->count();
 
     expect(Shift::query()->where('user_id', $absentEmployee->id)->count())->toBe(0)
-        ->and($firstAvailableShiftCount + $secondAvailableShiftCount)->toBe(31)
+        ->and($firstAvailableShiftCount + $secondAvailableShiftCount + $thirdAvailableShiftCount + $fourthAvailableShiftCount + $fifthAvailableShiftCount)->toBe(31)
         ->and($firstAvailableShiftCount)->toBeGreaterThan(0)
-        ->and($secondAvailableShiftCount)->toBeGreaterThan(0);
+        ->and($secondAvailableShiftCount)->toBeGreaterThan(0)
+        ->and($thirdAvailableShiftCount)->toBeGreaterThan(0);
 });
 
 it('prefers specialists for required specialist slots', function (): void {
@@ -541,6 +561,149 @@ it('counts auto shifts created earlier in the same generator run for consecutive
             ->exists())->toBeFalse()
         ->and($skippedForSeventhDay['code'])->toBe('no_candidate')
         ->and($skippedForSeventhDay['context']['reason'])->toBe('no_available_employee');
+});
+
+it('avoids the third weekend for the same employee', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $weekendEmployee = createRosterGeneratorEmployee($location, [], ['name' => 'Anna Wochenende']);
+    $availableEmployee = createRosterGeneratorEmployee($location, [], ['name' => 'Berta Frei']);
+    $roster = createRosterGeneratorRoster($location, $pdl);
+    $earlyShiftTemplate = createRosterGeneratorShiftTemplate($location);
+    createRosterGeneratorStaffingRule($earlyShiftTemplate, ['weekday' => 6]);
+
+    createRosterGeneratorShift($roster, $weekendEmployee, $earlyShiftTemplate, '2027-01-02');
+    createRosterGeneratorShift($roster, $weekendEmployee, $earlyShiftTemplate, '2027-01-09');
+    createRosterGeneratorShift($roster, $availableEmployee, $earlyShiftTemplate, '2027-01-04');
+    createRosterGeneratorShift($roster, $availableEmployee, $earlyShiftTemplate, '2027-01-05');
+
+    app(RosterGeneratorService::class)->generate($roster);
+
+    $generatedShift = Shift::query()
+        ->where('roster_id', $roster->id)
+        ->where('shift_template_id', $earlyShiftTemplate->id)
+        ->whereDate('date', '2027-01-16')
+        ->firstOrFail();
+
+    expect($generatedShift->user_id)->toBe($availableEmployee->id);
+});
+
+it('returns no candidate when the only employee would get a third weekend', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $employee = createRosterGeneratorEmployee($location);
+    $roster = createRosterGeneratorRoster($location, $pdl);
+    $earlyShiftTemplate = createRosterGeneratorShiftTemplate($location);
+    createRosterGeneratorStaffingRule($earlyShiftTemplate, ['weekday' => 6]);
+
+    createRosterGeneratorShift($roster, $employee, $earlyShiftTemplate, '2027-01-02');
+    createRosterGeneratorShift($roster, $employee, $earlyShiftTemplate, '2027-01-09');
+
+    $result = app(RosterGeneratorService::class)->generate($roster);
+
+    $skippedForTargetDate = collect($result->skipped)->firstWhere('context.date', '2027-01-16');
+
+    expect(Shift::query()
+        ->where('roster_id', $roster->id)
+        ->where('shift_template_id', $earlyShiftTemplate->id)
+        ->whereDate('date', '2027-01-16')
+        ->exists())->toBeFalse()
+        ->and($skippedForTargetDate['code'])->toBe('no_candidate')
+        ->and($skippedForTargetDate['context']['reason'])->toBe('no_available_employee');
+});
+
+it('counts Saturday and Sunday of the same weekend once for weekend load', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $employee = createRosterGeneratorEmployee($location);
+    $roster = createRosterGeneratorRoster($location, $pdl);
+    $earlyShiftTemplate = createRosterGeneratorShiftTemplate($location);
+    createRosterGeneratorStaffingRule($earlyShiftTemplate, ['weekday' => 6]);
+
+    createRosterGeneratorShift($roster, $employee, $earlyShiftTemplate, '2027-01-02');
+    createRosterGeneratorShift($roster, $employee, $earlyShiftTemplate, '2027-01-03');
+    createRosterGeneratorShift($roster, $employee, $earlyShiftTemplate, '2027-01-09');
+
+    $result = app(RosterGeneratorService::class)->generate($roster);
+
+    $skippedForTargetDate = collect($result->skipped)->firstWhere('context.date', '2027-01-16');
+
+    expect(Shift::query()
+        ->where('roster_id', $roster->id)
+        ->where('shift_template_id', $earlyShiftTemplate->id)
+        ->whereDate('date', '2027-01-16')
+        ->exists())->toBeFalse()
+        ->and($skippedForTargetDate['code'])->toBe('no_candidate');
+});
+
+it('allows the second weekend', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $employee = createRosterGeneratorEmployee($location);
+    $roster = createRosterGeneratorRoster($location, $pdl);
+    $earlyShiftTemplate = createRosterGeneratorShiftTemplate($location);
+    createRosterGeneratorStaffingRule($earlyShiftTemplate, ['weekday' => 6]);
+
+    createRosterGeneratorShift($roster, $employee, $earlyShiftTemplate, '2027-01-02');
+
+    app(RosterGeneratorService::class)->generate($roster);
+
+    $generatedShift = Shift::query()
+        ->where('roster_id', $roster->id)
+        ->where('shift_template_id', $earlyShiftTemplate->id)
+        ->whereDate('date', '2027-01-09')
+        ->firstOrFail();
+
+    expect($generatedShift->user_id)->toBe($employee->id);
+});
+
+it('ignores weekdays for weekend load', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $employee = createRosterGeneratorEmployee($location);
+    $roster = createRosterGeneratorRoster($location, $pdl);
+    $earlyShiftTemplate = createRosterGeneratorShiftTemplate($location);
+    createRosterGeneratorStaffingRule($earlyShiftTemplate, ['weekday' => 6]);
+
+    foreach (['2027-01-04', '2027-01-05', '2027-01-06', '2027-01-07', '2027-01-08'] as $date) {
+        createRosterGeneratorShift($roster, $employee, $earlyShiftTemplate, $date);
+    }
+
+    app(RosterGeneratorService::class)->generate($roster);
+
+    $generatedShift = Shift::query()
+        ->where('roster_id', $roster->id)
+        ->where('shift_template_id', $earlyShiftTemplate->id)
+        ->whereDate('date', '2027-01-02')
+        ->firstOrFail();
+
+    expect($generatedShift->user_id)->toBe($employee->id);
+});
+
+it('counts auto shifts created earlier in the same generator run for weekend load', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $employee = createRosterGeneratorEmployee($location);
+    $roster = createRosterGeneratorRoster($location, $pdl);
+    $earlyShiftTemplate = createRosterGeneratorShiftTemplate($location);
+    createRosterGeneratorStaffingRule($earlyShiftTemplate, ['weekday' => 6]);
+
+    $result = app(RosterGeneratorService::class)->generate($roster);
+
+    $skippedForThirdWeekend = collect($result->skipped)->firstWhere('context.date', '2027-01-16');
+
+    expect($result->createdShifts)->toBe(2)
+        ->and(Shift::query()
+            ->where('roster_id', $roster->id)
+            ->where('user_id', $employee->id)
+            ->where('source', ShiftSource::Auto->value)
+            ->count())->toBe(2)
+        ->and(Shift::query()
+            ->where('roster_id', $roster->id)
+            ->whereDate('date', '2027-01-16')
+            ->exists())->toBeFalse()
+        ->and($skippedForThirdWeekend['code'])->toBe('no_candidate')
+        ->and($skippedForThirdWeekend['context']['reason'])->toBe('no_available_employee');
 });
 
 it('roughly distributes by current shift count', function (): void {

@@ -21,6 +21,8 @@ class RosterGeneratorService
 
     private const MAX_ALLOWED_CONSECUTIVE_WORK_DAYS = 6;
 
+    private const MAX_ALLOWED_WEEKENDS = 2;
+
     public function __construct(private readonly RosterDateService $rosterDateService) {}
 
     public function generate(Roster $roster): RosterGenerationResult
@@ -181,6 +183,7 @@ class RosterGeneratorService
                     && ! $this->employeeHasApprovedAbsenceOverlap($employee, $startsAt, $endsAt)
                     && ! $this->employeeHasRestConflict($employee, $roster, $startsAt, $endsAt)
                     && ! $this->employeeWouldExceedConsecutiveWorkDays($employee, $roster, $date)
+                    && ! $this->employeeWouldExceedWeekendLoad($employee, $roster, $date)
                     && ! $this->employeeAlreadyAssigned($employee, $shiftTemplate, $date->toDateString());
             });
     }
@@ -319,6 +322,30 @@ class RosterGeneratorService
         }
 
         return $longestSequence > self::MAX_ALLOWED_CONSECUTIVE_WORK_DAYS;
+    }
+
+    private function employeeWouldExceedWeekendLoad(
+        User $employee,
+        Roster $roster,
+        CarbonImmutable $date,
+    ): bool {
+        if (! $date->isSaturday() && ! $date->isSunday()) {
+            return false;
+        }
+
+        $weekendStarts = Shift::query()
+            ->where('roster_id', $roster->id)
+            ->where('user_id', $employee->id)
+            ->pluck('date')
+            ->map(fn ($workDate) => CarbonImmutable::parse($workDate)->startOfDay())
+            ->filter(fn (CarbonImmutable $workDate): bool => $workDate->isSaturday() || $workDate->isSunday())
+            ->map(fn (CarbonImmutable $workDate): string => $workDate
+                ->subDays($workDate->isSunday() ? 1 : 0)
+                ->toDateString())
+            ->push($date->subDays($date->isSunday() ? 1 : 0)->toDateString())
+            ->unique();
+
+        return $weekendStarts->count() > self::MAX_ALLOWED_WEEKENDS;
     }
 
     private function employeeAlreadyAssigned(User $employee, ShiftTemplate $shiftTemplate, string $date): bool
