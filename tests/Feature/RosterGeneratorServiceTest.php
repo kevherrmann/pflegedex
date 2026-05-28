@@ -88,8 +88,8 @@ function createRosterGeneratorShift(
     ShiftSource $source = ShiftSource::Manual,
 ): Shift {
     $shiftDate = CarbonImmutable::parse($date)->startOfDay();
-    $startsAt = CarbonImmutable::parse($shiftDate->toDateString() . ' ' . $shiftTemplate->starts_at);
-    $endsAt = CarbonImmutable::parse($shiftDate->toDateString() . ' ' . $shiftTemplate->ends_at);
+    $startsAt = CarbonImmutable::parse($shiftDate->toDateString().' '.$shiftTemplate->starts_at);
+    $endsAt = CarbonImmutable::parse($shiftDate->toDateString().' '.$shiftTemplate->ends_at);
 
     if ($endsAt->lessThanOrEqualTo($startsAt)) {
         $endsAt = $endsAt->addDay();
@@ -268,7 +268,116 @@ it('returns skipped entries when no candidate is available', function (): void {
     expect($result->createdShifts)->toBe(0)
         ->and($result->hasSkipped())->toBeTrue()
         ->and($result->skipped[0]['code'])->toBe('no_candidate')
-        ->and($result->skipped[0]['context']['needSpecialist'])->toBeFalse();
+        ->and($result->skipped[0]['context']['needSpecialist'])->toBeFalse()
+        ->and($result->skipped[0]['context']['reason'])->toBe('no_available_employee');
+});
+
+it('avoids early shift after a late previous day for the same employee', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $restConflictEmployee = createRosterGeneratorEmployee($location, [], ['name' => 'Anna Konflikt']);
+    $availableEmployee = createRosterGeneratorEmployee($location, [], ['name' => 'Berta Frei']);
+    $roster = createRosterGeneratorRoster($location, $pdl);
+    $earlyShiftTemplate = createRosterGeneratorShiftTemplate($location);
+    $lateShiftTemplate = createRosterGeneratorShiftTemplate($location, [
+        'name' => 'Spätdienst',
+        'code' => 'late',
+        'starts_at' => '14:00',
+        'ends_at' => '22:00',
+        'active' => false,
+    ]);
+    createRosterGeneratorStaffingRule($earlyShiftTemplate, ['weekday' => 6]);
+    createRosterGeneratorShift($roster, $restConflictEmployee, $lateShiftTemplate, '2027-01-01');
+    createRosterGeneratorShift($roster, $availableEmployee, $earlyShiftTemplate, '2027-01-31');
+
+    app(RosterGeneratorService::class)->generate($roster);
+
+    $generatedShift = Shift::query()
+        ->where('roster_id', $roster->id)
+        ->where('shift_template_id', $earlyShiftTemplate->id)
+        ->whereDate('date', '2027-01-02')
+        ->firstOrFail();
+
+    expect($generatedShift->user_id)->toBe($availableEmployee->id);
+});
+
+it('avoids late shift before an early next day for the same employee', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $restConflictEmployee = createRosterGeneratorEmployee($location, [], ['name' => 'Anna Konflikt']);
+    $availableEmployee = createRosterGeneratorEmployee($location, [], ['name' => 'Berta Frei']);
+    $roster = createRosterGeneratorRoster($location, $pdl);
+    $lateShiftTemplate = createRosterGeneratorShiftTemplate($location, [
+        'name' => 'Spätdienst',
+        'code' => 'late',
+        'starts_at' => '14:00',
+        'ends_at' => '22:00',
+    ]);
+    $earlyShiftTemplate = createRosterGeneratorShiftTemplate($location, [
+        'active' => false,
+    ]);
+    createRosterGeneratorStaffingRule($lateShiftTemplate, ['weekday' => 6]);
+    createRosterGeneratorShift($roster, $restConflictEmployee, $earlyShiftTemplate, '2027-01-03');
+    createRosterGeneratorShift($roster, $availableEmployee, $earlyShiftTemplate, '2027-01-31');
+
+    app(RosterGeneratorService::class)->generate($roster);
+
+    $generatedShift = Shift::query()
+        ->where('roster_id', $roster->id)
+        ->where('shift_template_id', $lateShiftTemplate->id)
+        ->whereDate('date', '2027-01-02')
+        ->firstOrFail();
+
+    expect($generatedShift->user_id)->toBe($availableEmployee->id);
+});
+
+it('returns no candidate when the only employee would violate rest time', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $employee = createRosterGeneratorEmployee($location);
+    $roster = createRosterGeneratorRoster($location, $pdl);
+    $earlyShiftTemplate = createRosterGeneratorShiftTemplate($location);
+    $lateShiftTemplate = createRosterGeneratorShiftTemplate($location, [
+        'name' => 'Spätdienst',
+        'code' => 'late',
+        'starts_at' => '14:00',
+        'ends_at' => '22:00',
+        'active' => false,
+    ]);
+    createRosterGeneratorStaffingRule($earlyShiftTemplate, ['weekday' => 6]);
+    createRosterGeneratorShift($roster, $employee, $lateShiftTemplate, '2027-01-01');
+
+    $result = app(RosterGeneratorService::class)->generate($roster);
+
+    $skippedForTargetDate = collect($result->skipped)->firstWhere('context.date', '2027-01-02');
+
+    expect(Shift::query()
+        ->where('roster_id', $roster->id)
+        ->where('shift_template_id', $earlyShiftTemplate->id)
+        ->whereDate('date', '2027-01-02')
+        ->exists())->toBeFalse()
+        ->and($skippedForTargetDate['code'])->toBe('no_candidate')
+        ->and($skippedForTargetDate['context']['reason'])->toBe('no_available_employee');
+});
+
+it('allows shifts when the required rest time is met', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $employee = createRosterGeneratorEmployee($location);
+    $roster = createRosterGeneratorRoster($location, $pdl);
+    $earlyShiftTemplate = createRosterGeneratorShiftTemplate($location);
+    createRosterGeneratorStaffingRule($earlyShiftTemplate, ['weekday' => 6]);
+    createRosterGeneratorShift($roster, $employee, $earlyShiftTemplate, '2027-01-01');
+
+    app(RosterGeneratorService::class)->generate($roster);
+
+    $generatedShift = Shift::query()
+        ->where('roster_id', $roster->id)
+        ->where('shift_template_id', $earlyShiftTemplate->id)
+        ->whereDate('date', '2027-01-02')
+        ->firstOrFail();
+
+    expect($generatedShift->user_id)->toBe($employee->id);
 });
 
 it('roughly distributes by current shift count', function (): void {

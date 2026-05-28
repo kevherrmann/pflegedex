@@ -17,9 +17,9 @@ use Illuminate\Validation\ValidationException;
 
 class RosterGeneratorService
 {
-    public function __construct(private readonly RosterDateService $rosterDateService)
-    {
-    }
+    private const REQUIRED_REST_MINUTES = 660;
+
+    public function __construct(private readonly RosterDateService $rosterDateService) {}
 
     public function generate(Roster $roster): RosterGenerationResult
     {
@@ -29,7 +29,7 @@ class RosterGeneratorService
             ]);
         }
 
-        $result = new RosterGenerationResult();
+        $result = new RosterGenerationResult;
 
         $roster->load(['location']);
 
@@ -80,7 +80,6 @@ class RosterGeneratorService
         return $result;
     }
 
-
     public function deleteAutoShifts(Roster $roster): RosterGenerationResult
     {
         if (! $roster->isEditable()) {
@@ -89,7 +88,7 @@ class RosterGeneratorService
             ]);
         }
 
-        $result = new RosterGenerationResult();
+        $result = new RosterGenerationResult;
 
         $deletedAutoShifts = Shift::query()
             ->where('roster_id', $roster->id)
@@ -120,6 +119,7 @@ class RosterGeneratorService
                     'shiftTemplateId' => $shiftTemplate->id,
                     'shiftTemplateCode' => $shiftTemplate->code,
                     'needSpecialist' => true,
+                    'reason' => 'no_available_specialist',
                 ]);
 
                 return;
@@ -149,6 +149,7 @@ class RosterGeneratorService
                     'shiftTemplateId' => $shiftTemplate->id,
                     'shiftTemplateCode' => $shiftTemplate->code,
                     'needSpecialist' => false,
+                    'reason' => 'no_available_employee',
                 ]);
 
                 return;
@@ -169,13 +170,14 @@ class RosterGeneratorService
         bool $needSpecialist,
     ): ?User {
         return $this->sortedCandidates($employees, $roster)
-            ->first(function (User $employee) use ($shiftTemplate, $date, $startsAt, $endsAt, $needSpecialist): bool {
+            ->first(function (User $employee) use ($roster, $shiftTemplate, $date, $startsAt, $endsAt, $needSpecialist): bool {
                 if ($needSpecialist && ! ($employee->employeeProfile?->is_nursing_specialist ?? false)) {
                     return false;
                 }
 
                 return $this->employeeCanWorkShiftTemplate($employee, $shiftTemplate)
                     && ! $this->employeeHasApprovedAbsenceOverlap($employee, $startsAt, $endsAt)
+                    && ! $this->employeeHasRestConflict($employee, $roster, $startsAt, $endsAt)
                     && ! $this->employeeAlreadyAssigned($employee, $shiftTemplate, $date->toDateString());
             });
     }
@@ -251,6 +253,34 @@ class RosterGeneratorService
             ->whereDate('starts_on', '<=', $endsAt->toDateString())
             ->whereDate('ends_on', '>=', $startsAt->toDateString())
             ->exists();
+    }
+
+    private function employeeHasRestConflict(
+        User $employee,
+        Roster $roster,
+        CarbonImmutable $startsAt,
+        CarbonImmutable $endsAt,
+    ): bool {
+        $existingShifts = Shift::query()
+            ->where('roster_id', $roster->id)
+            ->where('user_id', $employee->id)
+            ->get(['id', 'starts_at', 'ends_at']);
+
+        foreach ($existingShifts as $existingShift) {
+            if ($existingShift->ends_at->lessThanOrEqualTo($startsAt)) {
+                $restMinutes = $existingShift->ends_at->diffInMinutes($startsAt, false);
+            } elseif ($endsAt->lessThanOrEqualTo($existingShift->starts_at)) {
+                $restMinutes = $endsAt->diffInMinutes($existingShift->starts_at, false);
+            } else {
+                return true;
+            }
+
+            if ($restMinutes < self::REQUIRED_REST_MINUTES) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function employeeAlreadyAssigned(User $employee, ShiftTemplate $shiftTemplate, string $date): bool
