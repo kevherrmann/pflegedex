@@ -19,6 +19,8 @@ class RosterGeneratorService
 {
     private const REQUIRED_REST_MINUTES = 660;
 
+    private const MAX_ALLOWED_CONSECUTIVE_WORK_DAYS = 6;
+
     public function __construct(private readonly RosterDateService $rosterDateService) {}
 
     public function generate(Roster $roster): RosterGenerationResult
@@ -178,6 +180,7 @@ class RosterGeneratorService
                 return $this->employeeCanWorkShiftTemplate($employee, $shiftTemplate)
                     && ! $this->employeeHasApprovedAbsenceOverlap($employee, $startsAt, $endsAt)
                     && ! $this->employeeHasRestConflict($employee, $roster, $startsAt, $endsAt)
+                    && ! $this->employeeWouldExceedConsecutiveWorkDays($employee, $roster, $date)
                     && ! $this->employeeAlreadyAssigned($employee, $shiftTemplate, $date->toDateString());
             });
     }
@@ -281,6 +284,41 @@ class RosterGeneratorService
         }
 
         return false;
+    }
+
+    private function employeeWouldExceedConsecutiveWorkDays(
+        User $employee,
+        Roster $roster,
+        CarbonImmutable $date,
+    ): bool {
+        $workDays = Shift::query()
+            ->where('roster_id', $roster->id)
+            ->where('user_id', $employee->id)
+            ->pluck('date')
+            ->map(fn ($workDate): string => CarbonImmutable::parse($workDate)->toDateString())
+            ->push($date->toDateString())
+            ->unique()
+            ->sort()
+            ->values();
+
+        $longestSequence = 0;
+        $currentSequence = 0;
+        $previousWorkDay = null;
+
+        foreach ($workDays as $workDay) {
+            $currentWorkDay = CarbonImmutable::parse($workDay)->startOfDay();
+
+            if ($previousWorkDay !== null && $currentWorkDay->equalTo($previousWorkDay->addDay())) {
+                $currentSequence++;
+            } else {
+                $currentSequence = 1;
+            }
+
+            $longestSequence = max($longestSequence, $currentSequence);
+            $previousWorkDay = $currentWorkDay;
+        }
+
+        return $longestSequence > self::MAX_ALLOWED_CONSECUTIVE_WORK_DAYS;
     }
 
     private function employeeAlreadyAssigned(User $employee, ShiftTemplate $shiftTemplate, string $date): bool

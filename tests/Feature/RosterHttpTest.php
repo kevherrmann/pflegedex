@@ -107,8 +107,8 @@ function createRosterHttpShift(
     string $date,
 ): Shift {
     $shiftDate = CarbonImmutable::parse($date)->startOfDay();
-    $startsAt = CarbonImmutable::parse($shiftDate->toDateString() . ' ' . $shiftTemplate->starts_at);
-    $endsAt = CarbonImmutable::parse($shiftDate->toDateString() . ' ' . $shiftTemplate->ends_at);
+    $startsAt = CarbonImmutable::parse($shiftDate->toDateString().' '.$shiftTemplate->starts_at);
+    $endsAt = CarbonImmutable::parse($shiftDate->toDateString().' '.$shiftTemplate->ends_at);
 
     if ($endsAt->lessThanOrEqualTo($startsAt)) {
         $endsAt = $endsAt->addDay();
@@ -745,7 +745,6 @@ it('flashes red status for a validation result with errors', function (): void {
             && count($result['errors']) > 0);
 });
 
-
 it('shows only rosters from the PDL Wohnbereich', function (): void {
     $location = Location::factory()->create(['name' => 'Wohnbereich A']);
     $otherLocation = Location::factory()->create(['name' => 'Wohnbereich B']);
@@ -829,7 +828,8 @@ it('blocks PDL users from changing or validating rosters from another Wohnbereic
 it('lets PDL users generate their own roster', function (): void {
     $location = Location::factory()->create();
     $pdl = createRosterHttpUser('PDL', $location);
-    createRosterHttpEmployee($location);
+    createRosterHttpEmployee($location, [], ['name' => 'Anna Pflege']);
+    createRosterHttpEmployee($location, [], ['name' => 'Berta Pflege']);
     $roster = createRosterHttpRoster($location, $pdl);
     $shiftTemplate = createRosterHttpShiftTemplate($location);
     createRosterHttpStaffingRule($shiftTemplate);
