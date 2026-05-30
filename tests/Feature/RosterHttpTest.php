@@ -842,10 +842,36 @@ it('lets PDL users generate their own roster', function (): void {
         ->assertSessionHas('status', 'roster-generated')
         ->assertSessionHas('rosterGenerationResult', fn (array $result): bool => $result['createdShifts'] === 31
             && $result['deletedAutoShifts'] === 0
-            && $result['skipped'] === []);
+            && $result['skipped'] === [])
+        ->assertSessionHas('rosterValidationResult', fn (array $result): bool => $result['rosterId'] === $roster->id
+            && in_array($result['status'], ['green', 'yellow', 'red'], true)
+            && array_key_exists('errors', $result)
+            && array_key_exists('warnings', $result));
 
     expect(Shift::query()->where('roster_id', $roster->id)->count())->toBe(31)
         ->and(Shift::query()->where('source', ShiftSource::Auto->value)->count())->toBe(31);
+});
+
+it('validates freshly generated shifts after generating a roster', function (): void {
+    $location = Location::factory()->create();
+    $pdl = createRosterHttpUser('PDL', $location);
+    createRosterHttpEmployee($location, ['weekly_hours' => 80.00], ['name' => 'Anna Pflege']);
+    createRosterHttpEmployee($location, ['weekly_hours' => 80.00], ['name' => 'Berta Pflege']);
+    createRosterHttpEmployee($location, ['weekly_hours' => 80.00], ['name' => 'Clara Pflege']);
+    $roster = createRosterHttpRoster($location, $pdl);
+    $shiftTemplate = createRosterHttpShiftTemplate($location);
+    createRosterHttpStaffingRule($shiftTemplate, [
+        'required_total_staff' => 1,
+        'required_specialists' => 0,
+    ]);
+
+    $this->actingAs($pdl)
+        ->from("/rosters/{$roster->id}")
+        ->post("/rosters/{$roster->id}/generate")
+        ->assertRedirect("/rosters/{$roster->id}")
+        ->assertSessionHas('rosterGenerationResult', fn (array $result): bool => $result['createdShifts'] > 0)
+        ->assertSessionHas('rosterValidationResult', fn (array $result): bool => collect($result['errors'])
+            ->doesntContain(fn (array $error): bool => $error['code'] === 'understaffed_shift'));
 });
 
 it('blocks PDL users from generating rosters from another Wohnbereich', function (): void {

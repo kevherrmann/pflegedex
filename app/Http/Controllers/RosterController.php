@@ -12,6 +12,7 @@ use App\Services\Rosters\PdlRosterAccess;
 use App\Services\Rosters\RosterGeneratorService;
 use App\Services\Rosters\RosterService;
 use App\Services\Rosters\RosterValidator;
+use App\Services\Rosters\RosterValidationResult;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -115,14 +116,7 @@ class RosterController extends Controller
 
         return back()
             ->with('status', 'roster-validated')
-            ->with('rosterValidationResult', [
-                'rosterId' => $roster->id,
-                'status' => $result->isRed()
-                    ? 'red'
-                    : ($result->isYellow() ? 'yellow' : 'green'),
-                'errors' => $result->errors,
-                'warnings' => $result->warnings,
-            ]);
+            ->with('rosterValidationResult', $this->validationFlashPayload($roster, $result));
     }
 
     public function generate(
@@ -130,10 +124,13 @@ class RosterController extends Controller
         Roster $roster,
         PdlRosterAccess $pdlRosterAccess,
         RosterGeneratorService $generator,
+        RosterValidator $rosterValidator,
     ): RedirectResponse {
         $pdlRosterAccess->ensurePdlCanAccessLocation($request, $roster->location_id);
 
         $result = $generator->generate($roster);
+        $roster->refresh();
+        $validationResult = $rosterValidator->validate($roster);
 
         return back()
             ->with('status', 'roster-generated')
@@ -141,7 +138,8 @@ class RosterController extends Controller
                 'createdShifts' => $result->createdShifts,
                 'deletedAutoShifts' => $result->deletedAutoShifts,
                 'skipped' => $result->skipped,
-            ]);
+            ])
+            ->with('rosterValidationResult', $this->validationFlashPayload($roster, $validationResult));
     }
 
     public function deleteAutoShifts(
@@ -161,6 +159,18 @@ class RosterController extends Controller
                 'deletedAutoShifts' => $result->deletedAutoShifts,
                 'skipped' => $result->skipped,
             ]);
+    }
+
+    private function validationFlashPayload(Roster $roster, RosterValidationResult $result): array
+    {
+        return [
+            'rosterId' => $roster->id,
+            'status' => $result->isRed()
+                ? 'red'
+                : ($result->isYellow() ? 'yellow' : 'green'),
+            'errors' => $result->errors,
+            'warnings' => $result->warnings,
+        ];
     }
 
     private function locations(string $locationId): Collection
