@@ -372,10 +372,40 @@ class RosterGeneratorService
 
         return $employees
             ->sortBy([
+                function (User $employee) use ($roster, $shiftStats): int {
+                    $plannedMinutes = (int) ($shiftStats[$employee->id]['planned_minutes'] ?? 0);
+
+                    return $this->utilizationPermille(
+                        $plannedMinutes,
+                        $this->targetMinutesForEmployee($employee, $roster),
+                    );
+                },
                 fn (User $employee): int => (int) ($shiftStats[$employee->id]['planned_minutes'] ?? 0),
                 fn (User $employee): int => (int) ($shiftStats[$employee->id]['shifts_count'] ?? 0),
                 fn (User $employee): string => $employee->name,
             ])
             ->values();
+    }
+
+    private function targetMinutesForEmployee(User $employee, Roster $roster): int
+    {
+        $weeklyHours = $employee->employeeProfile?->weekly_hours;
+
+        if ($weeklyHours === null || (float) $weeklyHours <= 0) {
+            return 0;
+        }
+
+        $daysInMonth = CarbonImmutable::create($roster->year, $roster->month, 1)->daysInMonth;
+
+        return (int) round((float) $weeklyHours * 60 / 7 * $daysInMonth);
+    }
+
+    private function utilizationPermille(int $plannedMinutes, int $targetMinutes): int
+    {
+        if ($targetMinutes <= 0) {
+            return 1000000;
+        }
+
+        return (int) round($plannedMinutes * 1000 / $targetMinutes);
     }
 }
