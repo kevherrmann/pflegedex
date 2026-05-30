@@ -706,24 +706,180 @@ it('counts auto shifts created earlier in the same generator run for weekend loa
         ->and($skippedForThirdWeekend['context']['reason'])->toBe('no_available_employee');
 });
 
-it('roughly distributes by current shift count', function (): void {
+it('roughly distributes by planned minutes', function (): void {
     $location = Location::factory()->create();
     $pdl = User::factory()->for($location)->create();
-    $alreadyPlanned = createRosterGeneratorEmployee($location, [], ['name' => 'Anna Viele']);
-    $lessPlanned = createRosterGeneratorEmployee($location, [], ['name' => 'Berta Wenige']);
+    $longPlanned = createRosterGeneratorEmployee($location, [], ['name' => 'Anna Lang']);
+    $shortPlanned = createRosterGeneratorEmployee($location, [], ['name' => 'Berta Kurz']);
     $roster = createRosterGeneratorRoster($location, $pdl);
-    $shiftTemplate = createRosterGeneratorShiftTemplate($location);
-    createRosterGeneratorStaffingRule($shiftTemplate);
-    createRosterGeneratorShift($roster, $alreadyPlanned, $shiftTemplate, '2027-01-02');
+    $longShiftTemplate = createRosterGeneratorShiftTemplate($location, [
+        'name' => 'Langer Dienst',
+        'code' => 'long_existing',
+        'starts_at' => '06:00',
+        'ends_at' => '14:00',
+        'duration_minutes' => 480,
+        'active' => false,
+    ]);
+    $shortShiftTemplate = createRosterGeneratorShiftTemplate($location, [
+        'name' => 'Kurzer Dienst',
+        'code' => 'short_existing',
+        'starts_at' => '06:00',
+        'ends_at' => '07:00',
+        'duration_minutes' => 60,
+        'active' => false,
+    ]);
+    $targetShiftTemplate = createRosterGeneratorShiftTemplate($location, [
+        'name' => 'Zieldienst',
+        'code' => 'target_planned_minutes',
+    ]);
+    createRosterGeneratorStaffingRule($targetShiftTemplate, ['weekday' => 2]);
+    createRosterGeneratorShift($roster, $longPlanned, $longShiftTemplate, '2027-01-01');
+    createRosterGeneratorShift($roster, $shortPlanned, $shortShiftTemplate, '2027-01-01');
 
     app(RosterGeneratorService::class)->generate($roster);
 
-    $firstDayShift = Shift::query()
+    $targetShift = Shift::query()
         ->where('roster_id', $roster->id)
-        ->whereDate('date', '2027-01-01')
+        ->where('shift_template_id', $targetShiftTemplate->id)
+        ->whereDate('date', '2027-01-05')
         ->firstOrFail();
 
-    expect($firstDayShift->user_id)->toBe($lessPlanned->id);
+    expect($targetShift->user_id)->toBe($shortPlanned->id);
+});
+
+it('prefers fewer shifts when planned minutes are equal', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $moreShifts = createRosterGeneratorEmployee($location, [], ['name' => 'Anna Mehr']);
+    $fewerShifts = createRosterGeneratorEmployee($location, [], ['name' => 'Berta Weniger']);
+    $roster = createRosterGeneratorRoster($location, $pdl);
+    $shortShiftTemplate = createRosterGeneratorShiftTemplate($location, [
+        'name' => 'Kurzer Dienst',
+        'code' => 'short_equal_minutes',
+        'starts_at' => '06:00',
+        'ends_at' => '07:00',
+        'duration_minutes' => 60,
+        'active' => false,
+    ]);
+    $mediumShiftTemplate = createRosterGeneratorShiftTemplate($location, [
+        'name' => 'Mittlerer Dienst',
+        'code' => 'medium_equal_minutes',
+        'starts_at' => '06:00',
+        'ends_at' => '08:00',
+        'duration_minutes' => 120,
+        'active' => false,
+    ]);
+    $targetShiftTemplate = createRosterGeneratorShiftTemplate($location, [
+        'name' => 'Zieldienst',
+        'code' => 'target_shift_count_tie',
+    ]);
+    createRosterGeneratorStaffingRule($targetShiftTemplate, ['weekday' => 2]);
+    createRosterGeneratorShift($roster, $moreShifts, $shortShiftTemplate, '2027-01-01');
+    createRosterGeneratorShift($roster, $moreShifts, $shortShiftTemplate, '2027-01-02');
+    createRosterGeneratorShift($roster, $fewerShifts, $mediumShiftTemplate, '2027-01-01');
+
+    app(RosterGeneratorService::class)->generate($roster);
+
+    $targetShift = Shift::query()
+        ->where('roster_id', $roster->id)
+        ->where('shift_template_id', $targetShiftTemplate->id)
+        ->whereDate('date', '2027-01-05')
+        ->firstOrFail();
+
+    expect($targetShift->user_id)->toBe($fewerShifts->id);
+});
+
+it('sorts by name when planned minutes and shift count are equal', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $anna = createRosterGeneratorEmployee($location, [], ['name' => 'Anna Pflege']);
+    createRosterGeneratorEmployee($location, [], ['name' => 'Berta Pflege']);
+    $roster = createRosterGeneratorRoster($location, $pdl);
+    $targetShiftTemplate = createRosterGeneratorShiftTemplate($location, [
+        'name' => 'Zieldienst',
+        'code' => 'target_name_tie',
+    ]);
+    createRosterGeneratorStaffingRule($targetShiftTemplate, ['weekday' => 2]);
+
+    app(RosterGeneratorService::class)->generate($roster);
+
+    $targetShift = Shift::query()
+        ->where('roster_id', $roster->id)
+        ->where('shift_template_id', $targetShiftTemplate->id)
+        ->whereDate('date', '2027-01-05')
+        ->firstOrFail();
+
+    expect($targetShift->user_id)->toBe($anna->id);
+});
+
+it('counts auto shifts created earlier in the same generator run for planned minutes', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $anna = createRosterGeneratorEmployee($location, [], ['name' => 'Anna Pflege']);
+    $berta = createRosterGeneratorEmployee($location, [], ['name' => 'Berta Pflege']);
+    $roster = createRosterGeneratorRoster($location, $pdl);
+    $targetShiftTemplate = createRosterGeneratorShiftTemplate($location, [
+        'name' => 'Zieldienst',
+        'code' => 'target_run_minutes',
+    ]);
+    createRosterGeneratorStaffingRule($targetShiftTemplate, ['weekday' => 2]);
+
+    app(RosterGeneratorService::class)->generate($roster);
+
+    $firstTargetShift = Shift::query()
+        ->where('roster_id', $roster->id)
+        ->where('shift_template_id', $targetShiftTemplate->id)
+        ->whereDate('date', '2027-01-05')
+        ->firstOrFail();
+    $secondTargetShift = Shift::query()
+        ->where('roster_id', $roster->id)
+        ->where('shift_template_id', $targetShiftTemplate->id)
+        ->whereDate('date', '2027-01-12')
+        ->firstOrFail();
+
+    expect($firstTargetShift->user_id)->toBe($anna->id)
+        ->and($secondTargetShift->user_id)->toBe($berta->id);
+});
+
+it('counts overnight shift minutes correctly for planned minutes', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $nightPlanned = createRosterGeneratorEmployee($location, [], ['name' => 'Anna Nacht']);
+    $shortPlanned = createRosterGeneratorEmployee($location, [], ['name' => 'Berta Kurz']);
+    $roster = createRosterGeneratorRoster($location, $pdl);
+    $nightShiftTemplate = createRosterGeneratorShiftTemplate($location, [
+        'name' => 'Nachtdienst',
+        'code' => 'night_existing',
+        'starts_at' => '22:00',
+        'ends_at' => '06:00',
+        'duration_minutes' => 480,
+        'active' => false,
+    ]);
+    $shortShiftTemplate = createRosterGeneratorShiftTemplate($location, [
+        'name' => 'Kurzer Dienst',
+        'code' => 'short_for_night_compare',
+        'starts_at' => '06:00',
+        'ends_at' => '07:00',
+        'duration_minutes' => 60,
+        'active' => false,
+    ]);
+    $targetShiftTemplate = createRosterGeneratorShiftTemplate($location, [
+        'name' => 'Zieldienst',
+        'code' => 'target_overnight_minutes',
+    ]);
+    createRosterGeneratorStaffingRule($targetShiftTemplate, ['weekday' => 2]);
+    createRosterGeneratorShift($roster, $nightPlanned, $nightShiftTemplate, '2027-01-01');
+    createRosterGeneratorShift($roster, $shortPlanned, $shortShiftTemplate, '2027-01-01');
+
+    app(RosterGeneratorService::class)->generate($roster);
+
+    $targetShift = Shift::query()
+        ->where('roster_id', $roster->id)
+        ->where('shift_template_id', $targetShiftTemplate->id)
+        ->whereDate('date', '2027-01-05')
+        ->firstOrFail();
+
+    expect($targetShift->user_id)->toBe($shortPlanned->id);
 });
 
 it('delete auto shifts deletes only auto shifts and keeps manual shifts', function (): void {

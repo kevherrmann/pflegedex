@@ -359,15 +359,21 @@ class RosterGeneratorService
 
     private function sortedCandidates(Collection $employees, Roster $roster): Collection
     {
-        $shiftCounts = Shift::query()
+        $shiftStats = Shift::query()
             ->where('roster_id', $roster->id)
-            ->selectRaw('user_id, count(*) as shifts_count')
+            ->get(['user_id', 'starts_at', 'ends_at'])
             ->groupBy('user_id')
-            ->pluck('shifts_count', 'user_id');
+            ->map(fn (Collection $shifts): array => [
+                'planned_minutes' => (int) $shifts->sum(
+                    fn (Shift $shift): int => (int) $shift->starts_at->diffInMinutes($shift->ends_at, true),
+                ),
+                'shifts_count' => $shifts->count(),
+            ]);
 
         return $employees
             ->sortBy([
-                fn (User $employee): int => (int) ($shiftCounts[$employee->id] ?? 0),
+                fn (User $employee): int => (int) ($shiftStats[$employee->id]['planned_minutes'] ?? 0),
+                fn (User $employee): int => (int) ($shiftStats[$employee->id]['shifts_count'] ?? 0),
                 fn (User $employee): string => $employee->name,
             ])
             ->values();
