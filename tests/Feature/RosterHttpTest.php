@@ -982,6 +982,46 @@ it('lets PDL users delete auto shifts in their own roster', function (): void {
         ->and($manualShift->refresh()->source)->toBe(ShiftSource::Manual);
 });
 
+it('keeps an auto shift after it was edited and auto shifts are reset', function (): void {
+    $location = Location::factory()->create();
+    $pdl = createRosterHttpUser('PDL', $location);
+    $employee = createRosterHttpEmployee($location);
+    $roster = createRosterHttpRoster($location, $pdl);
+    $shiftTemplate = createRosterHttpShiftTemplate($location);
+    $shift = createRosterHttpShift(
+        $roster,
+        $employee,
+        $shiftTemplate,
+        '2027-01-10',
+        ShiftSource::Auto,
+    );
+
+    $this->actingAs($pdl)
+        ->from("/rosters/{$roster->id}")
+        ->patch("/rosters/{$roster->id}/shifts/{$shift->id}", [
+            'user_id' => $employee->id,
+            'shift_template_id' => $shiftTemplate->id,
+            'date' => '2027-01-10',
+            'note' => 'Manuell gesichert',
+        ])
+        ->assertRedirect("/rosters/{$roster->id}")
+        ->assertSessionHas('status', 'shift-updated');
+
+    expect($shift->refresh()->source)->toBe(ShiftSource::Manual);
+
+    $this->actingAs($pdl)
+        ->from("/rosters/{$roster->id}")
+        ->delete("/rosters/{$roster->id}/auto-shifts")
+        ->assertRedirect("/rosters/{$roster->id}")
+        ->assertSessionHas('status', 'roster-auto-shifts-deleted')
+        ->assertSessionHas('rosterGenerationResult', fn (array $result): bool => $result['createdShifts'] === 0
+            && $result['deletedAutoShifts'] === 0
+            && $result['skipped'] === []);
+
+    expect(Shift::query()->whereKey($shift->id)->exists())->toBeTrue()
+        ->and($shift->refresh()->source)->toBe(ShiftSource::Manual);
+});
+
 it('blocks PDL users from deleting auto shifts in another Wohnbereich', function (): void {
     $location = Location::factory()->create();
     $otherLocation = Location::factory()->create();

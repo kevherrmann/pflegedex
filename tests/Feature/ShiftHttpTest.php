@@ -530,6 +530,42 @@ it('lets PDL users update a shift through http', function (): void {
         ->and($shift->source)->toBe(ShiftSource::Manual);
 });
 
+it('turns an auto shift into a manual shift when updated through http', function (): void {
+    $pdl = createShiftHttpUser('PDL');
+    $location = Location::factory()->create();
+    $employee = createShiftHttpEmployee($location);
+    $roster = createShiftHttpRoster($location, $pdl);
+    $shiftTemplate = createShiftHttpShiftTemplate($location);
+    $shift = createShiftHttpShift($roster, $employee, $shiftTemplate, [
+        'source' => ShiftSource::Auto,
+        'note' => 'Auto geplant',
+    ]);
+
+    $this->actingAs($pdl)
+        ->from('/rosters')
+        ->patch("/rosters/{$roster->id}/shifts/{$shift->id}", [
+            'user_id' => $employee->id,
+            'shift_template_id' => $shiftTemplate->id,
+            'date' => '2027-01-10',
+            'note' => 'Manuell angepasst',
+        ])
+        ->assertRedirect('/rosters')
+        ->assertSessionHas('status', 'shift-updated');
+
+    expect($shift->refresh()->source)->toBe(ShiftSource::Manual);
+
+    $this->actingAs($pdl)
+        ->get("/rosters/{$roster->id}")
+        ->assertOk()
+        ->assertInertia(
+            fn (Assert $page) => $page
+                ->component('Rosters/Show')
+                ->where('roster.shifts.0.id', $shift->id)
+                ->where('roster.shifts.0.source', 'manual')
+                ->where('roster.shifts.0.sourceLabel', 'Manuell')
+        );
+});
+
 it('blocks non PDL users from updating shifts', function (): void {
     $user = createShiftHttpUser('Pflegekraft');
     $location = Location::factory()->create();
