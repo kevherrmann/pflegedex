@@ -365,6 +365,30 @@ function buildValidationDayIndex(
     return dayIndex;
 }
 
+function buildGenerationSkippedDayIndex(
+    generationResult: RosterGenerationResult | null,
+): Record<string, GenerationSkippedEntry[]> {
+    if (generationResult === null) {
+        return {};
+    }
+
+    return generationResult.skipped.reduce<Record<string, GenerationSkippedEntry[]>>(
+        (dayIndex, entry) => {
+            const date = entry.context.date;
+
+            if (typeof date !== 'string') {
+                return dayIndex;
+            }
+
+            dayIndex[date] ??= [];
+            dayIndex[date].push(entry);
+
+            return dayIndex;
+        },
+        {},
+    );
+}
+
 function buildValidationUserIndex(
     validationResult: RosterValidationResult | null,
     rosterId: string,
@@ -407,13 +431,18 @@ function MonthOverview({
     calendarDays,
     validationResult,
     rosterId,
+    rosterGenerationResult,
 }: {
     calendarDays: CalendarDay[];
     validationResult: RosterValidationResult | null;
     rosterId: string;
+    rosterGenerationResult: RosterGenerationResult | null;
 }) {
     const [filter, setFilter] = useState<MonthOverviewFilter>('all');
     const validationDayIndex = buildValidationDayIndex(validationResult, rosterId);
+    const generationSkippedDayIndex = buildGenerationSkippedDayIndex(
+        rosterGenerationResult,
+    );
 
     const filterOptions: Array<{
         value: MonthOverviewFilter;
@@ -443,8 +472,14 @@ function MonthOverview({
         {
             value: 'with-validation',
             label: 'Mit Problemen',
-            count: calendarDays.filter((day) => Boolean(validationDayIndex[day.date]))
-                .length,
+            count: calendarDays.filter((day) => {
+                const hasValidationProblem = Boolean(validationDayIndex[day.date]);
+                const hasGenerationSkipped = Boolean(
+                    generationSkippedDayIndex[day.date]?.length,
+                );
+
+                return hasValidationProblem || hasGenerationSkipped;
+            }).length,
         },
     ];
 
@@ -462,7 +497,12 @@ function MonthOverview({
         }
 
         if (filter === 'with-validation') {
-            return Boolean(validationDayIndex[day.date]);
+            const hasValidationProblem = Boolean(validationDayIndex[day.date]);
+            const hasGenerationSkipped = Boolean(
+                generationSkippedDayIndex[day.date]?.length,
+            );
+
+            return hasValidationProblem || hasGenerationSkipped;
         }
 
         return true;
@@ -510,19 +550,34 @@ function MonthOverview({
                             validationEntries.length - visibleValidationEntries.length,
                             0,
                         );
+                        const generationSkippedEntries =
+                            generationSkippedDayIndex[day.date] ?? [];
+                        const visibleGenerationSkippedEntries =
+                            generationSkippedEntries.slice(0, 3);
+                        const hiddenGenerationSkippedCount = Math.max(
+                            generationSkippedEntries.length -
+                                visibleGenerationSkippedEntries.length,
+                            0,
+                        );
+                        const hasGenerationSkipped = generationSkippedEntries.length > 0;
                         const cardClassName = hasValidationError
                             ? 'border-red-300 bg-red-50/50 text-gray-900 ring-1 ring-red-200 shadow-sm'
                             : hasValidationWarning
                               ? 'border-amber-300 bg-amber-50/50 text-gray-900 ring-1 ring-amber-200 shadow-sm'
-                              : hasShifts
-                                ? 'border-gray-300 bg-white shadow-sm'
-                                : 'border-gray-100 bg-gray-50/70 text-gray-500';
+                              : hasGenerationSkipped
+                                ? 'border-amber-200 bg-amber-50/20 text-gray-900 ring-1 ring-amber-100 shadow-sm'
+                                : hasShifts
+                                  ? 'border-gray-300 bg-white shadow-sm'
+                                  : 'border-gray-100 bg-gray-50/70 text-gray-500';
 
                         return (
                             <div
                                 key={day.date}
                                 className={`rounded-md border p-3 transition ${cardClassName} ${
-                                    weekend && !hasValidationError && !hasValidationWarning
+                                    weekend &&
+                                    !hasValidationError &&
+                                    !hasValidationWarning &&
+                                    !hasGenerationSkipped
                                         ? 'ring-1 ring-[#9B1C3B]/15'
                                         : ''
                                 }`}
@@ -531,7 +586,7 @@ function MonthOverview({
                                     <div>
                                         <h4
                                             className={`text-sm font-semibold ${
-                                                hasShifts || dayValidation
+                                                hasShifts || dayValidation || hasGenerationSkipped
                                                     ? 'text-gray-900'
                                                     : 'text-gray-500'
                                             }`}
@@ -627,6 +682,67 @@ function MonthOverview({
                                     </ul>
                                 ) : (
                                     <p className="mt-3 text-xs">Keine Dienste</p>
+                                )}
+
+                                {hasGenerationSkipped && (
+                                    <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+                                        <p className="font-semibold">
+                                            Automatisch nicht besetzt
+                                        </p>
+                                        <ul className="mt-2 space-y-1.5">
+                                            {visibleGenerationSkippedEntries.map(
+                                                (entry, index) => {
+                                                    const shiftTemplateCodeValue =
+                                                        entry.context.shiftTemplateCode;
+                                                    const shiftTemplateCode =
+                                                        typeof shiftTemplateCodeValue ===
+                                                            'string' ||
+                                                        typeof shiftTemplateCodeValue ===
+                                                            'number'
+                                                            ? formatGenerationContextValue(
+                                                                  shiftTemplateCodeValue,
+                                                              )
+                                                            : null;
+                                                    const needLabel =
+                                                        generationSkippedNeedLabel(entry);
+
+                                                    return (
+                                                        <li
+                                                            key={`${entry.code}-${index}`}
+                                                            className="rounded bg-white/60 px-2 py-1"
+                                                        >
+                                                            <div className="font-medium">
+                                                                {generationSkippedTitle(entry)}
+                                                            </div>
+                                                            {(shiftTemplateCode ||
+                                                                needLabel) && (
+                                                                <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 text-[0.7rem] text-amber-800">
+                                                                    {shiftTemplateCode && (
+                                                                        <span>
+                                                                            Schicht:{' '}
+                                                                            {shiftTemplateCode}
+                                                                        </span>
+                                                                    )}
+                                                                    {needLabel && (
+                                                                        <span>
+                                                                            Bedarf:{' '}
+                                                                            {needLabel}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </li>
+                                                    );
+                                                },
+                                            )}
+                                        </ul>
+                                        {hiddenGenerationSkippedCount > 0 && (
+                                            <p className="mt-2 font-medium">
+                                                + {hiddenGenerationSkippedCount} weitere
+                                                Hinweise
+                                            </p>
+                                        )}
+                                    </div>
                                 )}
                             </div>
                         );
@@ -788,6 +904,18 @@ function generationSkippedTitle(entry: GenerationSkippedEntry): string {
     }
 
     return entry.message;
+}
+
+function generationSkippedNeedLabel(entry: GenerationSkippedEntry): string | null {
+    if (entry.context.needSpecialist === true) {
+        return 'Fachkraft';
+    }
+
+    if (entry.context.needSpecialist === false) {
+        return 'Mitarbeiter';
+    }
+
+    return null;
 }
 
 function formatGenerationReason(value: unknown): string | null {
@@ -1607,6 +1735,7 @@ export default function RosterShow({
                                 calendarDays={calendarDays}
                                 validationResult={rosterValidationResult}
                                 rosterId={roster.id}
+                                rosterGenerationResult={rosterGenerationResult}
                             />
                         </div>
                     </div>
