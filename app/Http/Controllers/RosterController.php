@@ -226,6 +226,12 @@ class RosterController extends Controller
             'employeeName' => $shift->user?->name,
             'shiftTemplateName' => $shift->shiftTemplate?->name,
             'shiftTemplateCode' => $shift->shiftTemplate?->code,
+            'source' => $shift->source->value,
+            'sourceLabel' => match ($shift->source->value) {
+                'auto' => 'Auto',
+                'manual' => 'Manuell',
+                default => $shift->source->value,
+            },
             'note' => $shift->note,
         ];
 

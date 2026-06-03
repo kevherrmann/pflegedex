@@ -36,6 +36,8 @@ type ShiftItem = {
     employeeName: string | null;
     shiftTemplateName: string | null;
     shiftTemplateCode: string | null;
+    source: string;
+    sourceLabel: string;
     note: string | null;
 };
 
@@ -170,6 +172,26 @@ function statusClass(status: string): string {
 
 function isWeekend(day: CalendarDay): boolean {
     return day.weekdayLabel === 'Samstag' || day.weekdayLabel === 'Sonntag';
+}
+
+function shiftSourceClass(source: string): string {
+    if (source === 'auto') {
+        return 'bg-blue-100 text-blue-800';
+    }
+
+    return 'bg-gray-100 text-gray-700';
+}
+
+function ShiftSourceBadge({ shift }: { shift: ShiftItem }) {
+    return (
+        <span
+            className={`inline-flex rounded-full px-2 py-0.5 text-[0.7rem] font-semibold ${shiftSourceClass(
+                shift.source,
+            )}`}
+        >
+            {shift.sourceLabel}
+        </span>
+    );
 }
 
 function shiftBadgeClass(code: string | null): string {
@@ -659,11 +681,14 @@ function MonthOverview({
                                                             shift.shiftTemplateCode ??
                                                             'Unbekannte Schicht'}
                                                     </span>
-                                                    {shift.shiftTemplateCode && (
-                                                        <span className="shrink-0 rounded bg-white/60 px-1.5 py-0.5 font-mono text-[0.65rem] uppercase">
-                                                            {shift.shiftTemplateCode}
-                                                        </span>
-                                                    )}
+                                                    <span className="flex shrink-0 flex-wrap justify-end gap-1">
+                                                        <ShiftSourceBadge shift={shift} />
+                                                        {shift.shiftTemplateCode && (
+                                                            <span className="rounded bg-white/60 px-1.5 py-0.5 font-mono text-[0.65rem] uppercase">
+                                                                {shift.shiftTemplateCode}
+                                                            </span>
+                                                        )}
+                                                    </span>
                                                 </div>
                                                 <div className="mt-1 font-medium">
                                                     {formatTime(shift.startsAt)} bis{' '}
@@ -1574,9 +1599,14 @@ function ShiftList({
                 >
                     <div className="grid gap-2 md:grid-cols-[1fr_1.4fr_1.2fr_2fr_auto] md:items-center">
                         <span className="font-medium text-gray-900">{shift.date}</span>
-                        <span>
-                            {shift.shiftTemplateName ?? 'Unbekannte Schicht'}{' '}
-                            {shift.shiftTemplateCode ? `(${shift.shiftTemplateCode})` : ''}
+                        <span className="flex flex-wrap items-center gap-1.5">
+                            <span>
+                                {shift.shiftTemplateName ?? 'Unbekannte Schicht'}{' '}
+                                {shift.shiftTemplateCode
+                                    ? `(${shift.shiftTemplateCode})`
+                                    : ''}
+                            </span>
+                            <ShiftSourceBadge shift={shift} />
                         </span>
                         <span>{shift.employeeName ?? 'Unbekannt'}</span>
                         <span className="text-gray-500">

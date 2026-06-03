@@ -105,6 +105,7 @@ function createRosterHttpShift(
     User $employee,
     ShiftTemplate $shiftTemplate,
     string $date,
+    ShiftSource $source = ShiftSource::Manual,
 ): Shift {
     $shiftDate = CarbonImmutable::parse($date)->startOfDay();
     $startsAt = CarbonImmutable::parse($shiftDate->toDateString().' '.$shiftTemplate->starts_at);
@@ -122,7 +123,7 @@ function createRosterHttpShift(
         'date' => $shiftDate->toDateString(),
         'starts_at' => $startsAt,
         'ends_at' => $endsAt,
-        'source' => ShiftSource::Manual,
+        'source' => $source,
         'note' => null,
     ]);
 }
@@ -232,7 +233,7 @@ it('passes roster shifts to the roster detail page', function (): void {
     $roster = createRosterHttpRoster($location, $pdl);
     $shiftTemplate = createRosterHttpShiftTemplate($location);
 
-    Shift::query()->create([
+    $manualShift = Shift::query()->create([
         'roster_id' => $roster->id,
         'location_id' => $location->id,
         'user_id' => $employee->id,
@@ -244,19 +245,42 @@ it('passes roster shifts to the roster detail page', function (): void {
         'note' => 'Notiz',
     ]);
 
+    $autoShift = Shift::query()->create([
+        'roster_id' => $roster->id,
+        'location_id' => $location->id,
+        'user_id' => $employee->id,
+        'shift_template_id' => $shiftTemplate->id,
+        'date' => '2027-01-11',
+        'starts_at' => '2027-01-11 06:00:00',
+        'ends_at' => '2027-01-11 14:00:00',
+        'source' => ShiftSource::Auto,
+        'note' => null,
+    ]);
+
     $this->actingAs($pdl)
         ->get("/rosters/{$roster->id}")
         ->assertOk()
         ->assertInertia(
             fn (Assert $page) => $page
                 ->where('roster.id', $roster->id)
+                ->where('roster.shifts.0.id', $manualShift->id)
                 ->where('roster.shifts.0.date', '2027-01-10')
                 ->where('roster.shifts.0.employeeName', $employee->name)
                 ->where('roster.shifts.0.shiftTemplateName', 'Frühdienst')
                 ->where('roster.shifts.0.shiftTemplateCode', 'early')
+                ->where('roster.shifts.0.source', 'manual')
+                ->where('roster.shifts.0.sourceLabel', 'Manuell')
                 ->where('roster.shifts.0.note', 'Notiz')
                 ->has('roster.shifts.0.startsAt')
                 ->has('roster.shifts.0.endsAt')
+                ->where('roster.shifts.1.id', $autoShift->id)
+                ->where('roster.shifts.1.date', '2027-01-11')
+                ->where('roster.shifts.1.source', 'auto')
+                ->where('roster.shifts.1.sourceLabel', 'Auto')
+                ->where('calendarDays.9.shifts.0.source', 'manual')
+                ->where('calendarDays.9.shifts.0.sourceLabel', 'Manuell')
+                ->where('calendarDays.10.shifts.0.source', 'auto')
+                ->where('calendarDays.10.shifts.0.sourceLabel', 'Auto')
         );
 });
 

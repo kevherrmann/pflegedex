@@ -233,6 +233,8 @@ it('passes roster shifts to inertia', function (): void {
                 ->where('roster.shifts.0.employeeName', $employee->name)
                 ->where('roster.shifts.0.shiftTemplateName', 'Frühdienst')
                 ->where('roster.shifts.0.shiftTemplateCode', 'early')
+                ->where('roster.shifts.0.source', 'manual')
+                ->where('roster.shifts.0.sourceLabel', 'Manuell')
                 ->where('roster.shifts.0.note', 'Notiz')
                 ->has('roster.shifts.0.startsAt')
                 ->has('roster.shifts.0.endsAt')
