@@ -57,11 +57,13 @@ type RosterValidationResult = {
 type RosterGenerationResult = {
     createdShifts: number;
     deletedAutoShifts: number;
-    skipped: Array<{
-        code: string;
-        message: string;
-        context: Record<string, unknown>;
-    }>;
+    skipped: GenerationSkippedEntry[];
+};
+
+type GenerationSkippedEntry = {
+    code: string;
+    message: string;
+    context: Record<string, unknown>;
 };
 
 type CalendarDay = {
@@ -753,14 +755,127 @@ function GenerationResult({ result }: { result: RosterGenerationResult | null })
                     <p className="font-medium">
                         Einige Dienste konnten nicht vollständig besetzt werden.
                     </p>
-                    <ul className="mt-2 list-disc space-y-1 pl-5">
+                    <div className="mt-2 space-y-2">
                         {visibleSkipped.map((entry, index) => (
-                            <li key={`${entry.code}-${index}`}>{entry.message}</li>
+                            <GenerationSkippedSummary
+                                key={`${entry.code}-${index}`}
+                                entry={entry}
+                            />
                         ))}
-                        {hiddenSkippedCount > 0 && <li>+ {hiddenSkippedCount} weitere</li>}
-                    </ul>
+                        {hiddenSkippedCount > 0 && (
+                            <p className="text-xs font-medium text-blue-900">
+                                + {hiddenSkippedCount} weitere
+                            </p>
+                        )}
+                    </div>
                 </div>
             )}
+        </div>
+    );
+}
+
+function generationSkippedTitle(entry: GenerationSkippedEntry): string {
+    if (entry.code === 'missing_staffing_rule') {
+        return 'Besetzungsregel fehlt';
+    }
+
+    if (entry.code === 'no_candidate') {
+        if (entry.context.needSpecialist === true) {
+            return 'Keine passende Fachkraft gefunden';
+        }
+
+        return 'Kein passender Mitarbeiter gefunden';
+    }
+
+    return entry.message;
+}
+
+function formatGenerationReason(value: unknown): string | null {
+    if (value === 'no_available_specialist') {
+        return 'Keine verfügbare Fachkraft';
+    }
+
+    if (value === 'no_available_employee') {
+        return 'Kein verfügbarer Mitarbeiter';
+    }
+
+    if (typeof value === 'string') {
+        return value;
+    }
+
+    return null;
+}
+
+function formatGenerationContextValue(value: unknown): string {
+    if (typeof value === 'string' || typeof value === 'number') {
+        return String(value);
+    }
+
+    if (typeof value === 'boolean') {
+        return value ? 'Ja' : 'Nein';
+    }
+
+    if (
+        Array.isArray(value) &&
+        value.every(
+            (item) =>
+                typeof item === 'string' ||
+                typeof item === 'number' ||
+                typeof item === 'boolean',
+        )
+    ) {
+        return value.map((item) => formatGenerationContextValue(item)).join(', ');
+    }
+
+    return JSON.stringify(value) ?? '';
+}
+
+function GenerationSkippedSummary({ entry }: { entry: GenerationSkippedEntry }) {
+    const title = generationSkippedTitle(entry);
+    const reason = formatGenerationReason(entry.context.reason);
+    const contextDetails: Array<[string, unknown]> = [
+        ['Datum', entry.context.date],
+        ['Schichtcode', entry.context.shiftTemplateCode],
+        [
+            'Bedarf',
+            typeof entry.context.needSpecialist === 'boolean'
+                ? entry.context.needSpecialist
+                    ? 'Fachkraft erforderlich'
+                    : 'Mitarbeiter erforderlich'
+                : null,
+        ],
+        ['Grund', reason],
+    ];
+    const details = contextDetails.filter(
+        ([, value]) => value !== null && value !== undefined,
+    );
+
+    return (
+        <div className="rounded-md bg-white/70 p-3 text-blue-950 ring-1 ring-blue-100">
+            <p className="font-semibold">{title}</p>
+            {entry.message !== title && (
+                <p className="mt-1 text-xs text-blue-900">{entry.message}</p>
+            )}
+
+            {details.length > 0 && (
+                <dl className="mt-2 grid gap-x-3 gap-y-1 text-xs sm:grid-cols-[max-content_1fr]">
+                    {details.map(([label, value]) => (
+                        <div key={label} className="contents">
+                            <dt className="font-medium text-blue-800">{label}</dt>
+                            <dd>{formatGenerationContextValue(value)}</dd>
+                        </div>
+                    ))}
+                </dl>
+            )}
+
+            <details className="mt-2 text-xs text-blue-900">
+                <summary className="cursor-pointer font-medium">
+                    Technische Details
+                </summary>
+                <pre className="mt-2 max-h-48 overflow-auto rounded-md bg-blue-950/5 p-2 font-mono text-[0.7rem] leading-relaxed text-blue-950">
+                    {JSON.stringify(entry.context, null, 2)}
+                </pre>
+            </details>
         </div>
     );
 }
