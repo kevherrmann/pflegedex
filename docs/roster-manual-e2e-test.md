@@ -149,7 +149,6 @@ Für jeden Filter prüfen, ob die angezeigte Auswahl plausibel zur Auswahlbeding
 
 Die folgenden Grenzen sind dem aktuellen Stand bekannt und beim Testen zu berücksichtigen. Auffälligkeiten in diesen Bereichen sind erwartbar und kein Fehler:
 
-- Die Mitarbeiteransicht „Mein Dienstplan" fehlt.
 - Die Ansicht „Mit wem arbeite ich zusammen?" fehlt.
 - Mehrfachzuordnung zu Wohnbereichen ist noch nicht abschließend geprüft (später prüfen).
 - Das historische Löschverhalten ist noch nicht abschließend geprüft (später prüfen).
@@ -170,6 +169,8 @@ Frühere Grenzen, die inzwischen behoben sind:
 - Mitarbeiterwünsche (Wunschfrei / Wunschdienst) existieren als eigene
   Verwaltungsseite und fließen als weiche Ziele in die Planung ein.
 - Schwellwerte und Strafgewichte sind über `config/rostering.php` konfigurierbar.
+- Mitarbeiter sehen ihre eigenen Dienste unter „Mein Dienstplan" (/my-roster);
+  sichtbar sind ausschließlich veröffentlichte oder gesperrte Pläne.
 
 ## 12. Testergebnis-Vorlage
 
