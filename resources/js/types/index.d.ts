@@ -20,6 +20,7 @@ export type PageProps<
             viewAuditLog: boolean;
             canViewAbsenceRequests: boolean;
             canManageAbsenceRequests: boolean;
+            canViewOwnRoster: boolean;
         };
     };
     ai: {

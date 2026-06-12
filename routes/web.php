@@ -8,6 +8,7 @@ use App\Http\Controllers\CarePlanPdfController;
 use App\Http\Controllers\CareReportController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LocationController;
+use App\Http\Controllers\MyRosterController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ResidentController;
 use App\Http\Controllers\RosterBlackoutDayController;
@@ -136,6 +137,9 @@ Route::middleware('auth')->group(function () {
 
     Route::patch('/shift-templates/{shiftTemplate}/staffing-rule', [ShiftTemplateController::class, 'updateStaffingRule'])
         ->name('shift-templates.staffing-rule.update');
+
+    Route::get('/my-roster', [MyRosterController::class, 'show'])
+        ->name('my-roster.show');
 
     Route::get('/rosters', [RosterController::class, 'index'])
         ->name('rosters.index');
