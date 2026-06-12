@@ -170,8 +170,9 @@ Frühere Grenzen, die inzwischen behoben sind:
 - Schwellwerte und Strafgewichte sind über `config/rostering.php` konfigurierbar.
 - Mitarbeiter sehen ihre eigenen Dienste unter „Mein Dienstplan" (/my-roster);
   sichtbar sind ausschließlich veröffentlichte oder gesperrte Pläne.
-- An eigenen Arbeitstagen zeigt „Mein Dienstplan" die Teambesetzung des Tages
-  („Mit wem arbeite ich zusammen?"), gruppiert nach Schicht.
+- „Mein Dienstplan" zeigt die Teambesetzung des Wohnbereichs an allen Tagen
+  des Monats (an Arbeitstagen „Mit wem arbeite ich zusammen?", an freien Tagen
+  „Wer ist im Dienst?") — Grundlage für Diensttausch-Absprachen.
 
 ## 12. Testergebnis-Vorlage
 
