@@ -2,6 +2,19 @@
 
 use Illuminate\Support\Str;
 
+// SQLite-Pfad umgebungs-agnostisch aufloesen: relative Werte/Dateinamen werden
+// relativ zum database-Verzeichnis aufgeloest (database_path), absolute Pfade
+// und ":memory:" bleiben unveraendert. So funktioniert dieselbe .env in
+// unterschiedlich gemounteten Umgebungen (lokal /var/www/html vs. /workspace).
+$sqliteDatabase = env('DB_DATABASE', database_path('database.sqlite'));
+if (is_string($sqliteDatabase)
+    && $sqliteDatabase !== ''
+    && ! str_starts_with($sqliteDatabase, '/')
+    && ! str_starts_with($sqliteDatabase, ':')
+) {
+    $sqliteDatabase = database_path($sqliteDatabase);
+}
+
 return [
 
     /*
@@ -34,7 +47,7 @@ return [
         'sqlite' => [
             'driver' => 'sqlite',
             'url' => env('DB_URL'),
-            'database' => env('DB_DATABASE', database_path('database.sqlite')),
+            'database' => $sqliteDatabase,
             'prefix' => '',
             'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
             'busy_timeout' => null,
