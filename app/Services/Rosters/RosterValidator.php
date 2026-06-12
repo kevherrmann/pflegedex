@@ -10,26 +10,38 @@ use App\Models\Shift;
 use App\Models\ShiftStaffingRule;
 use App\Models\ShiftTemplate;
 use App\Models\User;
+use App\Services\Rosters\Planning\TargetMinutesCalculator;
+use App\Services\Rosters\Planning\WorkRules;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 
 class RosterValidator
 {
-    public function __construct(private readonly RosterDateService $rosterDateService) {}
+    private readonly int $requiredRestMinutes;
 
-    private const REQUIRED_REST_MINUTES = 660;
+    private readonly int $maxConsecutiveWorkDays;
 
-    private const PLANNED_WORKING_HOURS_TOLERANCE_MINUTES = 60;
+    private readonly int $maxWeekends;
 
-    private const MAX_ALLOWED_CONSECUTIVE_WORK_DAYS = 6;
+    private readonly int $defaultShiftMinutes;
 
-    private const MAX_ALLOWED_WEEKENDS = 2;
-
-    private const DEFAULT_SHIFT_MINUTES = 480;
+    private readonly int $plannedHoursToleranceMinutes;
 
     // Unter diesem Anteil der Soll-Kapazitaet gilt ein Mitarbeiter als deutlich unter Soll geplant.
-    private const UNDER_PLANNED_FACTOR = 0.5;
+    private readonly float $underPlannedFactor;
+
+    public function __construct(
+        private readonly RosterDateService $rosterDateService,
+        private readonly TargetMinutesCalculator $targetMinutesCalculator = new TargetMinutesCalculator,
+    ) {
+        $this->requiredRestMinutes = (int) config('rostering.required_rest_minutes');
+        $this->maxConsecutiveWorkDays = (int) config('rostering.max_consecutive_work_days');
+        $this->maxWeekends = (int) config('rostering.max_weekends_per_month');
+        $this->defaultShiftMinutes = (int) config('rostering.default_shift_minutes');
+        $this->plannedHoursToleranceMinutes = (int) config('rostering.planned_hours_tolerance_minutes');
+        $this->underPlannedFactor = (float) config('rostering.under_planned_factor');
+    }
 
     public function validate(Roster $roster): RosterValidationResult
     {
@@ -48,16 +60,44 @@ class RosterValidator
             ->orderBy('starts_at')
             ->get();
 
+        // Dienste derselben Mitarbeiter im Randfenster um den Monat (inklusive
+        // anderer Dienstplaene/Standorte), damit Ruhezeiten und Folgetage nicht
+        // an der Monatsgrenze abreissen.
+        $boundaryShiftsByUser = $this->boundaryShiftsByUser($roster);
+
         $this->validateStaffing($roster, $shiftTemplates, $result);
         $this->validateAbsenceConflicts($roster, $result);
         $this->validatePlannedWorkingHours($roster, $shiftTemplates, $result);
-        $this->validateConsecutiveWorkDays($roster, $result);
-        $this->validateWeekendLoad($roster, $result);
-        $this->validateMonthlyFreeDays($roster, $result);
-        $this->validateSundayCompensationRestDays($roster, $result);
-        $this->validateRestPeriods($roster, $result);
+        $this->validateConsecutiveWorkDays($roster, $boundaryShiftsByUser, $result);
+        $this->validateWeekendLoad($roster, $boundaryShiftsByUser, $result);
+        $this->validateMonthlyFreeDays($roster, $boundaryShiftsByUser, $result);
+        $this->validateSundayCompensationRestDays($roster, $boundaryShiftsByUser, $result);
+        $this->validateRestPeriods($roster, $boundaryShiftsByUser, $result);
 
         return $result;
+    }
+
+    /**
+     * @return Collection<string, Collection<int, Shift>>
+     */
+    private function boundaryShiftsByUser(Roster $roster): Collection
+    {
+        if ($roster->shifts->isEmpty()) {
+            return collect();
+        }
+
+        $windowDays = (int) config('rostering.boundary_window_days');
+        $monthStart = CarbonImmutable::create($roster->year, $roster->month, 1)->startOfDay();
+        $monthEnd = $monthStart->endOfMonth()->startOfDay();
+
+        return Shift::query()
+            ->with('shiftTemplate')
+            ->whereIn('user_id', $roster->shifts->pluck('user_id')->unique())
+            ->where('roster_id', '!=', $roster->id)
+            ->whereDate('date', '>=', $monthStart->subDays($windowDays)->toDateString())
+            ->whereDate('date', '<=', $monthEnd->addDays($windowDays)->toDateString())
+            ->get()
+            ->groupBy('user_id');
     }
 
     /**
@@ -159,12 +199,16 @@ class RosterValidator
             ->values();
     }
 
-    private function validateRestPeriods(Roster $roster, RosterValidationResult $result): void
+    /**
+     * @param  Collection<string, Collection<int, Shift>>  $boundaryShiftsByUser
+     */
+    private function validateRestPeriods(Roster $roster, Collection $boundaryShiftsByUser, RosterValidationResult $result): void
     {
         $roster->shifts
             ->groupBy('user_id')
-            ->each(function (Collection $shifts, string $userId) use ($result): void {
+            ->each(function (Collection $shifts, string $userId) use ($roster, $boundaryShiftsByUser, $result): void {
                 $orderedShifts = $shifts
+                    ->concat($boundaryShiftsByUser->get($userId, collect()))
                     ->sortBy(fn (Shift $shift): int => $shift->starts_at->getTimestamp())
                     ->values();
 
@@ -173,9 +217,15 @@ class RosterValidator
                     $previousShift = $orderedShifts[$index - 1];
                     /** @var Shift $nextShift */
                     $nextShift = $orderedShifts[$index];
+
+                    // Konflikte rein zwischen fremden Dienstplaenen meldet deren eigener Plan.
+                    if ($previousShift->roster_id !== $roster->id && $nextShift->roster_id !== $roster->id) {
+                        continue;
+                    }
+
                     $restMinutes = (int) $previousShift->ends_at->diffInMinutes($nextShift->starts_at);
 
-                    if ($restMinutes < self::REQUIRED_REST_MINUTES) {
+                    if ($restMinutes < $this->requiredRestMinutes) {
                         $result->addError(
                             'rest_period_violation',
                             'Die Ruhezeit zwischen zwei Diensten ist zu kurz.',
@@ -191,7 +241,7 @@ class RosterValidator
                                 'nextShiftTemplateName' => $nextShift->shiftTemplate?->name,
                                 'nextShiftStartsAt' => $nextShift->starts_at->toDateTimeString(),
                                 'restMinutes' => $restMinutes,
-                                'requiredRestMinutes' => self::REQUIRED_REST_MINUTES,
+                                'requiredRestMinutes' => $this->requiredRestMinutes,
                             ],
                             'Ruhezeit unterschritten',
                             'Zwischen zwei Diensten liegt weniger als die erforderliche Ruhezeit.',
@@ -201,13 +251,21 @@ class RosterValidator
             });
     }
 
-    private function validateConsecutiveWorkDays(Roster $roster, RosterValidationResult $result): void
+    /**
+     * @param  Collection<string, Collection<int, Shift>>  $boundaryShiftsByUser
+     */
+    private function validateConsecutiveWorkDays(Roster $roster, Collection $boundaryShiftsByUser, RosterValidationResult $result): void
     {
         $roster->shifts
             ->groupBy('user_id')
-            ->each(function (Collection $shifts, string $userId) use ($roster, $result): void {
-                $workDates = $shifts
+            ->each(function (Collection $shifts, string $userId) use ($roster, $boundaryShiftsByUser, $result): void {
+                $rosterWorkDates = $shifts
                     ->map(fn (Shift $shift): string => $shift->date->toDateString())
+                    ->unique();
+
+                $workDates = $rosterWorkDates
+                    ->concat($boundaryShiftsByUser->get($userId, collect())
+                        ->map(fn (Shift $shift): string => $shift->date->toDateString()))
                     ->unique()
                     ->sort()
                     ->values();
@@ -219,6 +277,7 @@ class RosterValidator
                 $sequenceStart = CarbonImmutable::parse($workDates->first())->startOfDay();
                 $previousDate = $sequenceStart;
                 $consecutiveDays = 1;
+                $sequenceTouchesRoster = $rosterWorkDates->contains($workDates->first());
 
                 for ($index = 1; $index < $workDates->count(); $index++) {
                     $currentDate = CarbonImmutable::parse($workDates[$index])->startOfDay();
@@ -226,32 +285,38 @@ class RosterValidator
                     if ($currentDate->isSameDay($previousDate->addDay())) {
                         $consecutiveDays++;
                     } else {
-                        $this->addConsecutiveWorkDaysWarning(
-                            $result,
-                            $userId,
-                            $shifts->first()?->user?->name,
-                            $roster,
-                            $sequenceStart,
-                            $previousDate,
-                            $consecutiveDays,
-                        );
+                        if ($sequenceTouchesRoster) {
+                            $this->addConsecutiveWorkDaysWarning(
+                                $result,
+                                $userId,
+                                $shifts->first()?->user?->name,
+                                $roster,
+                                $sequenceStart,
+                                $previousDate,
+                                $consecutiveDays,
+                            );
+                        }
 
                         $sequenceStart = $currentDate;
                         $consecutiveDays = 1;
+                        $sequenceTouchesRoster = false;
                     }
 
+                    $sequenceTouchesRoster = $sequenceTouchesRoster || $rosterWorkDates->contains($workDates[$index]);
                     $previousDate = $currentDate;
                 }
 
-                $this->addConsecutiveWorkDaysWarning(
-                    $result,
-                    $userId,
-                    $shifts->first()?->user?->name,
-                    $roster,
-                    $sequenceStart,
-                    $previousDate,
-                    $consecutiveDays,
-                );
+                if ($sequenceTouchesRoster) {
+                    $this->addConsecutiveWorkDaysWarning(
+                        $result,
+                        $userId,
+                        $shifts->first()?->user?->name,
+                        $roster,
+                        $sequenceStart,
+                        $previousDate,
+                        $consecutiveDays,
+                    );
+                }
             });
     }
 
@@ -264,7 +329,7 @@ class RosterValidator
         CarbonImmutable $endsOn,
         int $consecutiveDays,
     ): void {
-        if ($consecutiveDays <= self::MAX_ALLOWED_CONSECUTIVE_WORK_DAYS) {
+        if ($consecutiveDays <= $this->maxConsecutiveWorkDays) {
             return;
         }
 
@@ -275,7 +340,7 @@ class RosterValidator
                 'userId' => $userId,
                 'employeeName' => $employeeName,
                 'consecutiveDays' => $consecutiveDays,
-                'maxAllowedConsecutiveDays' => self::MAX_ALLOWED_CONSECUTIVE_WORK_DAYS,
+                'maxAllowedConsecutiveDays' => $this->maxConsecutiveWorkDays,
                 'startsOn' => $startsOn->toDateString(),
                 'endsOn' => $endsOn->toDateString(),
                 'month' => $roster->month,
@@ -286,31 +351,30 @@ class RosterValidator
         );
     }
 
-    private function validateWeekendLoad(Roster $roster, RosterValidationResult $result): void
+    /**
+     * @param  Collection<string, Collection<int, Shift>>  $boundaryShiftsByUser
+     */
+    private function validateWeekendLoad(Roster $roster, Collection $boundaryShiftsByUser, RosterValidationResult $result): void
     {
+        $monthStart = CarbonImmutable::create($roster->year, $roster->month, 1)->startOfDay();
+        $monthEnd = $monthStart->endOfMonth()->startOfDay();
+
         $roster->shifts
             ->groupBy('user_id')
-            ->each(function (Collection $shifts, string $userId) use ($roster, $result): void {
+            ->each(function (Collection $shifts, string $userId) use ($roster, $boundaryShiftsByUser, $monthStart, $monthEnd, $result): void {
+                // Auch Wochenenddienste desselben Monats in anderen Dienstplaenen zaehlen mit.
                 $weekendStartsOn = $shifts
-                    ->map(function (Shift $shift): ?string {
-                        $date = CarbonImmutable::parse($shift->date)->startOfDay();
-
-                        if ($date->dayOfWeekIso === 6) {
-                            return $date->toDateString();
-                        }
-
-                        if ($date->dayOfWeekIso === 7) {
-                            return $date->subDay()->toDateString();
-                        }
-
-                        return null;
-                    })
+                    ->concat($boundaryShiftsByUser->get($userId, collect())
+                        ->filter(fn (Shift $shift): bool => CarbonImmutable::parse($shift->date)->startOfDay()->between($monthStart, $monthEnd)))
+                    ->map(fn (Shift $shift): ?string => WorkRules::weekendStartKey(
+                        CarbonImmutable::parse($shift->date)->startOfDay(),
+                    ))
                     ->filter()
                     ->unique()
                     ->sort()
                     ->values();
 
-                if ($weekendStartsOn->count() <= self::MAX_ALLOWED_WEEKENDS) {
+                if ($weekendStartsOn->count() <= $this->maxWeekends) {
                     return;
                 }
 
@@ -321,7 +385,7 @@ class RosterValidator
                         'userId' => $userId,
                         'employeeName' => $shifts->first()?->user?->name,
                         'workedWeekends' => $weekendStartsOn->count(),
-                        'maxAllowedWeekends' => self::MAX_ALLOWED_WEEKENDS,
+                        'maxAllowedWeekends' => $this->maxWeekends,
                         'weekendStartsOn' => $weekendStartsOn->all(),
                         'month' => $roster->month,
                         'year' => $roster->year,
@@ -332,7 +396,10 @@ class RosterValidator
             });
     }
 
-    private function validateMonthlyFreeDays(Roster $roster, RosterValidationResult $result): void
+    /**
+     * @param  Collection<string, Collection<int, Shift>>  $boundaryShiftsByUser
+     */
+    private function validateMonthlyFreeDays(Roster $roster, Collection $boundaryShiftsByUser, RosterValidationResult $result): void
     {
         $monthDates = collect($this->rosterDateService->datesForRosterMonth($roster))
             ->map(fn (CarbonImmutable $date): string => $date->toDateString())
@@ -341,8 +408,10 @@ class RosterValidator
 
         $roster->shifts
             ->groupBy('user_id')
-            ->each(function (Collection $shifts, string $userId) use ($monthDates, $daysInMonth, $roster, $result): void {
+            ->each(function (Collection $shifts, string $userId) use ($monthDates, $daysInMonth, $roster, $boundaryShiftsByUser, $result): void {
+                // Auch Dienste desselben Monats in anderen Dienstplaenen belegen Tage.
                 $workedDays = $shifts
+                    ->concat($boundaryShiftsByUser->get($userId, collect()))
                     ->map(fn (Shift $shift): string => $shift->date->toDateString())
                     ->unique()
                     ->intersect($monthDates)
@@ -369,7 +438,10 @@ class RosterValidator
             });
     }
 
-    private function validateSundayCompensationRestDays(Roster $roster, RosterValidationResult $result): void
+    /**
+     * @param  Collection<string, Collection<int, Shift>>  $boundaryShiftsByUser
+     */
+    private function validateSundayCompensationRestDays(Roster $roster, Collection $boundaryShiftsByUser, RosterValidationResult $result): void
     {
         $monthDates = collect($this->rosterDateService->datesForRosterMonth($roster))
             ->map(fn (CarbonImmutable $date): string => $date->toDateString())
@@ -377,12 +449,18 @@ class RosterValidator
 
         $roster->shifts
             ->groupBy('user_id')
-            ->each(function (Collection $shifts, string $userId) use ($monthDates, $roster, $result): void {
+            ->each(function (Collection $shifts, string $userId) use ($monthDates, $roster, $boundaryShiftsByUser, $result): void {
+                // Belegte Tage inklusive Diensten in anderen Dienstplaenen im Randfenster,
+                // damit ein vermeintlich freier Tag nicht anderswo verplant ist.
                 $workedDays = $shifts
+                    ->concat($boundaryShiftsByUser->get($userId, collect()))
                     ->map(fn (Shift $shift): string => $shift->date->toDateString())
                     ->unique()
                     ->values();
-                $workedSundays = $workedDays
+                // Ersatzruhetage werden nur fuer Sonntage gemeldet, die dieser Dienstplan verplant.
+                $workedSundays = $shifts
+                    ->map(fn (Shift $shift): string => $shift->date->toDateString())
+                    ->unique()
                     ->filter(fn (string $date): bool => CarbonImmutable::parse($date)->dayOfWeekIso === 7)
                     ->values();
 
@@ -487,7 +565,7 @@ class RosterValidator
         $weeksFactor = $daysInMonth / 7;
 
         $shiftMinutes = (int) round((float) ($shiftTemplates->avg('duration_minutes') ?? 0));
-        $shiftMinutes = $shiftMinutes > 0 ? $shiftMinutes : self::DEFAULT_SHIFT_MINUTES;
+        $shiftMinutes = $shiftMinutes > 0 ? $shiftMinutes : $this->defaultShiftMinutes;
 
         // Alle berechtigten Mitarbeiter betrachten, damit auch gar nicht oder
         // kaum eingeplante Personen erkannt werden (nicht nur die mit Diensten).
@@ -514,7 +592,7 @@ class RosterValidator
 
             $plannedMinutes = (int) ($plannedByUser->get($employee->id) ?? 0);
 
-            if ($plannedMinutes > $targetMinutes + self::PLANNED_WORKING_HOURS_TOLERANCE_MINUTES) {
+            if ($plannedMinutes > $targetMinutes + $this->plannedHoursToleranceMinutes) {
                 $result->addWarning(
                     'employee_over_planned_hours',
                     'Der Mitarbeiter ist über seiner Soll-Arbeitszeit geplant.',
@@ -535,7 +613,7 @@ class RosterValidator
                 continue;
             }
 
-            if ($plannedMinutes < (int) round($targetMinutes * self::UNDER_PLANNED_FACTOR)) {
+            if ($plannedMinutes < (int) round($targetMinutes * $this->underPlannedFactor)) {
                 $result->addWarning(
                     'employee_under_planned_hours',
                     'Der Mitarbeiter ist deutlich unter seiner Soll-Arbeitszeit geplant.',
@@ -557,26 +635,8 @@ class RosterValidator
         }
     }
 
-    /**
-     * Monatliche Soll-Kapazitaet in Minuten = das Strengere aus Wochenstunden
-     * und Regel-Arbeitstagen (Schichten sind feste Bloecke).
-     */
     private function targetMinutesForEmployee(User $employee, float $weeksFactor, int $shiftMinutes): int
     {
-        $profile = $employee->employeeProfile;
-
-        $targets = [];
-
-        $weeklyHours = (float) ($profile?->weekly_hours ?? 0);
-        if ($weeklyHours > 0) {
-            $targets[] = (int) round($weeklyHours * 60 * $weeksFactor);
-        }
-
-        $regularDays = (int) ($profile?->regular_work_days_per_week ?? 0);
-        if ($regularDays > 0 && $shiftMinutes > 0) {
-            $targets[] = (int) round($regularDays * $shiftMinutes * $weeksFactor);
-        }
-
-        return $targets === [] ? 0 : min($targets);
+        return $this->targetMinutesCalculator->targetMinutes($employee->employeeProfile, $weeksFactor, $shiftMinutes);
     }
 }

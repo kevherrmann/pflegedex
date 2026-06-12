@@ -9,6 +9,7 @@ use App\Models\AbsenceRequest;
 use App\Models\EmployeeProfile;
 use App\Models\Location;
 use App\Models\Roster;
+use App\Models\RosterBlackoutDay;
 use App\Models\Shift;
 use App\Models\ShiftStaffingRule;
 use App\Models\ShiftTemplate;
@@ -16,6 +17,7 @@ use App\Models\User;
 use App\Services\Rosters\RosterGeneratorService;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 uses(RefreshDatabase::class);
@@ -1023,3 +1025,251 @@ it('delete auto shifts blocks published or locked rosters', function (RosterStat
         'status',
     );
 })->with([RosterStatus::Published, RosterStatus::Locked]);
+
+it('respects rest periods across the month boundary', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $employee = createRosterGeneratorEmployee($location, ['can_work_night' => true]);
+    $decemberRoster = createRosterGeneratorRoster($location, $pdl, ['year' => 2026, 'month' => 12]);
+    $januaryRoster = createRosterGeneratorRoster($location, $pdl);
+    $nightShiftTemplate = createRosterGeneratorShiftTemplate($location, [
+        'name' => 'Nachtdienst',
+        'code' => 'night',
+        'starts_at' => '22:00',
+        'ends_at' => '06:00',
+    ]);
+    $earlyShiftTemplate = createRosterGeneratorShiftTemplate($location, [
+        'name' => 'Frühdienst',
+        'code' => 'early',
+        'starts_at' => '06:00',
+        'ends_at' => '14:00',
+    ]);
+    createRosterGeneratorStaffingRule($earlyShiftTemplate);
+
+    // Nachtdienst am 31.12. endet am 1.1. um 06:00 — Frühdienst am 1.1. wäre ohne Ruhezeit.
+    createRosterGeneratorShift($decemberRoster, $employee, $nightShiftTemplate, '2026-12-31');
+
+    $result = app(RosterGeneratorService::class)->generate($januaryRoster);
+
+    $firstOfJanuarySkip = collect($result->skipped)
+        ->first(fn (array $entry): bool => $entry['code'] === 'no_candidate'
+            && $entry['context']['date'] === '2027-01-01');
+
+    expect(Shift::query()
+        ->where('roster_id', $januaryRoster->id)
+        ->whereDate('date', '2027-01-01')
+        ->exists())->toBeFalse()
+        ->and(Shift::query()
+            ->where('roster_id', $januaryRoster->id)
+            ->whereDate('date', '2027-01-02')
+            ->exists())->toBeTrue()
+        ->and($firstOfJanuarySkip)->not->toBeNull()
+        ->and($firstOfJanuarySkip['context']['rejections'])->toHaveKey('rest_period');
+});
+
+it('respects consecutive work days across the month boundary', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $employee = createRosterGeneratorEmployee($location);
+    $decemberRoster = createRosterGeneratorRoster($location, $pdl, ['year' => 2026, 'month' => 12]);
+    $januaryRoster = createRosterGeneratorRoster($location, $pdl);
+    $shiftTemplate = createRosterGeneratorShiftTemplate($location);
+    createRosterGeneratorStaffingRule($shiftTemplate);
+
+    // 27.-31.12. bereits gearbeitet: Der 1.1. ist Tag 6, der 2.1. wäre Tag 7.
+    foreach (['2026-12-27', '2026-12-28', '2026-12-29', '2026-12-30', '2026-12-31'] as $date) {
+        createRosterGeneratorShift($decemberRoster, $employee, $shiftTemplate, $date);
+    }
+
+    $result = app(RosterGeneratorService::class)->generate($januaryRoster);
+
+    $secondOfJanuarySkip = collect($result->skipped)
+        ->first(fn (array $entry): bool => $entry['context']['date'] === '2027-01-02');
+
+    expect(Shift::query()
+        ->where('roster_id', $januaryRoster->id)
+        ->whereDate('date', '2027-01-01')
+        ->exists())->toBeTrue()
+        ->and(Shift::query()
+            ->where('roster_id', $januaryRoster->id)
+            ->whereDate('date', '2027-01-02')
+            ->exists())->toBeFalse()
+        ->and($secondOfJanuarySkip)->not->toBeNull()
+        ->and($secondOfJanuarySkip['context']['rejections'])->toHaveKey('consecutive_days');
+});
+
+it('respects rest conflicts with shifts in another location roster', function (): void {
+    $homeLocation = Location::factory()->create();
+    $otherLocation = Location::factory()->create();
+    $pdl = User::factory()->for($homeLocation)->create();
+    $employee = createRosterGeneratorEmployee($homeLocation, ['can_work_night' => true]);
+    $homeRoster = createRosterGeneratorRoster($homeLocation, $pdl);
+    $otherRoster = createRosterGeneratorRoster($otherLocation, $pdl);
+    $earlyShiftTemplate = createRosterGeneratorShiftTemplate($homeLocation);
+    createRosterGeneratorStaffingRule($earlyShiftTemplate);
+    $otherNightTemplate = createRosterGeneratorShiftTemplate($otherLocation, [
+        'name' => 'Nachtdienst',
+        'code' => 'night',
+        'starts_at' => '22:00',
+        'ends_at' => '06:00',
+    ]);
+
+    // Nachtdienst am anderen Standort am 14.1. endet am 15.1. um 06:00.
+    createRosterGeneratorShift($otherRoster, $employee, $otherNightTemplate, '2027-01-14');
+
+    $result = app(RosterGeneratorService::class)->generate($homeRoster);
+
+    $fifteenthSkip = collect($result->skipped)
+        ->first(fn (array $entry): bool => $entry['code'] === 'no_candidate'
+            && $entry['context']['date'] === '2027-01-15');
+
+    expect(Shift::query()
+        ->where('roster_id', $homeRoster->id)
+        ->whereDate('date', '2027-01-15')
+        ->exists())->toBeFalse()
+        ->and($fifteenthSkip)->not->toBeNull()
+        ->and($fifteenthSkip['context']['rejections'])->toHaveKey('rest_period');
+});
+
+it('enforces the weekly maximum working minutes', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    createRosterGeneratorEmployee($location, ['weekly_hours' => 60.00, 'regular_work_days_per_week' => 7]);
+    $roster = createRosterGeneratorRoster($location, $pdl);
+    // 12-Stunden-Dienste: Nach vier Diensten in einer ISO-Woche sind 48h erreicht.
+    $longShiftTemplate = createRosterGeneratorShiftTemplate($location, [
+        'name' => 'Langdienst',
+        'code' => 'long_day',
+        'starts_at' => '06:00',
+        'ends_at' => '18:00',
+        'duration_minutes' => 720,
+    ]);
+    createRosterGeneratorStaffingRule($longShiftTemplate);
+
+    $result = app(RosterGeneratorService::class)->generate($roster);
+
+    // ISO-Woche 4.-10.1.2027: Maximal 4 Dienste à 720 Minuten.
+    $minutesInWeek = Shift::query()
+        ->where('roster_id', $roster->id)
+        ->whereDate('date', '>=', '2027-01-04')
+        ->whereDate('date', '<=', '2027-01-10')
+        ->count() * 720;
+
+    $weeklyCapSkips = collect($result->skipped)
+        ->filter(fn (array $entry): bool => isset($entry['context']['rejections']['weekly_hours_cap']));
+
+    expect($minutesInWeek)->toBeLessThanOrEqual(2880)
+        ->and($weeklyCapSkips)->not->toBeEmpty();
+});
+
+it('fills blackout days before regular days', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    createRosterGeneratorEmployee($location, ['weekly_hours' => 60.00, 'regular_work_days_per_week' => 7]);
+    $roster = createRosterGeneratorRoster($location, $pdl);
+    $longShiftTemplate = createRosterGeneratorShiftTemplate($location, [
+        'name' => 'Langdienst',
+        'code' => 'long_day',
+        'starts_at' => '06:00',
+        'ends_at' => '18:00',
+        'duration_minutes' => 720,
+    ]);
+    createRosterGeneratorStaffingRule($longShiftTemplate);
+
+    // Freitag 8.1. ist Urlaubssperre: Trotz Wochenstunden-Limit muss dieser Tag besetzt sein.
+    RosterBlackoutDay::query()->create([
+        'location_id' => $location->id,
+        'date' => '2027-01-08',
+        'created_by' => $pdl->id,
+    ]);
+
+    app(RosterGeneratorService::class)->generate($roster);
+
+    expect(Shift::query()
+        ->where('roster_id', $roster->id)
+        ->whereDate('date', '2027-01-08')
+        ->exists())->toBeTrue();
+});
+
+it('reports per-constraint rejection counts when no candidate is available', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    createRosterGeneratorEmployee($location, ['can_work_night' => false]);
+    createRosterGeneratorEmployee($location, ['can_work_night' => false]);
+    $roster = createRosterGeneratorRoster($location, $pdl);
+    $nightShiftTemplate = createRosterGeneratorShiftTemplate($location, [
+        'name' => 'Nachtdienst',
+        'code' => 'night',
+        'starts_at' => '22:00',
+        'ends_at' => '06:00',
+    ]);
+    createRosterGeneratorStaffingRule($nightShiftTemplate);
+
+    $result = app(RosterGeneratorService::class)->generate($roster);
+
+    expect($result->skipped[0]['context']['rejections'])->toBe(['shift_capability' => 2]);
+});
+
+it('warns when an assigned employee has a pending absence request', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $employee = createRosterGeneratorEmployee($location);
+    $roster = createRosterGeneratorRoster($location, $pdl);
+    $shiftTemplate = createRosterGeneratorShiftTemplate($location);
+    createRosterGeneratorStaffingRule($shiftTemplate, ['weekday' => 5]);
+
+    createRosterGeneratorAbsenceRequest($employee, $pdl, [
+        'starts_on' => '2027-01-01',
+        'ends_on' => '2027-01-01',
+        'status' => AbsenceRequestStatus::Requested,
+        'decided_by' => null,
+        'decided_at' => null,
+    ]);
+
+    $result = app(RosterGeneratorService::class)->generate($roster);
+
+    $pendingWarning = collect($result->warnings)
+        ->first(fn (array $entry): bool => $entry['code'] === 'pending_absence_overlap');
+
+    expect($result->createdShifts)->toBeGreaterThan(0)
+        ->and($pendingWarning)->not->toBeNull()
+        ->and($pendingWarning['context']['date'])->toBe('2027-01-01')
+        ->and($pendingWarning['context']['userId'])->toBe($employee->id);
+});
+
+it('generates with a bounded number of database queries', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+
+    foreach (range(1, 12) as $index) {
+        createRosterGeneratorEmployee($location, [
+            'is_nursing_specialist' => $index <= 5,
+            'can_work_night' => $index % 2 === 0,
+        ], ['name' => sprintf('Pflegekraft %02d', $index)]);
+    }
+
+    $roster = createRosterGeneratorRoster($location, $pdl);
+
+    foreach ([
+        ['name' => 'Frühdienst', 'code' => 'early', 'starts_at' => '06:00', 'ends_at' => '14:00'],
+        ['name' => 'Spätdienst', 'code' => 'late', 'starts_at' => '14:00', 'ends_at' => '22:00'],
+        ['name' => 'Nachtdienst', 'code' => 'night', 'starts_at' => '22:00', 'ends_at' => '06:00'],
+    ] as $template) {
+        createRosterGeneratorStaffingRule(
+            createRosterGeneratorShiftTemplate($location, $template),
+            ['required_total_staff' => 2, 'required_specialists' => 1],
+        );
+    }
+
+    DB::enableQueryLog();
+    $result = app(RosterGeneratorService::class)->generate($roster);
+    $queries = DB::getQueryLog();
+    DB::disableQueryLog();
+
+    $selectQueries = collect($queries)
+        ->filter(fn (array $query): bool => str_starts_with(strtolower(ltrim($query['query'])), 'select'));
+
+    // Der Planungszustand wird einmal geladen: Lesezugriffe wachsen nicht mit der Slot-Anzahl.
+    expect($result->createdShifts)->toBeGreaterThan(50)
+        ->and($selectQueries->count())->toBeLessThan(30);
+});

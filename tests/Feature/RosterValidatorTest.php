@@ -1010,3 +1010,120 @@ it('reports missing sunday compensation rest days as warning without errors', fu
         ->and(rosterValidatorCodes($result->warnings))->toContain('missing_sunday_compensation_rest_day')
         ->and($result->isYellow())->toBeTrue();
 });
+
+it('reports rest period violations across the month boundary', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $employee = createRosterValidatorEmployee($location, ['can_work_night' => true]);
+    $decemberRoster = createRosterValidatorRoster($location, $pdl, ['year' => 2026, 'month' => 12]);
+    $januaryRoster = createRosterValidatorRoster($location, $pdl);
+    $nightShiftTemplate = createRosterValidatorShiftTemplate($location, [
+        'name' => 'Nachtdienst',
+        'code' => 'night',
+        'starts_at' => '22:00',
+        'ends_at' => '06:00',
+    ]);
+    $earlyShiftTemplate = createRosterValidatorShiftTemplate($location, [
+        'name' => 'Frühdienst',
+        'code' => 'early',
+        'starts_at' => '06:00',
+        'ends_at' => '14:00',
+    ]);
+
+    // Nachtdienst am 31.12. endet am 1.1. um 06:00 — der Frühdienst am 1.1. startet ohne Ruhezeit.
+    createRosterValidatorShift($decemberRoster, $employee, $nightShiftTemplate, '2026-12-31');
+    createRosterValidatorShift($januaryRoster, $employee, $earlyShiftTemplate, '2027-01-01');
+
+    $result = app(RosterValidator::class)->validate($januaryRoster);
+
+    $restViolation = collect($result->errors)
+        ->first(fn (array $entry): bool => $entry['code'] === 'rest_period_violation');
+
+    expect($restViolation)->not->toBeNull()
+        ->and($restViolation['context']['previousShiftDate'])->toBe('2026-12-31')
+        ->and($restViolation['context']['nextShiftDate'])->toBe('2027-01-01');
+});
+
+it('reports consecutive work day warnings across the month boundary', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $employee = createRosterValidatorEmployee($location);
+    $decemberRoster = createRosterValidatorRoster($location, $pdl, ['year' => 2026, 'month' => 12]);
+    $januaryRoster = createRosterValidatorRoster($location, $pdl);
+    $shiftTemplate = createRosterValidatorShiftTemplate($location);
+
+    // 28.-31.12. plus 1.-3.1.: zusammen 7 Tage am Stück über die Monatsgrenze.
+    foreach (['2026-12-28', '2026-12-29', '2026-12-30', '2026-12-31'] as $date) {
+        createRosterValidatorShift($decemberRoster, $employee, $shiftTemplate, $date);
+    }
+
+    foreach (['2027-01-01', '2027-01-02', '2027-01-03'] as $date) {
+        createRosterValidatorShift($januaryRoster, $employee, $shiftTemplate, $date);
+    }
+
+    $result = app(RosterValidator::class)->validate($januaryRoster);
+
+    $warning = collect($result->warnings)
+        ->first(fn (array $entry): bool => $entry['code'] === 'employee_too_many_consecutive_work_days');
+
+    expect($warning)->not->toBeNull()
+        ->and($warning['context']['consecutiveDays'])->toBe(7)
+        ->and($warning['context']['startsOn'])->toBe('2026-12-28')
+        ->and($warning['context']['endsOn'])->toBe('2027-01-03');
+});
+
+it('does not report violations that only concern foreign rosters', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $employee = createRosterValidatorEmployee($location, ['can_work_night' => true]);
+    $decemberRoster = createRosterValidatorRoster($location, $pdl, ['year' => 2026, 'month' => 12]);
+    $januaryRoster = createRosterValidatorRoster($location, $pdl);
+    $nightShiftTemplate = createRosterValidatorShiftTemplate($location, [
+        'name' => 'Nachtdienst',
+        'code' => 'night',
+        'starts_at' => '22:00',
+        'ends_at' => '06:00',
+    ]);
+    $earlyShiftTemplate = createRosterValidatorShiftTemplate($location, [
+        'name' => 'Frühdienst',
+        'code' => 'early',
+        'starts_at' => '06:00',
+        'ends_at' => '14:00',
+    ]);
+
+    // Ruhezeitverstoß komplett im Dezember-Plan: Der Januar-Plan meldet ihn nicht.
+    createRosterValidatorShift($decemberRoster, $employee, $nightShiftTemplate, '2026-12-30');
+    createRosterValidatorShift($decemberRoster, $employee, $earlyShiftTemplate, '2026-12-31');
+    createRosterValidatorShift($januaryRoster, $employee, $earlyShiftTemplate, '2027-01-15');
+
+    $result = app(RosterValidator::class)->validate($januaryRoster);
+
+    expect(collect($result->errors)
+        ->where('code', 'rest_period_violation'))->toBeEmpty();
+});
+
+it('counts weekend shifts from other rosters of the same month for the weekend load', function (): void {
+    $homeLocation = Location::factory()->create();
+    $otherLocation = Location::factory()->create();
+    $pdl = User::factory()->for($homeLocation)->create();
+    $employee = createRosterValidatorEmployee($homeLocation);
+    $homeRoster = createRosterValidatorRoster($homeLocation, $pdl);
+    $otherRoster = createRosterValidatorRoster($otherLocation, $pdl);
+    $homeTemplate = createRosterValidatorShiftTemplate($homeLocation);
+    $otherTemplate = createRosterValidatorShiftTemplate($otherLocation);
+
+    // Zwei Wochenenden im eigenen Plan (2./3.1. und 9.1.), eines am anderen Standort (16.1.).
+    foreach (['2027-01-02', '2027-01-09'] as $date) {
+        createRosterValidatorShift($homeRoster, $employee, $homeTemplate, $date);
+    }
+
+    createRosterValidatorShift($otherRoster, $employee, $otherTemplate, '2027-01-16');
+
+    $result = app(RosterValidator::class)->validate($homeRoster);
+
+    $warning = collect($result->warnings)
+        ->first(fn (array $entry): bool => $entry['code'] === 'employee_too_many_weekends');
+
+    expect($warning)->not->toBeNull()
+        ->and($warning['context']['workedWeekends'])->toBe(3);
+});

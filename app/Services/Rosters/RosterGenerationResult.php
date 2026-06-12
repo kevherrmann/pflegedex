@@ -20,6 +20,8 @@ class RosterGenerationResult
         $this->deletedAutoShifts += $count;
     }
 
+    public array $warnings = [];
+
     public function addSkipped(string $code, string $message, array $context = []): void
     {
         $this->skipped[] = [
@@ -29,8 +31,22 @@ class RosterGenerationResult
         ];
     }
 
+    public function addWarning(string $code, string $message, array $context = []): void
+    {
+        $this->warnings[] = [
+            'code' => $code,
+            'message' => $message,
+            'context' => $context,
+        ];
+    }
+
     public function hasSkipped(): bool
     {
         return $this->skipped !== [];
+    }
+
+    public function hasWarnings(): bool
+    {
+        return $this->warnings !== [];
     }
 }

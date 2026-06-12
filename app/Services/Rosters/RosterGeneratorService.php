@@ -2,29 +2,20 @@
 
 namespace App\Services\Rosters;
 
-use App\Enums\AbsenceRequestStatus;
-use App\Enums\EmploymentArea;
 use App\Enums\ShiftSource;
-use App\Models\AbsenceRequest;
 use App\Models\Roster;
 use App\Models\Shift;
 use App\Models\ShiftStaffingRule;
 use App\Models\ShiftTemplate;
 use App\Models\User;
+use App\Services\Rosters\Planning\PlanningContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class RosterGeneratorService
 {
-    private const REQUIRED_REST_MINUTES = 660;
-
-    private const MAX_ALLOWED_CONSECUTIVE_WORK_DAYS = 6;
-
-    private const MAX_ALLOWED_WEEKENDS = 2;
-
-    private const DEFAULT_SHIFT_MINUTES = 480;
-
     public function __construct(private readonly RosterDateService $rosterDateService) {}
 
     public function generate(Roster $roster): RosterGenerationResult
@@ -35,59 +26,27 @@ class RosterGeneratorService
             ]);
         }
 
-        $result = new RosterGenerationResult;
+        return DB::transaction(function () use ($roster): RosterGenerationResult {
+            $result = new RosterGenerationResult;
 
-        $roster->load(['location']);
+            $roster->load(['location']);
 
-        $deletedAutoShifts = Shift::query()
-            ->where('roster_id', $roster->id)
-            ->where('source', ShiftSource::Auto->value)
-            ->delete();
+            $deletedAutoShifts = Shift::query()
+                ->where('roster_id', $roster->id)
+                ->where('source', ShiftSource::Auto->value)
+                ->delete();
 
-        $result->addDeletedAutoShifts($deletedAutoShifts);
+            $result->addDeletedAutoShifts($deletedAutoShifts);
 
-        $shiftTemplates = ShiftTemplate::query()
-            ->with('staffingRules')
-            ->where('location_id', $roster->location_id)
-            ->where('active', true)
-            ->orderBy('starts_at')
-            ->get();
+            $context = new PlanningContext($roster);
 
-        $employees = User::query()
-            ->with('employeeProfile')
-            ->where('location_id', $roster->location_id)
-            ->whereHas('employeeProfile', fn ($query) => $query
-                ->where('active', true)
-                ->where('employment_area', EmploymentArea::Nursing->value))
-            ->orderBy('name')
-            ->get();
-
-        // Repraesentative Schichtlaenge fuer die Kapazitaetsberechnung aus Regeltagen.
-        $shiftMinutes = (int) round((float) ($shiftTemplates->avg('duration_minutes') ?? 0));
-        $shiftMinutes = $shiftMinutes > 0 ? $shiftMinutes : self::DEFAULT_SHIFT_MINUTES;
-
-        foreach ($this->rosterDateService->datesForRosterMonth($roster) as $date) {
-            foreach ($shiftTemplates as $shiftTemplate) {
-                $staffingRule = $this->findStaffingRule($shiftTemplate, $date);
-
-                if ($staffingRule === null) {
-                    $result->addSkipped('missing_staffing_rule', 'Für diese Schichtvorlage gibt es keine Besetzungsregel.', [
-                        'date' => $date->toDateString(),
-                        'shiftTemplateId' => $shiftTemplate->id,
-                        'shiftTemplateCode' => $shiftTemplate->code,
-                    ]);
-
-                    continue;
-                }
-
-                [$startsAt, $endsAt] = $this->rosterDateService->buildShiftTimes($date, $shiftTemplate);
-
-                $this->fillMissingSpecialists($employees, $roster, $shiftTemplate, $date, $startsAt, $endsAt, $staffingRule, $result, $shiftMinutes);
-                $this->fillMissingStaff($employees, $roster, $shiftTemplate, $date, $startsAt, $endsAt, $staffingRule, $result, $shiftMinutes);
+            foreach ($this->plannableSlots($roster, $context, $result) as $slot) {
+                $this->fillMissingSpecialists($context, $roster, $slot, $result);
+                $this->fillMissingStaff($context, $roster, $slot, $result);
             }
-        }
 
-        return $result;
+            return $result;
+        });
     }
 
     public function deleteAutoShifts(Roster $roster): RosterGenerationResult
@@ -110,131 +69,233 @@ class RosterGeneratorService
         return $result;
     }
 
-    private function fillMissingSpecialists(
-        Collection $employees,
-        Roster $roster,
-        ShiftTemplate $shiftTemplate,
-        CarbonImmutable $date,
-        CarbonImmutable $startsAt,
-        CarbonImmutable $endsAt,
-        ShiftStaffingRule $staffingRule,
-        RosterGenerationResult $result,
-        int $shiftMinutes,
-    ): void {
-        while ($this->actualSpecialists($roster, $shiftTemplate, $date) < $staffingRule->required_specialists) {
-            $candidate = $this->nextCandidate($employees, $roster, $shiftTemplate, $date, $startsAt, $endsAt, needSpecialist: true, shiftMinutes: $shiftMinutes);
+    /**
+     * Baut die zu planenden Slots auf und ordnet sie nach Schwierigkeit:
+     * Urlaubssperren-Tage (hoher Bedarf) zuerst, dann Schichten mit dem
+     * kleinsten Kandidatenkreis, damit knappe Besetzungen (z. B. Nachtdienst)
+     * nicht von leicht besetzbaren Slots leergeplant werden.
+     *
+     * @return array<int, array{date: CarbonImmutable, template: ShiftTemplate, rule: ShiftStaffingRule, startsAt: CarbonImmutable, endsAt: CarbonImmutable}>
+     */
+    private function plannableSlots(Roster $roster, PlanningContext $context, RosterGenerationResult $result): array
+    {
+        $capablePoolSizes = [];
 
-            if ($candidate === null) {
-                $result->addSkipped('no_candidate', 'Es wurde kein geeigneter Mitarbeiter gefunden.', [
-                    'date' => $date->toDateString(),
-                    'shiftTemplateId' => $shiftTemplate->id,
-                    'shiftTemplateCode' => $shiftTemplate->code,
-                    'needSpecialist' => true,
-                    'reason' => 'no_available_specialist',
-                ]);
-
-                return;
-            }
-
-            $this->createAutoShift($roster, $candidate, $shiftTemplate, $date, $startsAt, $endsAt);
-            $result->addCreatedShift();
+        foreach ($context->shiftTemplates as $shiftTemplate) {
+            $capablePoolSizes[$shiftTemplate->id] = $context->employees
+                ->filter(fn (User $employee): bool => $this->employeeCanWorkShiftTemplate($employee, $shiftTemplate))
+                ->count();
         }
-    }
 
-    private function fillMissingStaff(
-        Collection $employees,
-        Roster $roster,
-        ShiftTemplate $shiftTemplate,
-        CarbonImmutable $date,
-        CarbonImmutable $startsAt,
-        CarbonImmutable $endsAt,
-        ShiftStaffingRule $staffingRule,
-        RosterGenerationResult $result,
-        int $shiftMinutes,
-    ): void {
-        while ($this->actualTotalStaff($roster, $shiftTemplate, $date) < $staffingRule->required_total_staff) {
-            $candidate = $this->nextCandidate($employees, $roster, $shiftTemplate, $date, $startsAt, $endsAt, needSpecialist: false, shiftMinutes: $shiftMinutes);
+        $slots = [];
 
-            if ($candidate === null) {
-                $result->addSkipped('no_candidate', 'Es wurde kein geeigneter Mitarbeiter gefunden.', [
-                    'date' => $date->toDateString(),
-                    'shiftTemplateId' => $shiftTemplate->id,
-                    'shiftTemplateCode' => $shiftTemplate->code,
-                    'needSpecialist' => false,
-                    'reason' => 'no_available_employee',
-                ]);
+        foreach ($this->rosterDateService->datesForRosterMonth($roster) as $date) {
+            foreach ($context->shiftTemplates as $shiftTemplate) {
+                $staffingRule = $this->findStaffingRule($shiftTemplate, $date);
 
-                return;
-            }
+                if ($staffingRule === null) {
+                    $result->addSkipped('missing_staffing_rule', 'Für diese Schichtvorlage gibt es keine Besetzungsregel.', [
+                        'date' => $date->toDateString(),
+                        'shiftTemplateId' => $shiftTemplate->id,
+                        'shiftTemplateCode' => $shiftTemplate->code,
+                    ]);
 
-            $this->createAutoShift($roster, $candidate, $shiftTemplate, $date, $startsAt, $endsAt);
-            $result->addCreatedShift();
-        }
-    }
-
-    private function nextCandidate(
-        Collection $employees,
-        Roster $roster,
-        ShiftTemplate $shiftTemplate,
-        CarbonImmutable $date,
-        CarbonImmutable $startsAt,
-        CarbonImmutable $endsAt,
-        bool $needSpecialist,
-        int $shiftMinutes,
-    ): ?User {
-        return $this->sortedCandidates($employees, $roster, $shiftMinutes)
-            ->first(function (User $employee) use ($roster, $shiftTemplate, $date, $startsAt, $endsAt, $needSpecialist): bool {
-                if ($needSpecialist && ! ($employee->employeeProfile?->is_nursing_specialist ?? false)) {
-                    return false;
+                    continue;
                 }
 
-                return $this->employeeCanWorkShiftTemplate($employee, $shiftTemplate)
-                    && ! $this->employeeHasApprovedAbsenceOverlap($employee, $startsAt, $endsAt)
-                    && ! $this->employeeHasRestConflict($employee, $roster, $startsAt, $endsAt)
-                    && ! $this->employeeWouldExceedConsecutiveWorkDays($employee, $roster, $date)
-                    && ! $this->employeeWouldExceedWeekendLoad($employee, $roster, $date)
-                    && ! $this->employeeAlreadyAssigned($employee, $shiftTemplate, $date->toDateString());
-            });
+                [$startsAt, $endsAt] = $this->rosterDateService->buildShiftTimes($date, $shiftTemplate);
+
+                $slots[] = [
+                    'date' => $date,
+                    'template' => $shiftTemplate,
+                    'rule' => $staffingRule,
+                    'startsAt' => $startsAt,
+                    'endsAt' => $endsAt,
+                ];
+            }
+        }
+
+        usort($slots, function (array $first, array $second) use ($context, $capablePoolSizes): int {
+            return [
+                $context->isBlackoutDate($first['date']) ? 0 : 1,
+                $capablePoolSizes[$first['template']->id],
+                $first['date']->toDateString(),
+                (string) $first['template']->starts_at,
+                $first['template']->id,
+            ] <=> [
+                $context->isBlackoutDate($second['date']) ? 0 : 1,
+                $capablePoolSizes[$second['template']->id],
+                $second['date']->toDateString(),
+                (string) $second['template']->starts_at,
+                $second['template']->id,
+            ];
+        });
+
+        return $slots;
     }
 
+    /**
+     * @param  array{date: CarbonImmutable, template: ShiftTemplate, rule: ShiftStaffingRule, startsAt: CarbonImmutable, endsAt: CarbonImmutable}  $slot
+     */
+    private function fillMissingSpecialists(
+        PlanningContext $context,
+        Roster $roster,
+        array $slot,
+        RosterGenerationResult $result,
+    ): void {
+        while ($context->slotSpecialistCount($slot['date'], $slot['template']) < $slot['rule']->required_specialists) {
+            $candidate = $this->nextCandidate($context, $slot, needSpecialist: true, result: $result);
+
+            if ($candidate === null) {
+                return;
+            }
+
+            $this->createAutoShift($context, $roster, $candidate, $slot, $result);
+        }
+    }
+
+    /**
+     * @param  array{date: CarbonImmutable, template: ShiftTemplate, rule: ShiftStaffingRule, startsAt: CarbonImmutable, endsAt: CarbonImmutable}  $slot
+     */
+    private function fillMissingStaff(
+        PlanningContext $context,
+        Roster $roster,
+        array $slot,
+        RosterGenerationResult $result,
+    ): void {
+        while ($context->slotTotalStaff($slot['date'], $slot['template']) < $slot['rule']->required_total_staff) {
+            $candidate = $this->nextCandidate($context, $slot, needSpecialist: false, result: $result);
+
+            if ($candidate === null) {
+                return;
+            }
+
+            $this->createAutoShift($context, $roster, $candidate, $slot, $result);
+        }
+    }
+
+    /**
+     * @param  array{date: CarbonImmutable, template: ShiftTemplate, rule: ShiftStaffingRule, startsAt: CarbonImmutable, endsAt: CarbonImmutable}  $slot
+     */
+    private function nextCandidate(
+        PlanningContext $context,
+        array $slot,
+        bool $needSpecialist,
+        RosterGenerationResult $result,
+    ): ?User {
+        $rejections = [];
+
+        foreach ($this->sortedCandidates($context) as $employee) {
+            $failedConstraint = $this->firstFailedConstraint($context, $employee, $slot, $needSpecialist);
+
+            if ($failedConstraint === null) {
+                return $employee;
+            }
+
+            $rejections[$failedConstraint] = ($rejections[$failedConstraint] ?? 0) + 1;
+        }
+
+        $result->addSkipped('no_candidate', 'Es wurde kein geeigneter Mitarbeiter gefunden.', [
+            'date' => $slot['date']->toDateString(),
+            'shiftTemplateId' => $slot['template']->id,
+            'shiftTemplateCode' => $slot['template']->code,
+            'needSpecialist' => $needSpecialist,
+            'reason' => $needSpecialist ? 'no_available_specialist' : 'no_available_employee',
+            'rejections' => $rejections,
+        ]);
+
+        return null;
+    }
+
+    /**
+     * Liefert den Code der ersten verletzten Regel oder null, wenn der
+     * Mitarbeiter den Dienst übernehmen kann.
+     *
+     * @param  array{date: CarbonImmutable, template: ShiftTemplate, rule: ShiftStaffingRule, startsAt: CarbonImmutable, endsAt: CarbonImmutable}  $slot
+     */
+    private function firstFailedConstraint(
+        PlanningContext $context,
+        User $employee,
+        array $slot,
+        bool $needSpecialist,
+    ): ?string {
+        if ($needSpecialist && ! ($employee->employeeProfile?->is_nursing_specialist ?? false)) {
+            return 'not_specialist';
+        }
+
+        if (! $this->employeeCanWorkShiftTemplate($employee, $slot['template'])) {
+            return 'shift_capability';
+        }
+
+        if ($context->isAlreadyAssigned($employee, $slot['template'], $slot['date'])) {
+            return 'already_assigned';
+        }
+
+        if ($context->hasApprovedAbsenceOverlap($employee, $slot['startsAt'], $slot['endsAt'])) {
+            return 'absence';
+        }
+
+        if ($context->hasRestConflict($employee, $slot['startsAt'], $slot['endsAt'])) {
+            return 'rest_period';
+        }
+
+        if ($context->wouldExceedConsecutiveWorkDays($employee, $slot['date'])) {
+            return 'consecutive_days';
+        }
+
+        if ($context->wouldExceedWeekendLoad($employee, $slot['date'])) {
+            return 'weekend_limit';
+        }
+
+        $shiftMinutes = (int) $slot['startsAt']->diffInMinutes($slot['endsAt'], true);
+
+        if ($context->wouldExceedWeeklyMaxMinutes($employee, $slot['date'], $shiftMinutes)) {
+            return 'weekly_hours_cap';
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array{date: CarbonImmutable, template: ShiftTemplate, rule: ShiftStaffingRule, startsAt: CarbonImmutable, endsAt: CarbonImmutable}  $slot
+     */
     private function createAutoShift(
+        PlanningContext $context,
         Roster $roster,
         User $employee,
-        ShiftTemplate $shiftTemplate,
-        CarbonImmutable $date,
-        CarbonImmutable $startsAt,
-        CarbonImmutable $endsAt,
+        array $slot,
+        RosterGenerationResult $result,
     ): Shift {
-        return Shift::query()->create([
+        $shift = Shift::query()->create([
             'roster_id' => $roster->id,
             'location_id' => $roster->location_id,
             'user_id' => $employee->id,
-            'shift_template_id' => $shiftTemplate->id,
-            'date' => $date->toDateString(),
-            'starts_at' => $startsAt,
-            'ends_at' => $endsAt,
+            'shift_template_id' => $slot['template']->id,
+            'date' => $slot['date']->toDateString(),
+            'starts_at' => $slot['startsAt'],
+            'ends_at' => $slot['endsAt'],
             'source' => ShiftSource::Auto,
             'note' => null,
         ]);
-    }
 
-    private function actualTotalStaff(Roster $roster, ShiftTemplate $shiftTemplate, CarbonImmutable $date): int
-    {
-        return Shift::query()
-            ->where('roster_id', $roster->id)
-            ->where('shift_template_id', $shiftTemplate->id)
-            ->whereDate('date', $date->toDateString())
-            ->count();
-    }
+        $context->addAssignment($employee, $slot['template'], $slot['date'], $slot['startsAt'], $slot['endsAt']);
+        $result->addCreatedShift();
 
-    private function actualSpecialists(Roster $roster, ShiftTemplate $shiftTemplate, CarbonImmutable $date): int
-    {
-        return Shift::query()
-            ->where('roster_id', $roster->id)
-            ->where('shift_template_id', $shiftTemplate->id)
-            ->whereDate('date', $date->toDateString())
-            ->whereHas('user.employeeProfile', fn ($query) => $query->where('is_nursing_specialist', true))
-            ->count();
+        if ($context->hasRequestedAbsenceOverlap($employee, $slot['startsAt'], $slot['endsAt'])) {
+            $result->addWarning(
+                'pending_absence_overlap',
+                'Der Mitarbeiter hat eine noch offene Abwesenheitsanfrage an diesem Tag.',
+                [
+                    'date' => $slot['date']->toDateString(),
+                    'shiftTemplateId' => $slot['template']->id,
+                    'shiftTemplateCode' => $slot['template']->code,
+                    'userId' => $employee->id,
+                    'employeeName' => $employee->name,
+                ],
+            );
+        }
+
+        return $shift;
     }
 
     private function findStaffingRule(ShiftTemplate $shiftTemplate, CarbonImmutable $date): ?ShiftStaffingRule
@@ -257,177 +318,20 @@ class RosterGeneratorService
         };
     }
 
-    private function employeeHasApprovedAbsenceOverlap(
-        User $employee,
-        CarbonImmutable $startsAt,
-        CarbonImmutable $endsAt,
-    ): bool {
-        return AbsenceRequest::query()
-            ->where('user_id', $employee->id)
-            ->where('status', AbsenceRequestStatus::Approved->value)
-            ->whereDate('starts_on', '<=', $endsAt->toDateString())
-            ->whereDate('ends_on', '>=', $startsAt->toDateString())
-            ->exists();
-    }
-
-    private function employeeHasRestConflict(
-        User $employee,
-        Roster $roster,
-        CarbonImmutable $startsAt,
-        CarbonImmutable $endsAt,
-    ): bool {
-        $existingShifts = Shift::query()
-            ->where('roster_id', $roster->id)
-            ->where('user_id', $employee->id)
-            ->get(['id', 'starts_at', 'ends_at']);
-
-        foreach ($existingShifts as $existingShift) {
-            if ($existingShift->ends_at->lessThanOrEqualTo($startsAt)) {
-                $restMinutes = $existingShift->ends_at->diffInMinutes($startsAt, false);
-            } elseif ($endsAt->lessThanOrEqualTo($existingShift->starts_at)) {
-                $restMinutes = $endsAt->diffInMinutes($existingShift->starts_at, false);
-            } else {
-                return true;
-            }
-
-            if ($restMinutes < self::REQUIRED_REST_MINUTES) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private function employeeWouldExceedConsecutiveWorkDays(
-        User $employee,
-        Roster $roster,
-        CarbonImmutable $date,
-    ): bool {
-        $workDays = Shift::query()
-            ->where('roster_id', $roster->id)
-            ->where('user_id', $employee->id)
-            ->pluck('date')
-            ->map(fn ($workDate): string => CarbonImmutable::parse($workDate)->toDateString())
-            ->push($date->toDateString())
-            ->unique()
-            ->sort()
-            ->values();
-
-        $longestSequence = 0;
-        $currentSequence = 0;
-        $previousWorkDay = null;
-
-        foreach ($workDays as $workDay) {
-            $currentWorkDay = CarbonImmutable::parse($workDay)->startOfDay();
-
-            if ($previousWorkDay !== null && $currentWorkDay->equalTo($previousWorkDay->addDay())) {
-                $currentSequence++;
-            } else {
-                $currentSequence = 1;
-            }
-
-            $longestSequence = max($longestSequence, $currentSequence);
-            $previousWorkDay = $currentWorkDay;
-        }
-
-        return $longestSequence > self::MAX_ALLOWED_CONSECUTIVE_WORK_DAYS;
-    }
-
-    private function employeeWouldExceedWeekendLoad(
-        User $employee,
-        Roster $roster,
-        CarbonImmutable $date,
-    ): bool {
-        if (! $date->isSaturday() && ! $date->isSunday()) {
-            return false;
-        }
-
-        $weekendStarts = Shift::query()
-            ->where('roster_id', $roster->id)
-            ->where('user_id', $employee->id)
-            ->pluck('date')
-            ->map(fn ($workDate) => CarbonImmutable::parse($workDate)->startOfDay())
-            ->filter(fn (CarbonImmutable $workDate): bool => $workDate->isSaturday() || $workDate->isSunday())
-            ->map(fn (CarbonImmutable $workDate): string => $workDate
-                ->subDays($workDate->isSunday() ? 1 : 0)
-                ->toDateString())
-            ->push($date->subDays($date->isSunday() ? 1 : 0)->toDateString())
-            ->unique();
-
-        return $weekendStarts->count() > self::MAX_ALLOWED_WEEKENDS;
-    }
-
-    private function employeeAlreadyAssigned(User $employee, ShiftTemplate $shiftTemplate, string $date): bool
+    /**
+     * Fairness-Sortierung: am wenigsten ausgelastete Mitarbeiter zuerst.
+     *
+     * @return Collection<int, User>
+     */
+    private function sortedCandidates(PlanningContext $context): Collection
     {
-        return Shift::query()
-            ->where('user_id', $employee->id)
-            ->where('shift_template_id', $shiftTemplate->id)
-            ->whereDate('date', $date)
-            ->exists();
-    }
-
-    private function sortedCandidates(Collection $employees, Roster $roster, int $shiftMinutes): Collection
-    {
-        $shiftStats = Shift::query()
-            ->where('roster_id', $roster->id)
-            ->get(['user_id', 'starts_at', 'ends_at'])
-            ->groupBy('user_id')
-            ->map(fn (Collection $shifts): array => [
-                'planned_minutes' => (int) $shifts->sum(
-                    fn (Shift $shift): int => (int) $shift->starts_at->diffInMinutes($shift->ends_at, true),
-                ),
-                'shifts_count' => $shifts->count(),
-            ]);
-
-        return $employees
+        return $context->employees
             ->sortBy([
-                function (User $employee) use ($roster, $shiftStats, $shiftMinutes): int {
-                    $plannedMinutes = (int) ($shiftStats[$employee->id]['planned_minutes'] ?? 0);
-
-                    return $this->utilizationPermille(
-                        $plannedMinutes,
-                        $this->targetMinutesForEmployee($employee, $roster, $shiftMinutes),
-                    );
-                },
-                fn (User $employee): int => (int) ($shiftStats[$employee->id]['planned_minutes'] ?? 0),
-                fn (User $employee): int => (int) ($shiftStats[$employee->id]['shifts_count'] ?? 0),
+                fn (User $employee): int => $context->utilizationPermilleFor($employee),
+                fn (User $employee): int => $context->plannedMinutesFor($employee),
+                fn (User $employee): int => $context->shiftCountFor($employee),
                 fn (User $employee): string => $employee->name,
             ])
             ->values();
-    }
-
-    /**
-     * Monatliche Soll-Kapazitaet in Minuten = das Strengere aus Wochenstunden
-     * und Regel-Arbeitstagen. Schichten sind feste Bloecke, daher bindet bei
-     * Teilzeit oft die vereinbarte Tageszahl statt der Stunden.
-     */
-    private function targetMinutesForEmployee(User $employee, Roster $roster, int $shiftMinutes): int
-    {
-        $profile = $employee->employeeProfile;
-        $daysInMonth = CarbonImmutable::create($roster->year, $roster->month, 1)->daysInMonth;
-        $weeksFactor = $daysInMonth / 7;
-
-        $targets = [];
-
-        $weeklyHours = (float) ($profile?->weekly_hours ?? 0);
-        if ($weeklyHours > 0) {
-            $targets[] = (int) round($weeklyHours * 60 * $weeksFactor);
-        }
-
-        $regularDays = (int) ($profile?->regular_work_days_per_week ?? 0);
-        if ($regularDays > 0 && $shiftMinutes > 0) {
-            $targets[] = (int) round($regularDays * $shiftMinutes * $weeksFactor);
-        }
-
-        return $targets === [] ? 0 : min($targets);
-    }
-
-    private function utilizationPermille(int $plannedMinutes, int $targetMinutes): int
-    {
-        if ($targetMinutes <= 0) {
-            return 1000000;
-        }
-
-        return (int) round($plannedMinutes * 1000 / $targetMinutes);
     }
 }

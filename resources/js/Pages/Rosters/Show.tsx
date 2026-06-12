@@ -60,9 +60,16 @@ type RosterGenerationResult = {
     createdShifts: number;
     deletedAutoShifts: number;
     skipped: GenerationSkippedEntry[];
+    warnings?: GenerationWarningEntry[];
 };
 
 type GenerationSkippedEntry = {
+    code: string;
+    message: string;
+    context: Record<string, unknown>;
+};
+
+type GenerationWarningEntry = {
     code: string;
     message: string;
     context: Record<string, unknown>;
@@ -962,8 +969,75 @@ function GenerationResult({ result }: { result: RosterGenerationResult | null })
                     </div>
                 </div>
             )}
+
+            {(result.warnings ?? []).length > 0 && (
+                <div className="mt-3 border-t border-blue-200 pt-3">
+                    <p className="font-medium">Hinweise zur Planung</p>
+                    <div className="mt-2 space-y-2">
+                        {(result.warnings ?? []).map((entry, index) => (
+                            <div
+                                key={`${entry.code}-${index}`}
+                                className="rounded-md bg-white/70 p-3 text-blue-950 ring-1 ring-blue-100"
+                            >
+                                <p className="font-semibold">
+                                    {generationWarningTitle(entry)}
+                                </p>
+                                <p className="mt-1 text-xs text-blue-900">
+                                    {[
+                                        entry.context.employeeName,
+                                        entry.context.date,
+                                        entry.message,
+                                    ]
+                                        .filter(
+                                            (value) => typeof value === 'string',
+                                        )
+                                        .join(' · ')}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
+}
+
+function generationWarningTitle(entry: GenerationWarningEntry): string {
+    if (entry.code === 'pending_absence_overlap') {
+        return 'Offene Abwesenheitsanfrage am Diensttag';
+    }
+
+    return entry.message;
+}
+
+const generationRejectionLabels: Record<string, string> = {
+    not_specialist: 'Keine Fachkraft',
+    shift_capability: 'Schichtart nicht möglich',
+    already_assigned: 'Bereits eingeplant',
+    absence: 'Genehmigte Abwesenheit',
+    rest_period: 'Ruhezeit zu kurz',
+    consecutive_days: 'Zu viele Tage am Stück',
+    weekend_limit: 'Wochenend-Limit erreicht',
+    weekly_hours_cap: 'Wochenstunden-Limit erreicht',
+};
+
+function formatGenerationRejections(value: unknown): string | null {
+    if (
+        value === null ||
+        typeof value !== 'object' ||
+        Array.isArray(value) ||
+        Object.keys(value).length === 0
+    ) {
+        return null;
+    }
+
+    return Object.entries(value as Record<string, unknown>)
+        .filter(([, count]) => typeof count === 'number')
+        .map(
+            ([code, count]) =>
+                `${generationRejectionLabels[code] ?? code}: ${String(count)}`,
+        )
+        .join(' · ');
 }
 
 function generationSkippedTitle(entry: GenerationSkippedEntry): string {
@@ -1049,6 +1123,7 @@ function GenerationSkippedSummary({ entry }: { entry: GenerationSkippedEntry }) 
                 : null,
         ],
         ['Grund', reason],
+        ['Abgelehnte Kandidaten', formatGenerationRejections(entry.context.rejections)],
     ];
     const details = contextDetails.filter(
         ([, value]) => value !== null && value !== undefined,

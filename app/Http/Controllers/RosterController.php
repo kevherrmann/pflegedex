@@ -138,6 +138,7 @@ class RosterController extends Controller
                 'createdShifts' => $result->createdShifts,
                 'deletedAutoShifts' => $result->deletedAutoShifts,
                 'skipped' => $result->skipped,
+                'warnings' => $result->warnings,
             ])
             ->with('rosterValidationResult', $this->validationFlashPayload($roster, $validationResult));
     }
@@ -158,6 +159,7 @@ class RosterController extends Controller
                 'createdShifts' => $result->createdShifts,
                 'deletedAutoShifts' => $result->deletedAutoShifts,
                 'skipped' => $result->skipped,
+                'warnings' => $result->warnings,
             ]);
     }
 
