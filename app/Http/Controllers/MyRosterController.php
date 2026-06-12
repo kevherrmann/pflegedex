@@ -69,6 +69,8 @@ class MyRosterController extends Controller
             ->whereNotIn('status', $visibleStatuses)
             ->exists();
 
+        $teamShifts = $this->loadTeamShifts($user, $shifts, $monthStart, $monthEnd, $visibleStatuses);
+
         return Inertia::render('MyRoster/Show', [
             'month' => [
                 'year' => $month->year,
@@ -78,7 +80,7 @@ class MyRosterController extends Controller
                 'next' => $month->addMonth()->format('Y-m'),
                 'daysInMonth' => $month->daysInMonth,
             ],
-            'days' => $this->buildDays($monthStart, $monthEnd, $shifts, $absences),
+            'days' => $this->buildDays($monthStart, $monthEnd, $shifts, $absences, $teamShifts),
             'summary' => $this->buildSummary($user, $month, $shifts),
             'hasUnpublishedRoster' => $hasUnpublishedRoster,
         ]);
@@ -98,8 +100,40 @@ class MyRosterController extends Controller
     }
 
     /**
+     * Dienste der Kolleginnen und Kollegen an den eigenen Arbeitstagen und
+     * Standorten — Grundlage fuer "Mit wem arbeite ich zusammen?". Nur aus
+     * veroeffentlichten/gesperrten Plaenen, denn nur die sind verbindlich.
+     *
+     * @param  Collection<int, Shift>  $ownShifts
+     * @param  array<int, string>  $visibleStatuses
+     * @return Collection<int, Shift>
+     */
+    private function loadTeamShifts(
+        $user,
+        $ownShifts,
+        CarbonImmutable $monthStart,
+        CarbonImmutable $monthEnd,
+        array $visibleStatuses,
+    ) {
+        if ($ownShifts->isEmpty()) {
+            return collect();
+        }
+
+        return Shift::query()
+            ->with(['shiftTemplate', 'user'])
+            ->where('user_id', '!=', $user->id)
+            ->whereIn('location_id', $ownShifts->pluck('location_id')->unique())
+            ->whereDate('date', '>=', $monthStart->toDateString())
+            ->whereDate('date', '<=', $monthEnd->toDateString())
+            ->whereHas('roster', fn ($query) => $query->whereIn('status', $visibleStatuses))
+            ->orderBy('starts_at')
+            ->get();
+    }
+
+    /**
      * @param  Collection<int, Shift>  $shifts
      * @param  Collection<int, AbsenceRequest>  $absences
+     * @param  Collection<int, Shift>  $teamShifts
      * @return array<int, array<string, mixed>>
      */
     private function buildDays(
@@ -107,8 +141,13 @@ class MyRosterController extends Controller
         CarbonImmutable $monthEnd,
         $shifts,
         $absences,
+        $teamShifts,
     ): array {
         $shiftsByDate = $shifts->groupBy(
+            fn (Shift $shift): string => CarbonImmutable::parse($shift->date)->toDateString(),
+        );
+
+        $teamShiftsByDate = $teamShifts->groupBy(
             fn (Shift $shift): string => CarbonImmutable::parse($shift->date)->toDateString(),
         );
 
@@ -146,10 +185,54 @@ class MyRosterController extends Controller
                     'startsOn' => $dayAbsence->starts_on->toDateString(),
                     'endsOn' => $dayAbsence->ends_on->toDateString(),
                 ],
+                'team' => $this->buildTeamForDay(
+                    $shiftsByDate->get($dateKey, collect()),
+                    $teamShiftsByDate->get($dateKey, collect()),
+                ),
             ];
         }
 
         return $days;
+    }
+
+    /**
+     * "Mit wem arbeite ich zusammen?": Kollegen am selben Tag und Standort,
+     * nach Schichtvorlage gruppiert. Nur an eigenen Arbeitstagen — an freien
+     * Tagen ist die Besetzung anderer nicht relevant.
+     *
+     * @param  Collection<int, Shift>  $ownDayShifts
+     * @param  Collection<int, Shift>  $dayTeamShifts
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildTeamForDay($ownDayShifts, $dayTeamShifts): array
+    {
+        if ($ownDayShifts->isEmpty()) {
+            return [];
+        }
+
+        $ownLocationIds = $ownDayShifts->pluck('location_id')->unique();
+        $ownTemplateIds = $ownDayShifts->pluck('shift_template_id')->unique();
+
+        return $dayTeamShifts
+            ->filter(fn (Shift $shift): bool => $ownLocationIds->contains($shift->location_id))
+            ->groupBy('shift_template_id')
+            ->map(fn ($templateShifts): array => [
+                'shiftTemplateName' => $templateShifts->first()->shiftTemplate?->name,
+                'shiftTemplateCode' => $templateShifts->first()->shiftTemplate?->code,
+                'shiftTemplateColor' => $templateShifts->first()->shiftTemplate?->color,
+                'startsAt' => $templateShifts->first()->starts_at->format('H:i'),
+                'endsAt' => $templateShifts->first()->ends_at->format('H:i'),
+                'isOwnShift' => $ownTemplateIds->contains($templateShifts->first()->shift_template_id),
+                'colleagues' => $templateShifts
+                    ->map(fn (Shift $shift): ?string => $shift->user?->name)
+                    ->filter()
+                    ->sort()
+                    ->values()
+                    ->all(),
+            ])
+            ->sortBy('startsAt')
+            ->values()
+            ->all();
     }
 
     /**

@@ -14,6 +14,16 @@ type MyShift = {
     isLocked: boolean;
 };
 
+type TeamGroup = {
+    shiftTemplateName: string | null;
+    shiftTemplateCode: string | null;
+    shiftTemplateColor: string | null;
+    startsAt: string;
+    endsAt: string;
+    isOwnShift: boolean;
+    colleagues: string[];
+};
+
 type MyDay = {
     date: string;
     dayLabel: string;
@@ -26,6 +36,7 @@ type MyDay = {
         startsOn: string;
         endsOn: string;
     } | null;
+    team: TeamGroup[];
 };
 
 type Props = {
@@ -127,9 +138,51 @@ function DayRow({ day }: { day: MyDay }) {
                     <ShiftRow key={shift.id} shift={shift} />
                 ))}
 
+                {day.team.length > 0 && <TeamBlock team={day.team} />}
+
                 {!hasContent && (
                     <p className="pt-1 text-sm text-gray-400">frei</p>
                 )}
+            </div>
+        </div>
+    );
+}
+
+function TeamBlock({ team }: { team: TeamGroup[] }) {
+    return (
+        <div className="rounded-lg bg-gray-50 px-3 py-2 ring-1 ring-gray-200">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                Mit wem arbeite ich zusammen?
+            </p>
+            <div className="mt-1.5 space-y-1">
+                {team.map((group, index) => (
+                    <div
+                        key={`${group.shiftTemplateCode ?? 'unbekannt'}-${index}`}
+                        className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs"
+                    >
+                        <span className="inline-flex items-center gap-1.5 font-semibold text-gray-700">
+                            <span
+                                className="h-2 w-2 shrink-0 rounded-full"
+                                style={{
+                                    backgroundColor:
+                                        group.shiftTemplateColor ?? '#9B1C3B',
+                                }}
+                            />
+                            {group.shiftTemplateName ?? 'Dienst'}
+                            {group.isOwnShift && (
+                                <span className="rounded-full bg-[#9B1C3B]/10 px-1.5 py-0.5 text-[10px] font-semibold text-[#9B1C3B]">
+                                    meine Schicht
+                                </span>
+                            )}
+                        </span>
+                        <span className="text-gray-500">
+                            {group.startsAt}–{group.endsAt} Uhr
+                        </span>
+                        <span className="text-gray-700">
+                            {group.colleagues.join(', ')}
+                        </span>
+                    </div>
+                ))}
             </div>
         </div>
     );

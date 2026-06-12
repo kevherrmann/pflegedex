@@ -225,3 +225,101 @@ it('forbids access for users without an active employee profile', function (): v
 it('requires authentication', function (): void {
     $this->get(route('my-roster.show'))->assertRedirect(route('login'));
 });
+
+it('shows colleagues working the same day grouped by shift', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $employee = myRosterEmployee($location);
+    $colleagueSameShift = myRosterEmployee($location);
+    $colleagueLateShift = myRosterEmployee($location);
+    $roster = myRosterRoster($location, $pdl, RosterStatus::Published);
+    $earlyTemplate = myRosterTemplate($location);
+
+    $lateTemplate = ShiftTemplate::query()->create([
+        'location_id' => $location->id,
+        'name' => 'Spätdienst',
+        'code' => 'late',
+        'starts_at' => '14:00',
+        'ends_at' => '22:00',
+        'duration_minutes' => 480,
+        'color' => '#7C3AED',
+        'active' => true,
+    ]);
+
+    myRosterShift($roster, $employee, $earlyTemplate, '2027-01-05');
+    myRosterShift($roster, $colleagueSameShift, $earlyTemplate, '2027-01-05');
+
+    Shift::query()->create([
+        'roster_id' => $roster->id,
+        'location_id' => $location->id,
+        'user_id' => $colleagueLateShift->id,
+        'shift_template_id' => $lateTemplate->id,
+        'date' => '2027-01-05',
+        'starts_at' => CarbonImmutable::parse('2027-01-05 14:00'),
+        'ends_at' => CarbonImmutable::parse('2027-01-05 22:00'),
+        'source' => ShiftSource::Auto,
+    ]);
+
+    $this->actingAs($employee)
+        ->get(route('my-roster.show', ['month' => '2027-01']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('days.4.team', 2)
+            ->where('days.4.team.0.shiftTemplateName', 'Frühdienst')
+            ->where('days.4.team.0.isOwnShift', true)
+            ->where('days.4.team.0.colleagues', [$colleagueSameShift->name])
+            ->where('days.4.team.1.shiftTemplateName', 'Spätdienst')
+            ->where('days.4.team.1.isOwnShift', false)
+            ->where('days.4.team.1.colleagues', [$colleagueLateShift->name]));
+});
+
+it('shows no team on free days', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $employee = myRosterEmployee($location);
+    $colleague = myRosterEmployee($location);
+    $roster = myRosterRoster($location, $pdl, RosterStatus::Published);
+    $template = myRosterTemplate($location);
+
+    // Nur der Kollege arbeitet am 5.1. — der Mitarbeiter hat frei.
+    myRosterShift($roster, $colleague, $template, '2027-01-05');
+
+    $this->actingAs($employee)
+        ->get(route('my-roster.show', ['month' => '2027-01']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('days.4.team', []));
+});
+
+it('excludes colleagues from draft rosters and other locations from the team', function (): void {
+    $homeLocation = Location::factory()->create();
+    $otherLocation = Location::factory()->create();
+    $pdl = User::factory()->for($homeLocation)->create();
+    $employee = myRosterEmployee($homeLocation);
+    $draftColleague = myRosterEmployee($homeLocation);
+    $remoteColleague = myRosterEmployee($otherLocation);
+
+    $publishedRoster = myRosterRoster($homeLocation, $pdl, RosterStatus::Published);
+    $draftRoster = myRosterRoster($otherLocation, $pdl, RosterStatus::Draft);
+    $homeTemplate = myRosterTemplate($homeLocation);
+    $otherTemplate = myRosterTemplate($otherLocation);
+
+    myRosterShift($publishedRoster, $employee, $homeTemplate, '2027-01-05');
+    // Entwurfs-Dienst des Kollegen am selben Standort: unsichtbar.
+    $draftHomeRoster = Roster::query()->create([
+        'location_id' => $homeLocation->id,
+        'year' => 2027,
+        'month' => 2,
+        'status' => RosterStatus::Draft,
+        'created_by' => $pdl->id,
+    ]);
+    myRosterShift($draftHomeRoster, $draftColleague, $homeTemplate, '2027-01-05');
+    // Veroeffentlichter Dienst am anderen Standort: nicht mein Team.
+    myRosterShift($draftRoster, $remoteColleague, $otherTemplate, '2027-01-05');
+
+    $this->actingAs($employee)
+        ->get(route('my-roster.show', ['month' => '2027-01']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('days.4.team', []));
+});
