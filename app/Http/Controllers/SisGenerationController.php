@@ -40,6 +40,19 @@ class SisGenerationController extends Controller
         /** @var Sis $sis */
         $sis = $resident->sis()->with(['topicEntries', 'risks'])->firstOrFail();
 
+        // Concurrency-Guard: keine zweite Generierung starten, solange eine
+        // laeuft (Doppelklick oder paralleler Start einer zweiten PDL).
+        $hasActiveGeneration = SisGeneration::query()
+            ->where('sis_id', $sis->id)
+            ->whereIn('status', [SisGeneration::STATUS_PENDING, SisGeneration::STATUS_RUNNING])
+            ->exists();
+
+        if ($hasActiveGeneration) {
+            return redirect()
+                ->route('residents.sis.show', $resident)
+                ->with('error', 'Es läuft bereits eine KI-Ausformulierung für diese SIS.');
+        }
+
         $generation = SisGeneration::query()->create([
             'sis_id' => $sis->id,
             'triggered_by' => $request->user()->id,
@@ -93,7 +106,7 @@ class SisGenerationController extends Controller
     {
         return [
             'opening_question' => $sis->opening_question,
-            'topics' => $sis->topicEntries->map(fn($t): array => [
+            'topics' => $sis->topicEntries->map(fn ($t): array => [
                 'topic_number' => $t->topic_number,
                 'content' => $t->content,
             ])->all(),

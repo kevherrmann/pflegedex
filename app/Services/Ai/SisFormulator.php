@@ -7,6 +7,7 @@ namespace App\Services\Ai;
 use App\Enums\Salutation;
 use App\Enums\SisTopic;
 use App\Models\Sis;
+use App\Services\Ai\Concerns\FormulatesWithOllama;
 
 /**
  * Formuliert SIS-Stichpunkte mit Hilfe eines LLM in fachlichen Fliesstext um.
@@ -25,10 +26,12 @@ use App\Models\Sis;
  */
 class SisFormulator
 {
+    use FormulatesWithOllama;
+
     public function __construct(
         private readonly OllamaClient $ollama,
-    ) {
-    }
+        private readonly AiOutputSanitizer $sanitizer = new AiOutputSanitizer,
+    ) {}
 
     /**
      * Schreibt den uebergebenen Stichpunkt in fachlichen Fliesstext um.
@@ -45,7 +48,9 @@ class SisFormulator
         $system = $this->systemPrompt($salutation);
         $prompt = $this->fieldPrompt($fieldLabel, $input);
 
-        return $this->ollama->generate($prompt, $system);
+        $output = $this->generateValidated($prompt, $system, $salutation);
+
+        return $output === '' ? null : $output;
     }
 
     /**

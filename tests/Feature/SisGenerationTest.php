@@ -9,9 +9,11 @@ use App\Models\Sis;
 use App\Models\SisGeneration;
 use App\Models\User;
 use App\Services\Ai\AiHealthService;
+use App\Services\Ai\SisFormulator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Inertia\Testing\AssertableInertia;
 use Spatie\Permission\Models\Role;
 use Tests\Support\FakeAiHealthService;
 
@@ -54,7 +56,7 @@ it('PDL kann eine Generation starten und der Job wird dispatcht', function (): v
 });
 
 it('blockt den Generation-Start wenn Ollama nicht verfuegbar ist', function (): void {
-    app()->bind(AiHealthService::class, fn() => FakeAiHealthService::unavailable());
+    app()->bind(AiHealthService::class, fn () => FakeAiHealthService::unavailable());
 
     $location = Location::factory()->create();
     $resident = Resident::factory()->for($location)->create();
@@ -142,7 +144,7 @@ it('GenerateSisJob ueberschreibt SIS-Felder mit Ollama-Antwort', function (): vo
     ]);
 
     $location = Location::factory()->create();
-    $resident = Resident::factory()->for($location)->create();
+    $resident = Resident::factory()->for($location)->create(['salutation' => 'frau']);
     $sis = Sis::factory()->withTopicsAndRisks()->create([
         'resident_id' => $resident->id,
         'location_id' => $location->id,
@@ -160,7 +162,7 @@ it('GenerateSisJob ueberschreibt SIS-Felder mit Ollama-Antwort', function (): vo
         'total_steps' => 7,
     ]);
 
-    (new GenerateSisJob($generation->id))->handle(app(\App\Services\Ai\SisFormulator::class));
+    (new GenerateSisJob($generation->id))->handle(app(SisFormulator::class));
 
     $sis->refresh();
     expect($sis->opening_question)->toBe('Die Bewohnerin moechte mehr Zeit im Garten verbringen.');
@@ -198,8 +200,8 @@ it('GenerateSisJob setzt status=failed bei Ollama-Fehler', function (): void {
     ]);
 
     try {
-        (new GenerateSisJob($generation->id))->handle(app(\App\Services\Ai\SisFormulator::class));
-    } catch (\Throwable) {
+        (new GenerateSisJob($generation->id))->handle(app(SisFormulator::class));
+    } catch (Throwable) {
         // Job re-throwt - das ist fuer Queue-Retry gewollt
     }
 
@@ -232,7 +234,7 @@ it('Show-Page liefert latestGeneration wenn vorhanden', function (): void {
     $this->actingAs($pdl)
         ->get(route('residents.sis.show', $resident))
         ->assertOk()
-        ->assertInertia(fn(\Inertia\Testing\AssertableInertia $page) => $page
+        ->assertInertia(fn (AssertableInertia $page) => $page
             ->component('Sis/Show')
             ->where('latestGeneration.status', 'running')
             ->where('latestGeneration.progress', 2)

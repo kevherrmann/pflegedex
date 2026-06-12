@@ -58,6 +58,23 @@ class CarePlanGenerationController extends Controller
                 ->with('error', $status['reason'] ?? 'KI-Service ist gerade nicht verfügbar.');
         }
 
+        // Concurrency-Guard: keine zweite Generierung starten, solange eine
+        // laeuft (Doppelklick oder paralleler Start einer zweiten PDL).
+        $existingCarePlan = $resident->carePlan()->first();
+
+        if ($existingCarePlan !== null) {
+            $hasActiveGeneration = CarePlanGeneration::query()
+                ->where('care_plan_id', $existingCarePlan->id)
+                ->whereIn('status', [CarePlanGeneration::STATUS_PENDING, CarePlanGeneration::STATUS_RUNNING])
+                ->exists();
+
+            if ($hasActiveGeneration) {
+                return redirect()
+                    ->route('residents.care-plan.show', $resident)
+                    ->with('error', 'Es läuft bereits eine KI-Erstellung für diesen Maßnahmenplan.');
+            }
+        }
+
         $generation = DB::transaction(function () use ($resident, $sis, $request): CarePlanGeneration {
             $user = $request->user();
 
@@ -131,11 +148,11 @@ class CarePlanGenerationController extends Controller
     {
         return [
             'opening_question' => $sis->opening_question,
-            'topics' => $sis->topicEntries->map(fn($t): array => [
+            'topics' => $sis->topicEntries->map(fn ($t): array => [
                 'topic_number' => $t->topic_number,
                 'content' => $t->content,
             ])->all(),
-            'risks' => $sis->risks->map(fn($r): array => [
+            'risks' => $sis->risks->map(fn ($r): array => [
                 'kind' => $r->risk_kind,
                 'is_at_risk' => $r->is_at_risk,
                 'notes' => $r->notes,

@@ -7,6 +7,7 @@ namespace App\Services\Ai;
 use App\Enums\CarePlanTopic;
 use App\Enums\Salutation;
 use App\Models\Sis;
+use App\Services\Ai\Concerns\FormulatesWithOllama;
 
 /**
  * Leitet einen Massnahmenplan aus einer fertiggestellten SIS ab.
@@ -30,13 +31,15 @@ use App\Models\Sis;
  */
 class CarePlanFormulator
 {
+    use FormulatesWithOllama;
+
     /** Sentinel-String. Wenn das LLM den ausgibt, weiss der Job: Thema ueberspringen. */
     private const NOT_APPLICABLE_TOKEN = 'NICHT_RELEVANT';
 
     public function __construct(
         private readonly OllamaClient $ollama,
-    ) {
-    }
+        private readonly AiOutputSanitizer $sanitizer = new AiOutputSanitizer,
+    ) {}
 
     /**
      * Liefert die geordneten Felder eines neuen MP fuer den Job.
@@ -73,16 +76,11 @@ class CarePlanFormulator
         $system = $this->systemPrompt($salutation);
         $prompt = $this->fieldPrompt($fieldKey, $fieldLabel, $sisContext);
 
-        $output = trim($this->ollama->generate($prompt, $system));
+        $output = $this->generateValidated($prompt, $system, $salutation);
 
-        if ($output === '' || $output === self::NOT_APPLICABLE_TOKEN) {
-            return null;
-        }
-
-        // Vorsichtsmassnahme: wenn das Modell den Token irgendwo im
-        // Text einbettet ("NICHT_RELEVANT, weil ..."), trotzdem als
-        // "nicht relevant" werten.
-        if (str_contains($output, self::NOT_APPLICABLE_TOKEN)) {
+        // Robuste Sentinel-Erkennung: auch eingebettet ("nicht relevant,
+        // weil ...") oder mit Leerzeichen/Bindestrich geschrieben.
+        if ($this->sanitizer->isNotApplicable($output)) {
             return null;
         }
 
@@ -103,14 +101,14 @@ class CarePlanFormulator
             'opening_question' => $sis->opening_question,
             'topics' => $sis->topicEntries
                 ->sortBy('topic_number')
-                ->map(fn($t): array => [
+                ->map(fn ($t): array => [
                     'number' => (int) $t->topic_number,
                     'content' => (string) $t->content,
                 ])
                 ->values()
                 ->all(),
             'risks' => $sis->risks
-                ->map(fn($r): array => [
+                ->map(fn ($r): array => [
                     'kind' => (string) $r->risk_kind,
                     'is_at_risk' => (bool) $r->is_at_risk,
                     'notes' => (string) ($r->notes ?? ''),
@@ -167,7 +165,7 @@ class CarePlanFormulator
         $sisBlock = $this->renderSisContext($sisContext);
 
         if ($fieldKey === 'grundbotschaft') {
-            $instruction = <<<TEXT
+            $instruction = <<<'TEXT'
                 Aufgabe: Formuliere die GRUNDBOTSCHAFT des Massnahmenplans.
 
                 Die Grundbotschaft enthaelt kurze, immer geltende Hinweise zum Bewohner,

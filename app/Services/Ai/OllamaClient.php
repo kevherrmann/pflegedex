@@ -24,8 +24,7 @@ class OllamaClient
 {
     public function __construct(
         private readonly HttpFactory $http,
-    ) {
-    }
+    ) {}
 
     public function generate(string $prompt, ?string $system = null): string
     {
@@ -42,8 +41,8 @@ class OllamaClient
             'prompt' => $prompt,
             'stream' => false,
             'options' => [
-                'temperature' => 0.3,
-                'top_p' => 0.9,
+                'temperature' => (float) config('ai.ollama.temperature', 0.3),
+                'top_p' => (float) config('ai.ollama.top_p', 0.9),
             ],
         ];
 
