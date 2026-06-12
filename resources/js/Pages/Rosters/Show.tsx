@@ -4,7 +4,7 @@ import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { FormEventHandler, useState } from 'react';
+import { FormEventHandler, useEffect, useState } from 'react';
 
 type EmployeeOption = {
     id: string;
@@ -75,6 +75,39 @@ type GenerationWarningEntry = {
     context: Record<string, unknown>;
 };
 
+type RosterPreviewAssignment = {
+    userId: string;
+    employeeName: string;
+    shiftTemplateId: string;
+    shiftTemplateName: string;
+    shiftTemplateCode: string;
+    date: string;
+    startsAt: string;
+    endsAt: string;
+};
+
+type RosterPreviewEmployeeStat = {
+    userId: string;
+    employeeName: string;
+    plannedMinutes: number;
+    targetMinutes: number;
+    utilizationPermille: number;
+    nightShifts: number;
+    weekends: number;
+    shiftCount: number;
+};
+
+type RosterPreviewResult = {
+    rosterId: string;
+    createdShifts: number;
+    replacedAutoShifts: number;
+    skipped: GenerationSkippedEntry[];
+    warnings: GenerationWarningEntry[];
+    plannedAssignments: RosterPreviewAssignment[];
+    employeeStats: RosterPreviewEmployeeStat[];
+    projectedValidation: RosterValidationResult;
+};
+
 type CalendarDay = {
     date: string;
     dayLabel: string;
@@ -133,6 +166,7 @@ type Props = {
     calendarDays: CalendarDay[];
     rosterValidationResult: RosterValidationResult | null;
     rosterGenerationResult: RosterGenerationResult | null;
+    rosterPreviewResult: RosterPreviewResult | null;
 };
 
 function formatDateTime(value: string | null): string {
@@ -855,6 +889,14 @@ function RosterActions({ roster }: { roster: RosterItem }) {
         }
     };
 
+    const preview = () => {
+        router.post(
+            route('rosters.generate-preview', roster.id),
+            {},
+            { preserveScroll: true },
+        );
+    };
+
     const deleteAutoShifts = () => {
         if (
             window.confirm(
@@ -885,6 +927,13 @@ function RosterActions({ roster }: { roster: RosterItem }) {
                         className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800 transition hover:bg-blue-100"
                     >
                         Automatisch planen
+                    </button>
+                    <button
+                        type="button"
+                        onClick={preview}
+                        className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                    >
+                        Vorschau
                     </button>
                     <button
                         type="button"
@@ -1155,6 +1204,155 @@ function GenerationSkippedSummary({ entry }: { entry: GenerationSkippedEntry }) 
                     {JSON.stringify(entry.context, null, 2)}
                 </pre>
             </details>
+        </div>
+    );
+}
+
+function RosterPreviewModal({
+    roster,
+    result,
+}: {
+    roster: RosterItem;
+    result: RosterPreviewResult;
+}) {
+    const [open, setOpen] = useState(true);
+
+    useEffect(() => {
+        setOpen(true);
+    }, [result]);
+
+    if (!open) {
+        return null;
+    }
+
+    const close = () => setOpen(false);
+
+    const apply = () => {
+        setOpen(false);
+        router.post(route('rosters.generate', roster.id), {}, { preserveScroll: true });
+    };
+
+    const validation = result.projectedValidation;
+
+    return (
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+            onClick={close}
+        >
+            <div
+                onClick={(event) => event.stopPropagation()}
+                className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl"
+            >
+                <h3 className="text-lg font-semibold text-gray-900">
+                    Vorschau der automatischen Planung
+                </h3>
+                <p className="mt-2 text-sm text-gray-700">
+                    {result.createdShifts} Dienste würden geplant,{' '}
+                    {result.replacedAutoShifts} bestehende Auto-Dienste ersetzt.
+                </p>
+
+                <div
+                    className={`mt-4 rounded-md border p-4 text-sm ${
+                        validation.status === 'red'
+                            ? 'border-red-200 bg-red-50 text-red-900'
+                            : validation.status === 'yellow'
+                              ? 'border-amber-200 bg-amber-50 text-amber-900'
+                              : 'border-green-200 bg-green-50 text-green-900'
+                    }`}
+                >
+                    <p className="font-semibold">
+                        {validation.status === 'red' && 'Der Dienstplan hätte Fehler.'}
+                        {validation.status === 'yellow' &&
+                            'Der Dienstplan hätte Hinweise.'}
+                        {validation.status === 'green' &&
+                            'Der Dienstplan würde alle aktuell geprüften Regeln erfüllen.'}
+                    </p>
+                    <p className="mt-1">
+                        {validation.errors.length} Fehler ·{' '}
+                        {validation.warnings.length} Hinweise
+                    </p>
+                </div>
+
+                {result.employeeStats.length > 0 && (
+                    <div className="mt-4 overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200 text-sm">
+                            <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                <tr>
+                                    <th className="px-4 py-3">Mitarbeiter</th>
+                                    <th className="px-4 py-3">Dienste</th>
+                                    <th className="px-4 py-3">Geplante Std.</th>
+                                    <th className="px-4 py-3">Soll-Std.</th>
+                                    <th className="px-4 py-3">Auslastung</th>
+                                    <th className="px-4 py-3">Nächte</th>
+                                    <th className="px-4 py-3">Wochenenden</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 bg-white text-gray-700">
+                                {result.employeeStats.map((stat) => (
+                                    <tr key={stat.userId}>
+                                        <td className="px-4 py-3 font-medium text-gray-900">
+                                            {stat.employeeName}
+                                        </td>
+                                        <td className="px-4 py-3">{stat.shiftCount}</td>
+                                        <td className="px-4 py-3">
+                                            {formatMinutesAsHours(stat.plannedMinutes)}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            {formatMinutesAsHours(stat.targetMinutes)}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            {(stat.utilizationPermille / 10).toFixed(0)} %
+                                        </td>
+                                        <td className="px-4 py-3">{stat.nightShifts}</td>
+                                        <td className="px-4 py-3">{stat.weekends}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+
+                {result.skipped.length > 0 && (
+                    <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-900">
+                        {result.skipped.length} Bedarfe könnten nicht besetzt werden.
+                    </p>
+                )}
+
+                {result.warnings.length > 0 && (
+                    <div className="mt-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-950">
+                        <p className="font-medium">Hinweise zur Planung</p>
+                        <ul className="mt-2 space-y-1">
+                            {result.warnings.map((entry, index) => (
+                                <li key={`${entry.code}-${index}`}>
+                                    {[
+                                        entry.context.employeeName,
+                                        entry.context.date,
+                                        entry.message,
+                                    ]
+                                        .filter(
+                                            (value): value is string =>
+                                                typeof value === 'string',
+                                        )
+                                        .join(' · ')}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+
+                <div className="mt-6 flex justify-end gap-2 border-t border-gray-100 pt-4">
+                    <button
+                        type="button"
+                        onClick={close}
+                        className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                    >
+                        Schließen
+                    </button>
+                    <PrimaryButton type="button" onClick={apply}>
+                        Übernehmen
+                    </PrimaryButton>
+                </div>
+            </div>
         </div>
     );
 }
@@ -1937,6 +2135,7 @@ export default function RosterShow({
     calendarDays,
     rosterValidationResult,
     rosterGenerationResult,
+    rosterPreviewResult,
 }: Props) {
     return (
         <AuthenticatedLayout
@@ -2006,6 +2205,14 @@ export default function RosterShow({
                     </div>
 
                     <GenerationResult result={rosterGenerationResult} />
+
+                    {rosterPreviewResult !== null &&
+                        rosterPreviewResult.rosterId === roster.id && (
+                            <RosterPreviewModal
+                                roster={roster}
+                                result={rosterPreviewResult}
+                            />
+                        )}
 
                     <ValidationResult
                         roster={roster}

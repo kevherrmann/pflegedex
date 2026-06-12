@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AbsenceRequestController;
 use App\Http\Controllers\AuditController;
 use App\Http\Controllers\CarePlanController;
 use App\Http\Controllers\CarePlanGenerationController;
@@ -9,10 +10,11 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ResidentController;
-use App\Http\Controllers\RosterController;
 use App\Http\Controllers\RosterBlackoutDayController;
+use App\Http\Controllers\RosterController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\ShiftTemplateController;
+use App\Http\Controllers\ShiftWishController;
 use App\Http\Controllers\SisController;
 use App\Http\Controllers\SisGenerationController;
 use App\Http\Controllers\SisPdfController;
@@ -23,7 +25,6 @@ use App\Support\BrandPalette;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
-use App\Http\Controllers\AbsenceRequestController;
 
 Route::get('/', function () {
     return Inertia::render('Welcome', [
@@ -118,6 +119,15 @@ Route::middleware('auth')->group(function () {
     Route::post('/roster-blackout-days', [RosterBlackoutDayController::class, 'store'])
         ->name('roster-blackout-days.store');
 
+    Route::get('/shift-wishes', [ShiftWishController::class, 'index'])
+        ->name('shift-wishes.index');
+
+    Route::post('/shift-wishes', [ShiftWishController::class, 'store'])
+        ->name('shift-wishes.store');
+
+    Route::delete('/shift-wishes/{shiftWish}', [ShiftWishController::class, 'destroy'])
+        ->name('shift-wishes.destroy');
+
     Route::get('/shift-templates', [ShiftTemplateController::class, 'index'])
         ->name('shift-templates.index');
 
@@ -151,6 +161,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/rosters/{roster}/generate', [RosterController::class, 'generate'])
         ->name('rosters.generate');
 
+    Route::post('/rosters/{roster}/generate-preview', [RosterController::class, 'generatePreview'])
+        ->name('rosters.generate-preview');
+
     Route::delete('/rosters/{roster}/auto-shifts', [RosterController::class, 'deleteAutoShifts'])
         ->name('rosters.auto-shifts.destroy');
 
@@ -164,4 +177,4 @@ Route::middleware('auth')->group(function () {
         ->name('rosters.shifts.destroy');
 });
 
-require __DIR__ . '/auth.php';
+require __DIR__.'/auth.php';

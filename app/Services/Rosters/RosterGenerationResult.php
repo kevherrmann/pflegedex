@@ -22,6 +22,15 @@ class RosterGenerationResult
 
     public array $warnings = [];
 
+    /** Nur in der Vorschau gefüllt: die geplanten Zuweisungen. */
+    public array $plannedAssignments = [];
+
+    /** Nur in der Vorschau gefüllt: Auslastung je Mitarbeiter. */
+    public array $employeeStats = [];
+
+    /** Gesamtstrafe der weichen Ziele nach der Verbesserungsphase. */
+    public int $penaltyTotal = 0;
+
     public function addSkipped(string $code, string $message, array $context = []): void
     {
         $this->skipped[] = [

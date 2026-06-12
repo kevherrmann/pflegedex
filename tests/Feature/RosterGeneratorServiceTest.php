@@ -591,6 +591,9 @@ it('avoids the third weekend for the same employee', function (): void {
 });
 
 it('returns no candidate when the only employee would get a third weekend', function (): void {
+    // Strikter Modus ohne Wochenend-Lockerung.
+    config(['rostering.relax_weekend_limit_for_coverage' => false]);
+
     $location = Location::factory()->create();
     $pdl = User::factory()->for($location)->create();
     $employee = createRosterGeneratorEmployee($location);
@@ -615,6 +618,9 @@ it('returns no candidate when the only employee would get a third weekend', func
 });
 
 it('counts Saturday and Sunday of the same weekend once for weekend load', function (): void {
+    // Strikter Modus ohne Wochenend-Lockerung.
+    config(['rostering.relax_weekend_limit_for_coverage' => false]);
+
     $location = Location::factory()->create();
     $pdl = User::factory()->for($location)->create();
     $employee = createRosterGeneratorEmployee($location);
@@ -683,6 +689,9 @@ it('ignores weekdays for weekend load', function (): void {
 });
 
 it('counts auto shifts created earlier in the same generator run for weekend load', function (): void {
+    // Strikter Modus ohne Wochenend-Lockerung.
+    config(['rostering.relax_weekend_limit_for_coverage' => false]);
+
     $location = Location::factory()->create();
     $pdl = User::factory()->for($location)->create();
     $employee = createRosterGeneratorEmployee($location);
@@ -1076,26 +1085,41 @@ it('respects consecutive work days across the month boundary', function (): void
     $shiftTemplate = createRosterGeneratorShiftTemplate($location);
     createRosterGeneratorStaffingRule($shiftTemplate);
 
-    // 27.-31.12. bereits gearbeitet: Der 1.1. ist Tag 6, der 2.1. wäre Tag 7.
+    // 27.-31.12. bereits gearbeitet: Die Folge darf im Januar nicht über
+    // insgesamt 6 Tage hinaus verlängert werden.
     foreach (['2026-12-27', '2026-12-28', '2026-12-29', '2026-12-30', '2026-12-31'] as $date) {
         createRosterGeneratorShift($decemberRoster, $employee, $shiftTemplate, $date);
     }
 
     $result = app(RosterGeneratorService::class)->generate($januaryRoster);
 
-    $secondOfJanuarySkip = collect($result->skipped)
-        ->first(fn (array $entry): bool => $entry['context']['date'] === '2027-01-02');
+    // Alle Arbeitstage des Mitarbeiters über die Monatsgrenze hinweg.
+    $workDates = Shift::query()
+        ->where('user_id', $employee->id)
+        ->pluck('date')
+        ->map(fn ($date): string => CarbonImmutable::parse($date)->toDateString())
+        ->unique()
+        ->sort()
+        ->values();
 
-    expect(Shift::query()
-        ->where('roster_id', $januaryRoster->id)
-        ->whereDate('date', '2027-01-01')
-        ->exists())->toBeTrue()
-        ->and(Shift::query()
-            ->where('roster_id', $januaryRoster->id)
-            ->whereDate('date', '2027-01-02')
-            ->exists())->toBeFalse()
-        ->and($secondOfJanuarySkip)->not->toBeNull()
-        ->and($secondOfJanuarySkip['context']['rejections'])->toHaveKey('consecutive_days');
+    $longestRun = 1;
+    $currentRun = 1;
+
+    for ($index = 1; $index < $workDates->count(); $index++) {
+        $currentRun = CarbonImmutable::parse($workDates[$index])
+            ->equalTo(CarbonImmutable::parse($workDates[$index - 1])->addDay())
+            ? $currentRun + 1
+            : 1;
+
+        $longestRun = max($longestRun, $currentRun);
+    }
+
+    $consecutiveSkips = collect($result->skipped)
+        ->filter(fn (array $entry): bool => $entry['code'] === 'no_candidate'
+            && array_key_exists('consecutive_days', $entry['context']['rejections']));
+
+    expect($longestRun)->toBeLessThanOrEqual(6)
+        ->and($consecutiveSkips)->not->toBeEmpty();
 });
 
 it('respects rest conflicts with shifts in another location roster', function (): void {
@@ -1272,4 +1296,27 @@ it('generates with a bounded number of database queries', function (): void {
     // Der Planungszustand wird einmal geladen: Lesezugriffe wachsen nicht mit der Slot-Anzahl.
     expect($result->createdShifts)->toBeGreaterThan(50)
         ->and($selectQueries->count())->toBeLessThan(30);
+});
+
+it('relaxes the weekend limit when the slot would otherwise stay unfilled', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $employee = createRosterGeneratorEmployee($location);
+    $roster = createRosterGeneratorRoster($location, $pdl);
+    $earlyShiftTemplate = createRosterGeneratorShiftTemplate($location);
+    createRosterGeneratorStaffingRule($earlyShiftTemplate, ['weekday' => 6]);
+
+    createRosterGeneratorShift($roster, $employee, $earlyShiftTemplate, '2027-01-02');
+    createRosterGeneratorShift($roster, $employee, $earlyShiftTemplate, '2027-01-09');
+
+    $result = app(RosterGeneratorService::class)->generate($roster);
+
+    // Besetzung schlägt Wochenend-Empfehlung: Das dritte Wochenende wird
+    // besetzt statt den Samstag unbesetzt zu lassen (Validator warnt dann).
+    expect(Shift::query()
+        ->where('roster_id', $roster->id)
+        ->where('shift_template_id', $earlyShiftTemplate->id)
+        ->whereDate('date', '2027-01-16')
+        ->exists())->toBeTrue()
+        ->and(collect($result->skipped)->where('code', 'no_candidate'))->toBeEmpty();
 });

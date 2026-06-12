@@ -4,11 +4,14 @@ namespace App\Services\Rosters\Planning;
 
 use App\Enums\AbsenceRequestStatus;
 use App\Enums\EmploymentArea;
+use App\Enums\ShiftWishKind;
 use App\Models\AbsenceRequest;
 use App\Models\Roster;
 use App\Models\RosterBlackoutDay;
 use App\Models\Shift;
+use App\Models\ShiftStaffingRule;
 use App\Models\ShiftTemplate;
+use App\Models\ShiftWish;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -21,9 +24,15 @@ use Illuminate\Support\Collection;
  * Dienstplanmonat (inklusive anderer Dienstpläne und Standorte), damit
  * Ruhezeiten, Folgetage und Wochenstunden nicht an der Monatsgrenze abreißen.
  * Alle Regel-Prüfungen arbeiten danach ohne weitere Datenbankzugriffe.
+ *
+ * Zuweisungen können wieder entfernt werden (Tausch- und Verschiebezüge der
+ * lokalen Suche), daher sind alle Indizes als Zähler gepflegt.
  */
 class PlanningContext
 {
+    /** Rangfolge für die Vorwärtsrotation Früh -> Spät -> Nacht. */
+    private const ROTATION_RANKS = ['early' => 0, 'late' => 1, 'night' => 2];
+
     /** @var Collection<int, User> */
     public Collection $employees;
 
@@ -44,10 +53,10 @@ class PlanningContext
 
     private readonly int $weeklyMaxMinutes;
 
-    /** @var array<string, array<string, true>> userId => [Y-m-d => true], alle bekannten Arbeitstage im Fenster */
+    /** @var array<string, array<string, int>> userId => [Y-m-d => Dienste an diesem Tag], fensterweit */
     private array $workDates = [];
 
-    /** @var array<string, array<int, array{0: int, 1: int}>> userId => Dienstintervalle als Timestamps */
+    /** @var array<string, array<string, array{0: int, 1: int}>> userId => [Belegungsschlüssel => Intervall-Timestamps] */
     private array $intervals = [];
 
     /** @var array<string, int> userId => geplante Minuten im aktuellen Dienstplan */
@@ -56,14 +65,20 @@ class PlanningContext
     /** @var array<string, int> userId => Dienste im aktuellen Dienstplan */
     private array $shiftCounts = [];
 
-    /** @var array<string, array<string, true>> userId => Wochenend-Schlüssel im Dienstplanmonat */
+    /** @var array<string, array<string, int>> userId => [Wochenend-Schlüssel => Dienste], nur Dienstplanmonat */
     private array $weekendKeys = [];
 
     /** @var array<string, array<string, int>> userId => [ISO-Woche => Minuten], fensterweit */
     private array $weeklyMinutes = [];
 
-    /** @var array<string, array<string, true>> userId => ["date|templateId" => true], fensterweit */
+    /** @var array<string, true> Belegungsschlüssel "userId|date|templateId", fensterweit */
     private array $assignedTemplates = [];
+
+    /** @var array<string, array<string, array<int, int>>> userId => [Y-m-d => [Rotationsrang => Dienste]] */
+    private array $rotationRanks = [];
+
+    /** @var array<string, int> userId => Nachtdienste im aktuellen Dienstplan */
+    private array $nightShiftCounts = [];
 
     /** @var array<string, array<int, array{0: string, 1: string}>> userId => genehmigte Abwesenheiten [von, bis] */
     private array $approvedAbsences = [];
@@ -83,8 +98,31 @@ class PlanningContext
     /** @var array<string, int> userId => monatliche Soll-Minuten */
     private array $targetMinutes = [];
 
-    public function __construct(private readonly Roster $roster)
-    {
+    /** @var array<string, array<string, true>> userId => [Y-m-d => true] Wunschfrei-Tage */
+    private array $wishFreeDates = [];
+
+    /** @var array<string, array<string, string|null>> userId => [Y-m-d => gewünschte Vorlage oder null] */
+    private array $wishShifts = [];
+
+    /** @var array<string, bool> userId => ist Fachkraft */
+    private array $specialists = [];
+
+    /** @var array<string, string> Y-m-d => Vortag, für Carbon-freie Nachbarschaftsprüfungen */
+    private array $previousDayKeys = [];
+
+    /** @var array<string, string> Y-m-d => Folgetag */
+    private array $nextDayKeys = [];
+
+    /** @var array<int, array{0: string, 1: array<int, string>}> [Sonntag, bekannte Fenstertage im Monat] */
+    private array $monthSundayWindows = [];
+
+    /** @var array<string, array{week: string, weekend: string|null, inMonth: bool}> Y-m-d => Metadaten */
+    private array $dateMeta = [];
+
+    public function __construct(
+        private readonly Roster $roster,
+        bool $ignoreAutoShifts = false,
+    ) {
         $this->requiredRestMinutes = (int) config('rostering.required_rest_minutes');
         $this->maxConsecutiveWorkDays = (int) config('rostering.max_consecutive_work_days');
         $this->maxWeekendsPerMonth = (int) config('rostering.max_weekends_per_month');
@@ -93,12 +131,88 @@ class PlanningContext
         $this->monthStart = CarbonImmutable::create($roster->year, $roster->month, 1)->startOfDay();
         $this->monthEnd = $this->monthStart->endOfMonth()->startOfDay();
 
+        $this->buildDateLookups();
         $this->loadTemplates();
         $this->loadEmployees();
-        $this->loadShifts();
+        $this->loadShifts($ignoreAutoShifts);
         $this->loadAbsences();
         $this->loadBlackoutDates();
+        $this->loadWishes();
         $this->calculateTargets();
+    }
+
+    /**
+     * Vorberechnete Datums-Nachbarschaften und Sonntags-Ausgleichsfenster,
+     * damit die Strafbewertung ohne Carbon-Objekte auskommt (heißer Pfad
+     * der lokalen Suche).
+     */
+    private function buildDateLookups(): void
+    {
+        [$windowStart, $windowEnd] = $this->windowBounds();
+
+        $previous = null;
+
+        for ($date = $windowStart->subDay(); $date->lessThanOrEqualTo($windowEnd->addDay()); $date = $date->addDay()) {
+            $key = $date->toDateString();
+
+            if ($previous !== null) {
+                $this->previousDayKeys[$key] = $previous;
+                $this->nextDayKeys[$previous] = $key;
+            }
+
+            $this->dateMeta[$key] = [
+                'week' => WorkRules::isoWeekKey($date),
+                'weekend' => WorkRules::weekendStartKey($date),
+                'inMonth' => $date->between($this->monthStart, $this->monthEnd),
+            ];
+
+            $previous = $key;
+        }
+
+        for ($date = $this->monthStart; $date->lessThanOrEqualTo($this->monthEnd); $date = $date->addDay()) {
+            if ($date->dayOfWeekIso !== 7) {
+                continue;
+            }
+
+            $window = [];
+
+            for ($windowDate = $date->subDays(6); $windowDate->lessThanOrEqualTo($date->addDays(7)); $windowDate = $windowDate->addDay()) {
+                if ($windowDate->between($this->monthStart, $this->monthEnd)) {
+                    $window[] = $windowDate->toDateString();
+                }
+            }
+
+            $this->monthSundayWindows[] = [$date->toDateString(), $window];
+        }
+    }
+
+    public function previousDayKey(string $date): string
+    {
+        return $this->previousDayKeys[$date]
+            ?? CarbonImmutable::parse($date)->subDay()->toDateString();
+    }
+
+    public function nextDayKey(string $date): string
+    {
+        return $this->nextDayKeys[$date]
+            ?? CarbonImmutable::parse($date)->addDay()->toDateString();
+    }
+
+    /**
+     * @return array{week: string, weekend: string|null, inMonth: bool}
+     */
+    private function dateMetaFor(CarbonImmutable $date): array
+    {
+        return $this->dateMeta[$date->toDateString()] ?? [
+            'week' => WorkRules::isoWeekKey($date),
+            'weekend' => WorkRules::weekendStartKey($date),
+            'inMonth' => $date->between($this->monthStart, $this->monthEnd),
+        ];
+    }
+
+    public function weekendStartKeyFor(CarbonImmutable $date): ?string
+    {
+        return $this->dateMetaFor($date)['weekend'];
     }
 
     private function loadTemplates(): void
@@ -127,23 +241,29 @@ class PlanningContext
             ->orderBy('name')
             ->get()
             ->values();
+
+        foreach ($this->employees as $employee) {
+            $this->specialists[$employee->id] = (bool) ($employee->employeeProfile?->is_nursing_specialist ?? false);
+        }
     }
 
-    private function loadShifts(): void
+    private function loadShifts(bool $ignoreAutoShifts): void
     {
         [$windowStart, $windowEnd] = $this->windowBounds();
 
         // Alle Dienste dieses Dienstplans (auch von inzwischen nicht mehr
         // berechtigten Mitarbeitern), damit Besetzungszaehler vollstaendig sind.
         $rosterShifts = Shift::query()
-            ->with('user.employeeProfile')
+            ->with(['user.employeeProfile', 'shiftTemplate:id,code'])
             ->where('roster_id', $this->roster->id)
+            ->when($ignoreAutoShifts, fn ($query) => $query->where('source', '!=', 'auto'))
             ->get();
 
         foreach ($rosterShifts as $shift) {
             $this->indexShift(
                 $shift->user_id,
                 $shift->shift_template_id,
+                $this->rotationRankForCode($shift->shiftTemplate?->code),
                 CarbonImmutable::parse($shift->date)->startOfDay(),
                 $shift->starts_at->toImmutable(),
                 $shift->ends_at->toImmutable(),
@@ -155,6 +275,7 @@ class PlanningContext
         // Dienste derselben Mitarbeiter im Randfenster, inklusive anderer
         // Dienstplaene und Standorte (Ruhezeiten, Folgetage, Wochenstunden).
         $boundaryShifts = Shift::query()
+            ->with('shiftTemplate:id,code')
             ->whereIn('user_id', $this->employees->pluck('id'))
             ->where('roster_id', '!=', $this->roster->id)
             ->whereDate('date', '>=', $windowStart->toDateString())
@@ -165,6 +286,7 @@ class PlanningContext
             $this->indexShift(
                 $shift->user_id,
                 $shift->shift_template_id,
+                $this->rotationRankForCode($shift->shiftTemplate?->code),
                 CarbonImmutable::parse($shift->date)->startOfDay(),
                 $shift->starts_at->toImmutable(),
                 $shift->ends_at->toImmutable(),
@@ -209,6 +331,25 @@ class PlanningContext
         }
     }
 
+    private function loadWishes(): void
+    {
+        $wishes = ShiftWish::query()
+            ->whereIn('user_id', $this->employees->pluck('id'))
+            ->whereDate('date', '>=', $this->monthStart->toDateString())
+            ->whereDate('date', '<=', $this->monthEnd->toDateString())
+            ->get(['user_id', 'date', 'kind', 'shift_template_id']);
+
+        foreach ($wishes as $wish) {
+            $dateKey = CarbonImmutable::parse($wish->date)->toDateString();
+
+            if ($wish->kind === ShiftWishKind::WishFree) {
+                $this->wishFreeDates[$wish->user_id][$dateKey] = true;
+            } else {
+                $this->wishShifts[$wish->user_id][$dateKey] = $wish->shift_template_id;
+            }
+        }
+    }
+
     private function calculateTargets(): void
     {
         $calculator = new TargetMinutesCalculator;
@@ -233,30 +374,83 @@ class PlanningContext
         return [$this->monthStart->subDays($windowDays), $this->monthEnd->addDays($windowDays)];
     }
 
+    public function rotationRankForCode(?string $code): ?int
+    {
+        return self::ROTATION_RANKS[$code] ?? null;
+    }
+
     /**
      * Registriert eine neue Zuweisung im Planungszustand.
      */
-    public function addAssignment(
-        User $employee,
-        ShiftTemplate $shiftTemplate,
-        CarbonImmutable $date,
-        CarbonImmutable $startsAt,
-        CarbonImmutable $endsAt,
-    ): void {
+    public function addAssignment(PlannedAssignment $assignment): void
+    {
         $this->indexShift(
-            $employee->id,
-            $shiftTemplate->id,
-            $date,
-            $startsAt,
-            $endsAt,
+            $assignment->employee->id,
+            $assignment->shiftTemplate->id,
+            $this->rotationRankForCode($assignment->shiftTemplate->code),
+            $assignment->date,
+            $assignment->startsAt,
+            $assignment->endsAt,
             belongsToRoster: true,
-            isSpecialist: (bool) ($employee->employeeProfile?->is_nursing_specialist ?? false),
+            isSpecialist: $this->isSpecialist($assignment->employee),
         );
+    }
+
+    /**
+     * Entfernt eine zuvor registrierte Zuweisung wieder (lokale Suche).
+     */
+    public function removeAssignment(PlannedAssignment $assignment): void
+    {
+        $userId = $assignment->employee->id;
+        $dateKey = $assignment->date->toDateString();
+        $minutes = $assignment->minutes();
+        $occupancyKey = $dateKey.'|'.$assignment->shiftTemplate->id;
+        $meta = $this->dateMetaFor($assignment->date);
+
+        $this->workDates[$userId][$dateKey]--;
+        if ($this->workDates[$userId][$dateKey] <= 0) {
+            unset($this->workDates[$userId][$dateKey]);
+        }
+
+        unset(
+            $this->intervals[$userId][$occupancyKey],
+            $this->assignedTemplates[$userId.'|'.$occupancyKey],
+        );
+
+        $this->weeklyMinutes[$userId][$meta['week']] -= $minutes;
+
+        if ($meta['inMonth'] && $meta['weekend'] !== null && isset($this->weekendKeys[$userId][$meta['weekend']])) {
+            $this->weekendKeys[$userId][$meta['weekend']]--;
+            if ($this->weekendKeys[$userId][$meta['weekend']] <= 0) {
+                unset($this->weekendKeys[$userId][$meta['weekend']]);
+            }
+        }
+
+        $rotationRank = $this->rotationRankForCode($assignment->shiftTemplate->code);
+        if ($rotationRank !== null) {
+            $this->rotationRanks[$userId][$dateKey][$rotationRank]--;
+            if ($this->rotationRanks[$userId][$dateKey][$rotationRank] <= 0) {
+                unset($this->rotationRanks[$userId][$dateKey][$rotationRank]);
+            }
+        }
+
+        if ($assignment->shiftTemplate->code === 'night') {
+            $this->nightShiftCounts[$userId]--;
+        }
+
+        $this->plannedMinutes[$userId] -= $minutes;
+        $this->shiftCounts[$userId]--;
+        $this->slotTotals[$occupancyKey]--;
+
+        if ($this->isSpecialist($assignment->employee)) {
+            $this->slotSpecialists[$occupancyKey]--;
+        }
     }
 
     private function indexShift(
         string $userId,
         string $shiftTemplateId,
+        ?int $rotationRank,
         CarbonImmutable $date,
         CarbonImmutable $startsAt,
         CarbonImmutable $endsAt,
@@ -265,33 +459,53 @@ class PlanningContext
     ): void {
         $dateKey = $date->toDateString();
         $minutes = (int) $startsAt->diffInMinutes($endsAt, true);
+        $occupancyKey = $dateKey.'|'.$shiftTemplateId;
+        $meta = $this->dateMetaFor($date);
 
-        $this->workDates[$userId][$dateKey] = true;
-        $this->intervals[$userId][] = [$startsAt->getTimestamp(), $endsAt->getTimestamp()];
-        $this->assignedTemplates[$userId][$dateKey.'|'.$shiftTemplateId] = true;
+        $this->workDates[$userId][$dateKey] = ($this->workDates[$userId][$dateKey] ?? 0) + 1;
+        $this->intervals[$userId][$occupancyKey] = [$startsAt->getTimestamp(), $endsAt->getTimestamp()];
+        $this->assignedTemplates[$userId.'|'.$occupancyKey] = true;
 
-        $weekKey = WorkRules::isoWeekKey($date);
-        $this->weeklyMinutes[$userId][$weekKey] = ($this->weeklyMinutes[$userId][$weekKey] ?? 0) + $minutes;
+        $this->weeklyMinutes[$userId][$meta['week']] = ($this->weeklyMinutes[$userId][$meta['week']] ?? 0) + $minutes;
 
-        if ($date->between($this->monthStart, $this->monthEnd)) {
-            $weekendKey = WorkRules::weekendStartKey($date);
+        if ($rotationRank !== null) {
+            $this->rotationRanks[$userId][$dateKey][$rotationRank] =
+                ($this->rotationRanks[$userId][$dateKey][$rotationRank] ?? 0) + 1;
+        }
 
-            if ($weekendKey !== null) {
-                $this->weekendKeys[$userId][$weekendKey] = true;
-            }
+        if ($meta['inMonth'] && $meta['weekend'] !== null) {
+            $this->weekendKeys[$userId][$meta['weekend']] = ($this->weekendKeys[$userId][$meta['weekend']] ?? 0) + 1;
         }
 
         if ($belongsToRoster) {
             $this->plannedMinutes[$userId] = ($this->plannedMinutes[$userId] ?? 0) + $minutes;
             $this->shiftCounts[$userId] = ($this->shiftCounts[$userId] ?? 0) + 1;
+            $this->slotTotals[$occupancyKey] = ($this->slotTotals[$occupancyKey] ?? 0) + 1;
 
-            $slotKey = $dateKey.'|'.$shiftTemplateId;
-            $this->slotTotals[$slotKey] = ($this->slotTotals[$slotKey] ?? 0) + 1;
+            if ($rotationRank === self::ROTATION_RANKS['night']) {
+                $this->nightShiftCounts[$userId] = ($this->nightShiftCounts[$userId] ?? 0) + 1;
+            }
 
             if ($isSpecialist) {
-                $this->slotSpecialists[$slotKey] = ($this->slotSpecialists[$slotKey] ?? 0) + 1;
+                $this->slotSpecialists[$occupancyKey] = ($this->slotSpecialists[$occupancyKey] ?? 0) + 1;
             }
         }
+    }
+
+    public function isSpecialist(User $employee): bool
+    {
+        return $this->specialists[$employee->id]
+            ?? (bool) ($employee->employeeProfile?->is_nursing_specialist ?? false);
+    }
+
+    public function staffingRuleFor(ShiftTemplate $shiftTemplate, CarbonImmutable $date): ?ShiftStaffingRule
+    {
+        $weekday = $date->dayOfWeekIso;
+
+        return $shiftTemplate->staffingRules
+            ->first(fn (ShiftStaffingRule $rule): bool => $rule->weekday === $weekday)
+            ?? $shiftTemplate->staffingRules
+                ->first(fn (ShiftStaffingRule $rule): bool => $rule->weekday === null);
     }
 
     public function slotTotalStaff(CarbonImmutable $date, ShiftTemplate $shiftTemplate): int
@@ -339,7 +553,7 @@ class PlanningContext
     public function hasRestConflict(User $employee, CarbonImmutable $startsAt, CarbonImmutable $endsAt): bool
     {
         return WorkRules::hasRestConflict(
-            $this->intervals[$employee->id] ?? [],
+            array_values($this->intervals[$employee->id] ?? []),
             $startsAt->getTimestamp(),
             $endsAt->getTimestamp(),
             $this->requiredRestMinutes,
@@ -348,22 +562,30 @@ class PlanningContext
 
     public function wouldExceedConsecutiveWorkDays(User $employee, CarbonImmutable $date): bool
     {
-        if (isset($this->workDates[$employee->id][$date->toDateString()])) {
+        $dateKey = $date->toDateString();
+        $workDates = $this->workDates[$employee->id] ?? [];
+
+        if (isset($workDates[$dateKey])) {
             // Der Tag ist bereits Arbeitstag, eine weitere Schicht ändert die Folge nicht.
             return false;
         }
 
-        $runLength = WorkRules::consecutiveRunLengthContaining(
-            $this->workDates[$employee->id] ?? [],
-            $date,
-        );
+        $runLength = 1;
+
+        for ($day = $this->previousDayKeys[$dateKey] ?? null; $day !== null && isset($workDates[$day]); $day = $this->previousDayKeys[$day] ?? null) {
+            $runLength++;
+        }
+
+        for ($day = $this->nextDayKeys[$dateKey] ?? null; $day !== null && isset($workDates[$day]); $day = $this->nextDayKeys[$day] ?? null) {
+            $runLength++;
+        }
 
         return $runLength > $this->maxConsecutiveWorkDays;
     }
 
     public function wouldExceedWeekendLoad(User $employee, CarbonImmutable $date): bool
     {
-        $weekendKey = WorkRules::weekendStartKey($date);
+        $weekendKey = $this->dateMetaFor($date)['weekend'];
 
         if ($weekendKey === null) {
             return false;
@@ -380,12 +602,12 @@ class PlanningContext
 
     public function isAlreadyAssigned(User $employee, ShiftTemplate $shiftTemplate, CarbonImmutable $date): bool
     {
-        return isset($this->assignedTemplates[$employee->id][$date->toDateString().'|'.$shiftTemplate->id]);
+        return isset($this->assignedTemplates[$employee->id.'|'.$date->toDateString().'|'.$shiftTemplate->id]);
     }
 
     public function wouldExceedWeeklyMaxMinutes(User $employee, CarbonImmutable $date, int $shiftMinutes): bool
     {
-        $weekKey = WorkRules::isoWeekKey($date);
+        $weekKey = $this->dateMetaFor($date)['week'];
         $currentMinutes = $this->weeklyMinutes[$employee->id][$weekKey] ?? 0;
 
         return $currentMinutes + $shiftMinutes > $this->weeklyMaxMinutes;
@@ -415,5 +637,105 @@ class PlanningContext
         }
 
         return (int) round($this->plannedMinutesFor($employee) * 1000 / $targetMinutes);
+    }
+
+    public function nightShiftCountFor(User $employee): int
+    {
+        return $this->nightShiftCounts[$employee->id] ?? 0;
+    }
+
+    public function weekendCountFor(User $employee): int
+    {
+        return count($this->weekendKeys[$employee->id] ?? []);
+    }
+
+    public function hasWeekend(User $employee, string $weekendKey): bool
+    {
+        return isset($this->weekendKeys[$employee->id][$weekendKey]);
+    }
+
+    public function isWorkDate(User $employee, string $date): bool
+    {
+        return isset($this->workDates[$employee->id][$date]);
+    }
+
+    /**
+     * Höchster Rotationsrang des Mitarbeiters an einem Tag oder null.
+     */
+    public function maxRotationRank(User $employee, string $date): ?int
+    {
+        $ranks = $this->rotationRanks[$employee->id][$date] ?? [];
+
+        return $ranks === [] ? null : max(array_keys($ranks));
+    }
+
+    /**
+     * Niedrigster Rotationsrang des Mitarbeiters an einem Tag oder null.
+     */
+    public function minRotationRank(User $employee, string $date): ?int
+    {
+        $ranks = $this->rotationRanks[$employee->id][$date] ?? [];
+
+        return $ranks === [] ? null : min(array_keys($ranks));
+    }
+
+    public function hasWishFree(User $employee, string $date): bool
+    {
+        return isset($this->wishFreeDates[$employee->id][$date]);
+    }
+
+    /**
+     * Wunschdienst des Mitarbeiters an einem Tag: true = Vorlage passt,
+     * false = kein Wunsch oder andere Vorlage gewünscht.
+     */
+    public function fulfillsWishShift(User $employee, string $date, ShiftTemplate $shiftTemplate): bool
+    {
+        if (! array_key_exists($date, $this->wishShifts[$employee->id] ?? [])) {
+            return false;
+        }
+
+        $wishedTemplateId = $this->wishShifts[$employee->id][$date];
+
+        return $wishedTemplateId === null || $wishedTemplateId === $shiftTemplate->id;
+    }
+
+    /**
+     * Anzahl der gearbeiteten Sonntage im Monat ohne bekannten freien
+     * Ersatzruhetag im Ausgleichszeitraum (6 Tage davor bis 7 Tage danach).
+     */
+    public function sundayCompensationViolations(User $employee, ?string $extraWorkDate = null): int
+    {
+        $workDates = $this->workDates[$employee->id] ?? [];
+
+        if ($extraWorkDate !== null) {
+            $workDates[$extraWorkDate] = ($workDates[$extraWorkDate] ?? 0) + 1;
+        }
+
+        if ($workDates === []) {
+            return 0;
+        }
+
+        $violations = 0;
+
+        foreach ($this->monthSundayWindows as [$sunday, $windowDates]) {
+            if (! isset($workDates[$sunday])) {
+                continue;
+            }
+
+            $hasFreeDay = false;
+
+            foreach ($windowDates as $windowDate) {
+                if (! isset($workDates[$windowDate])) {
+                    $hasFreeDay = true;
+                    break;
+                }
+            }
+
+            if (! $hasFreeDay) {
+                $violations++;
+            }
+        }
+
+        return $violations;
     }
 }

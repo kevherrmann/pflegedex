@@ -55,6 +55,7 @@ class RosterController extends Controller
             'calendarDays' => $this->calendarDaysForRoster($roster),
             'rosterValidationResult' => $request->session()->get('rosterValidationResult'),
             'rosterGenerationResult' => $request->session()->get('rosterGenerationResult'),
+            'rosterPreviewResult' => $request->session()->get('rosterPreviewResult'),
         ]);
     }
 
@@ -141,6 +142,36 @@ class RosterController extends Controller
                 'warnings' => $result->warnings,
             ])
             ->with('rosterValidationResult', $this->validationFlashPayload($roster, $validationResult));
+    }
+
+    /**
+     * Vorschau der automatischen Planung: identische Pipeline wie generate,
+     * aber ohne Persistenz — inklusive projizierter Validierung.
+     */
+    public function generatePreview(
+        Request $request,
+        Roster $roster,
+        PdlRosterAccess $pdlRosterAccess,
+        RosterGeneratorService $generator,
+        RosterValidator $rosterValidator,
+    ): RedirectResponse {
+        $pdlRosterAccess->ensurePdlCanAccessLocation($request, $roster->location_id);
+
+        [$result, $previewShifts] = $generator->preview($roster);
+        $projectedValidation = $rosterValidator->validate($roster, $previewShifts);
+
+        return back()
+            ->with('status', 'roster-preview-generated')
+            ->with('rosterPreviewResult', [
+                'rosterId' => $roster->id,
+                'createdShifts' => $result->createdShifts,
+                'replacedAutoShifts' => $result->deletedAutoShifts,
+                'skipped' => $result->skipped,
+                'warnings' => $result->warnings,
+                'plannedAssignments' => $result->plannedAssignments,
+                'employeeStats' => $result->employeeStats,
+                'projectedValidation' => $this->validationFlashPayload($roster, $projectedValidation),
+            ]);
     }
 
     public function deleteAutoShifts(
