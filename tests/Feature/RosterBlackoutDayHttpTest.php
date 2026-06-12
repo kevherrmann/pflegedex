@@ -1,5 +1,9 @@
 <?php
 
+use App\Enums\BlackoutScope;
+use App\Enums\EmploymentArea;
+use App\Enums\QualificationLevel;
+use App\Models\EmployeeProfile;
 use App\Models\Location;
 use App\Models\RosterBlackoutDay;
 use App\Models\User;
@@ -160,5 +164,79 @@ it('passes blackout days and locations to inertia', function (): void {
                 ->where('blackoutDays.0.createdByName', $pdl->name)
                 ->where('locations.0.id', $location->id)
                 ->where('locations.0.name', 'Wohnbereich A')
+                ->where('blackoutDays.0.scope', 'all')
+                ->where('blackoutDays.0.scopeLabel', 'Ganzer Wohnbereich')
+                ->has('qualificationLevels', 3)
+                ->has('staff')
         );
+});
+
+it('lets PDL users create a qualification-scoped blackout day', function (): void {
+    $pdl = createRosterBlackoutDayHttpUser('PDL');
+    $location = Location::factory()->create();
+
+    $this->actingAs($pdl)
+        ->from('/roster-blackout-days')
+        ->post('/roster-blackout-days', [
+            'location_id' => $location->id,
+            'date' => '2027-12-24',
+            'scope' => BlackoutScope::Qualification->value,
+            'qualification_levels' => [QualificationLevel::Specialist->value],
+            'reason' => 'Weihnachten nur Fachkräfte',
+        ])
+        ->assertRedirect('/roster-blackout-days')
+        ->assertSessionHas('status', 'roster-blackout-day-created');
+
+    $blackoutDay = RosterBlackoutDay::query()->firstOrFail();
+
+    expect($blackoutDay->scope)->toBe(BlackoutScope::Qualification)
+        ->and($blackoutDay->qualification_levels)->toBe([QualificationLevel::Specialist->value]);
+});
+
+it('lets PDL users create an employee-scoped blackout day', function (): void {
+    $pdl = createRosterBlackoutDayHttpUser('PDL');
+    $location = Location::factory()->create();
+
+    $employee = User::factory()->for($location)->create();
+    EmployeeProfile::query()->create([
+        'user_id' => $employee->id,
+        'employment_area' => EmploymentArea::Nursing,
+        'active' => true,
+    ]);
+
+    $this->actingAs($pdl)
+        ->from('/roster-blackout-days')
+        ->post('/roster-blackout-days', [
+            'location_id' => $location->id,
+            'date' => '2027-12-24',
+            'scope' => BlackoutScope::Employees->value,
+            'employee_ids' => [$employee->id],
+            'reason' => 'Sperre für einzelne Person',
+        ])
+        ->assertRedirect('/roster-blackout-days')
+        ->assertSessionHas('status', 'roster-blackout-day-created');
+
+    $blackoutDay = RosterBlackoutDay::query()->with('employees')->firstOrFail();
+
+    expect($blackoutDay->scope)->toBe(BlackoutScope::Employees)
+        ->and($blackoutDay->employees->pluck('id')->all())->toBe([$employee->id]);
+});
+
+it('rejects employee-scoped blackouts that reference foreign-location employees', function (): void {
+    $pdl = createRosterBlackoutDayHttpUser('PDL');
+    $location = Location::factory()->create();
+    $foreign = User::factory()->create();
+
+    $this->actingAs($pdl)
+        ->from('/roster-blackout-days')
+        ->post('/roster-blackout-days', [
+            'location_id' => $location->id,
+            'date' => '2027-12-24',
+            'scope' => BlackoutScope::Employees->value,
+            'employee_ids' => [$foreign->id],
+        ])
+        ->assertRedirect('/roster-blackout-days')
+        ->assertSessionHasErrors('employee_ids.0');
+
+    expect(RosterBlackoutDay::query()->count())->toBe(0);
 });

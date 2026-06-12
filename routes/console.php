@@ -39,14 +39,20 @@ Artisan::command('pflegedex:seed-roster-demo {--month=2027-01 : Demo month in YY
     }
 
     $this->info('Dienstplan-Demo-Daten wurden erstellt oder aktualisiert.');
-    $this->line("Wohnbereich: {$result['locationName']}");
+    $this->line("Wohnbereiche: {$result['locationsCount']}");
     $this->line("Monat: {$result['month']}");
     $this->line("PDL: {$result['pdlEmail']} / {$result['pdlPassword']}");
-    $this->line("Pflegekräfte: {$result['employeesCount']}");
+    $this->line("Pflegepersonal gesamt: {$result['nursingStaffCount']} (inkl. {$result['wblCount']} WBL)");
+    $this->line("  davon Pflegefachkräfte: {$result['specialistCount']}");
+    $this->line("  davon Pflegeassistenten: {$result['assistantCount']}");
+    $this->line("  davon Pflegehilfskräfte: {$result['aideCount']}");
+    $this->line("Putzkräfte: {$result['cleaningStaffCount']}");
+    $this->line("Hausmeister: {$result['caretakerCount']}");
+    $this->line("Bewohner: {$result['residentsCount']}");
     $this->line("Schichtvorlagen: {$result['shiftTemplatesCount']}");
     $this->line("Personalbesetzungsregeln: {$result['staffingRulesCount']}");
     $this->line("Abwesenheiten: {$result['absenceRequestsCount']}");
-    $this->line("Dienstplan: #{$result['rosterId']} ({$result['rosterStatus']})");
+    $this->line("Dienstpläne: {$result['rostersCount']} ({$result['rosterStatus']})");
 
     return Command::SUCCESS;
 })->purpose('Create or update realistic roster demo data for manual testing');

@@ -23,6 +23,8 @@ class RosterGeneratorService
 
     private const MAX_ALLOWED_WEEKENDS = 2;
 
+    private const DEFAULT_SHIFT_MINUTES = 480;
+
     public function __construct(private readonly RosterDateService $rosterDateService) {}
 
     public function generate(Roster $roster): RosterGenerationResult
@@ -60,6 +62,10 @@ class RosterGeneratorService
             ->orderBy('name')
             ->get();
 
+        // Repraesentative Schichtlaenge fuer die Kapazitaetsberechnung aus Regeltagen.
+        $shiftMinutes = (int) round((float) ($shiftTemplates->avg('duration_minutes') ?? 0));
+        $shiftMinutes = $shiftMinutes > 0 ? $shiftMinutes : self::DEFAULT_SHIFT_MINUTES;
+
         foreach ($this->rosterDateService->datesForRosterMonth($roster) as $date) {
             foreach ($shiftTemplates as $shiftTemplate) {
                 $staffingRule = $this->findStaffingRule($shiftTemplate, $date);
@@ -76,8 +82,8 @@ class RosterGeneratorService
 
                 [$startsAt, $endsAt] = $this->rosterDateService->buildShiftTimes($date, $shiftTemplate);
 
-                $this->fillMissingSpecialists($employees, $roster, $shiftTemplate, $date, $startsAt, $endsAt, $staffingRule, $result);
-                $this->fillMissingStaff($employees, $roster, $shiftTemplate, $date, $startsAt, $endsAt, $staffingRule, $result);
+                $this->fillMissingSpecialists($employees, $roster, $shiftTemplate, $date, $startsAt, $endsAt, $staffingRule, $result, $shiftMinutes);
+                $this->fillMissingStaff($employees, $roster, $shiftTemplate, $date, $startsAt, $endsAt, $staffingRule, $result, $shiftMinutes);
             }
         }
 
@@ -113,9 +119,10 @@ class RosterGeneratorService
         CarbonImmutable $endsAt,
         ShiftStaffingRule $staffingRule,
         RosterGenerationResult $result,
+        int $shiftMinutes,
     ): void {
         while ($this->actualSpecialists($roster, $shiftTemplate, $date) < $staffingRule->required_specialists) {
-            $candidate = $this->nextCandidate($employees, $roster, $shiftTemplate, $date, $startsAt, $endsAt, needSpecialist: true);
+            $candidate = $this->nextCandidate($employees, $roster, $shiftTemplate, $date, $startsAt, $endsAt, needSpecialist: true, shiftMinutes: $shiftMinutes);
 
             if ($candidate === null) {
                 $result->addSkipped('no_candidate', 'Es wurde kein geeigneter Mitarbeiter gefunden.', [
@@ -143,9 +150,10 @@ class RosterGeneratorService
         CarbonImmutable $endsAt,
         ShiftStaffingRule $staffingRule,
         RosterGenerationResult $result,
+        int $shiftMinutes,
     ): void {
         while ($this->actualTotalStaff($roster, $shiftTemplate, $date) < $staffingRule->required_total_staff) {
-            $candidate = $this->nextCandidate($employees, $roster, $shiftTemplate, $date, $startsAt, $endsAt, needSpecialist: false);
+            $candidate = $this->nextCandidate($employees, $roster, $shiftTemplate, $date, $startsAt, $endsAt, needSpecialist: false, shiftMinutes: $shiftMinutes);
 
             if ($candidate === null) {
                 $result->addSkipped('no_candidate', 'Es wurde kein geeigneter Mitarbeiter gefunden.', [
@@ -172,8 +180,9 @@ class RosterGeneratorService
         CarbonImmutable $startsAt,
         CarbonImmutable $endsAt,
         bool $needSpecialist,
+        int $shiftMinutes,
     ): ?User {
-        return $this->sortedCandidates($employees, $roster)
+        return $this->sortedCandidates($employees, $roster, $shiftMinutes)
             ->first(function (User $employee) use ($roster, $shiftTemplate, $date, $startsAt, $endsAt, $needSpecialist): bool {
                 if ($needSpecialist && ! ($employee->employeeProfile?->is_nursing_specialist ?? false)) {
                     return false;
@@ -357,7 +366,7 @@ class RosterGeneratorService
             ->exists();
     }
 
-    private function sortedCandidates(Collection $employees, Roster $roster): Collection
+    private function sortedCandidates(Collection $employees, Roster $roster, int $shiftMinutes): Collection
     {
         $shiftStats = Shift::query()
             ->where('roster_id', $roster->id)
@@ -372,12 +381,12 @@ class RosterGeneratorService
 
         return $employees
             ->sortBy([
-                function (User $employee) use ($roster, $shiftStats): int {
+                function (User $employee) use ($roster, $shiftStats, $shiftMinutes): int {
                     $plannedMinutes = (int) ($shiftStats[$employee->id]['planned_minutes'] ?? 0);
 
                     return $this->utilizationPermille(
                         $plannedMinutes,
-                        $this->targetMinutesForEmployee($employee, $roster),
+                        $this->targetMinutesForEmployee($employee, $roster, $shiftMinutes),
                     );
                 },
                 fn (User $employee): int => (int) ($shiftStats[$employee->id]['planned_minutes'] ?? 0),
@@ -387,17 +396,30 @@ class RosterGeneratorService
             ->values();
     }
 
-    private function targetMinutesForEmployee(User $employee, Roster $roster): int
+    /**
+     * Monatliche Soll-Kapazitaet in Minuten = das Strengere aus Wochenstunden
+     * und Regel-Arbeitstagen. Schichten sind feste Bloecke, daher bindet bei
+     * Teilzeit oft die vereinbarte Tageszahl statt der Stunden.
+     */
+    private function targetMinutesForEmployee(User $employee, Roster $roster, int $shiftMinutes): int
     {
-        $weeklyHours = $employee->employeeProfile?->weekly_hours;
+        $profile = $employee->employeeProfile;
+        $daysInMonth = CarbonImmutable::create($roster->year, $roster->month, 1)->daysInMonth;
+        $weeksFactor = $daysInMonth / 7;
 
-        if ($weeklyHours === null || (float) $weeklyHours <= 0) {
-            return 0;
+        $targets = [];
+
+        $weeklyHours = (float) ($profile?->weekly_hours ?? 0);
+        if ($weeklyHours > 0) {
+            $targets[] = (int) round($weeklyHours * 60 * $weeksFactor);
         }
 
-        $daysInMonth = CarbonImmutable::create($roster->year, $roster->month, 1)->daysInMonth;
+        $regularDays = (int) ($profile?->regular_work_days_per_week ?? 0);
+        if ($regularDays > 0 && $shiftMinutes > 0) {
+            $targets[] = (int) round($regularDays * $shiftMinutes * $weeksFactor);
+        }
 
-        return (int) round((float) $weeklyHours * 60 / 7 * $daysInMonth);
+        return $targets === [] ? 0 : min($targets);
     }
 
     private function utilizationPermille(int $plannedMinutes, int $targetMinutes): int

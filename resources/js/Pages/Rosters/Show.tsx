@@ -452,16 +452,21 @@ function buildValidationUserIndex(
 function MonthOverview({
     calendarDays,
     validationResult,
-    rosterId,
+    roster,
+    employees,
+    shiftTemplates,
     rosterGenerationResult,
 }: {
     calendarDays: CalendarDay[];
     validationResult: RosterValidationResult | null;
-    rosterId: string;
+    roster: RosterItem;
+    employees: EmployeeOption[];
+    shiftTemplates: ShiftTemplateOption[];
     rosterGenerationResult: RosterGenerationResult | null;
 }) {
     const [filter, setFilter] = useState<MonthOverviewFilter>('all');
-    const validationDayIndex = buildValidationDayIndex(validationResult, rosterId);
+    const [editingShift, setEditingShift] = useState<ShiftItem | null>(null);
+    const validationDayIndex = buildValidationDayIndex(validationResult, roster.id);
     const generationSkippedDayIndex = buildGenerationSkippedDayIndex(
         rosterGenerationResult,
     );
@@ -671,9 +676,38 @@ function MonthOverview({
                                         {day.shifts.map((shift) => (
                                             <li
                                                 key={shift.id}
+                                                role={roster.isEditable ? 'button' : undefined}
+                                                tabIndex={roster.isEditable ? 0 : undefined}
+                                                onClick={
+                                                    roster.isEditable
+                                                        ? () => setEditingShift(shift)
+                                                        : undefined
+                                                }
+                                                onKeyDown={
+                                                    roster.isEditable
+                                                        ? (event) => {
+                                                              if (
+                                                                  event.key === 'Enter' ||
+                                                                  event.key === ' '
+                                                              ) {
+                                                                  event.preventDefault();
+                                                                  setEditingShift(shift);
+                                                              }
+                                                          }
+                                                        : undefined
+                                                }
+                                                title={
+                                                    roster.isEditable
+                                                        ? 'Zum Bearbeiten oder Löschen klicken'
+                                                        : undefined
+                                                }
                                                 className={`rounded-md border px-2.5 py-2 text-xs ${shiftBadgeClass(
                                                     shift.shiftTemplateCode,
-                                                )}`}
+                                                )} ${
+                                                    roster.isEditable
+                                                        ? 'cursor-pointer transition hover:ring-2 hover:ring-[#9B1C3B]/30 focus:outline-none focus:ring-2 focus:ring-[#9B1C3B]/40'
+                                                        : ''
+                                                }`}
                                             >
                                                 <div className="flex items-start justify-between gap-2">
                                                     <span className="font-semibold">
@@ -684,7 +718,13 @@ function MonthOverview({
                                                     <span className="flex shrink-0 flex-wrap justify-end gap-1">
                                                         <ShiftSourceBadge shift={shift} />
                                                         {shift.shiftTemplateCode && (
-                                                            <span className="rounded bg-white/60 px-1.5 py-0.5 font-mono text-[0.65rem] uppercase">
+                                                            <span
+                                                                title={
+                                                                    shift.shiftTemplateName ??
+                                                                    undefined
+                                                                }
+                                                                className="rounded bg-white/60 px-1.5 py-0.5 font-mono text-[0.65rem] uppercase"
+                                                            >
                                                                 {shift.shiftTemplateCode}
                                                             </span>
                                                         )}
@@ -773,6 +813,17 @@ function MonthOverview({
                         );
                     })}
                 </div>
+            )}
+
+            {editingShift && (
+                <ShiftEditModal
+                    key={editingShift.id}
+                    roster={roster}
+                    shift={editingShift}
+                    employees={employees}
+                    shiftTemplates={shiftTemplates}
+                    onClose={() => setEditingShift(null)}
+                />
             )}
         </div>
     );
@@ -1571,6 +1622,157 @@ function ShiftEditForm({
     );
 }
 
+function ShiftEditModal({
+    roster,
+    shift,
+    employees,
+    shiftTemplates,
+    onClose,
+}: {
+    roster: RosterItem;
+    shift: ShiftItem;
+    employees: EmployeeOption[];
+    shiftTemplates: ShiftTemplateOption[];
+    onClose: () => void;
+}) {
+    const rosterEmployees = employees.filter(
+        (employee) => employee.locationId === null || employee.locationId === roster.locationId,
+    );
+    const form = useForm({
+        user_id: shift.userId,
+        shift_template_id: shift.shiftTemplateId,
+        date: shift.date,
+        note: shift.note ?? '',
+    });
+
+    const submit: FormEventHandler = (event) => {
+        event.preventDefault();
+
+        form.patch(route('rosters.shifts.update', [roster.id, shift.id]), {
+            preserveScroll: true,
+            onSuccess: onClose,
+        });
+    };
+
+    const remove = () => {
+        onClose();
+        deleteShift(roster, shift);
+    };
+
+    return (
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+            onClick={onClose}
+        >
+            <form
+                onSubmit={submit}
+                onClick={(event) => event.stopPropagation()}
+                className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl"
+            >
+                <div className="flex items-start justify-between gap-4">
+                    <div>
+                        <h3 className="text-lg font-semibold text-gray-900">
+                            Dienst bearbeiten
+                        </h3>
+                        <p className="mt-0.5 text-sm text-gray-500">
+                            {shift.shiftTemplateName ?? shift.shiftTemplateCode ?? 'Dienst'}
+                        </p>
+                    </div>
+                    <ShiftSourceBadge shift={shift} />
+                </div>
+
+                <div className="mt-5 space-y-4">
+                    <div>
+                        <InputLabel htmlFor="shift-modal-user" value="Mitarbeiter" />
+                        <select
+                            id="shift-modal-user"
+                            value={form.data.user_id}
+                            onChange={(event) => form.setData('user_id', event.target.value)}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]"
+                        >
+                            <option value="">Bitte wählen</option>
+                            {rosterEmployees.map((employee) => (
+                                <option key={employee.id} value={employee.id}>
+                                    {employee.name}
+                                    {employee.isNursingSpecialist ? ' · Fachkraft' : ''}
+                                </option>
+                            ))}
+                        </select>
+                        <InputError message={form.errors.user_id} className="mt-2" />
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                            <InputLabel htmlFor="shift-modal-template" value="Schicht" />
+                            <select
+                                id="shift-modal-template"
+                                value={form.data.shift_template_id}
+                                onChange={(event) =>
+                                    form.setData('shift_template_id', event.target.value)
+                                }
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]"
+                            >
+                                <option value="">Bitte wählen</option>
+                                {shiftTemplates.map((shiftTemplate) => (
+                                    <option key={shiftTemplate.id} value={shiftTemplate.id}>
+                                        {shiftTemplate.name} · {shiftTemplate.startsAt}–
+                                        {shiftTemplate.endsAt}
+                                    </option>
+                                ))}
+                            </select>
+                            <InputError message={form.errors.shift_template_id} className="mt-2" />
+                        </div>
+
+                        <div>
+                            <InputLabel htmlFor="shift-modal-date" value="Datum" />
+                            <TextInput
+                                id="shift-modal-date"
+                                type="date"
+                                value={form.data.date}
+                                onChange={(event) => form.setData('date', event.target.value)}
+                                className="mt-1 block w-full"
+                            />
+                            <InputError message={form.errors.date} className="mt-2" />
+                        </div>
+                    </div>
+
+                    <div>
+                        <InputLabel htmlFor="shift-modal-note" value="Notiz (optional)" />
+                        <TextInput
+                            id="shift-modal-note"
+                            value={form.data.note}
+                            onChange={(event) => form.setData('note', event.target.value)}
+                            className="mt-1 block w-full"
+                            placeholder="z. B. Einarbeitung, Sonderaufgabe …"
+                        />
+                        <InputError message={form.errors.note} className="mt-2" />
+                    </div>
+                </div>
+
+                <div className="mt-6 flex items-center justify-between border-t border-gray-100 pt-4">
+                    <button
+                        type="button"
+                        onClick={remove}
+                        className="rounded-md px-3 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50 hover:text-red-700"
+                    >
+                        Dienst löschen
+                    </button>
+                    <div className="flex gap-2">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                        >
+                            Abbrechen
+                        </button>
+                        <PrimaryButton disabled={form.processing}>Speichern</PrimaryButton>
+                    </div>
+                </div>
+            </form>
+        </div>
+    );
+}
+
 function ShiftList({
     roster,
     employees,
@@ -1764,7 +1966,9 @@ export default function RosterShow({
                             <MonthOverview
                                 calendarDays={calendarDays}
                                 validationResult={rosterValidationResult}
-                                rosterId={roster.id}
+                                roster={roster}
+                                employees={employees}
+                                shiftTemplates={shiftTemplates}
                                 rosterGenerationResult={rosterGenerationResult}
                             />
                         </div>

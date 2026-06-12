@@ -44,6 +44,7 @@ it('seeds the planned operational roles', function () {
 
     expect(Role::query()->where('name', 'Admin')->exists())->toBeTrue()
         ->and(Role::query()->where('name', 'PDL')->exists())->toBeTrue()
+        ->and(Role::query()->where('name', 'WBL')->exists())->toBeTrue()
         ->and(Role::query()->where('name', 'Pflegekraft')->exists())->toBeTrue()
         ->and(Role::query()->where('name', 'Putzkraft')->exists())->toBeTrue()
         ->and(Role::query()->where('name', 'Hausmeister')->exists())->toBeTrue();

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\EmploymentArea;
+use App\Enums\QualificationLevel;
 use App\Support\Concerns\HasUuidV7;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -21,6 +22,7 @@ class EmployeeProfile extends Model
         'user_id',
         'employment_area',
         'is_nursing_specialist',
+        'qualification_level',
         'weekly_hours',
         'regular_work_days_per_week',
         'annual_vacation_days',
@@ -50,6 +52,7 @@ class EmployeeProfile extends Model
         return [
             'employment_area' => EmploymentArea::class,
             'is_nursing_specialist' => 'boolean',
+            'qualification_level' => QualificationLevel::class,
             'weekly_hours' => 'decimal:2',
             'regular_work_days_per_week' => 'integer',
             'annual_vacation_days' => 'integer',

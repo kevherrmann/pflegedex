@@ -121,6 +121,89 @@ it('lets PDL users update shift templates', function (): void {
         ->and($shiftTemplate->active)->toBeFalse();
 });
 
+it('rejects a shift color already used by another template in the same location', function (): void {
+    $location = Location::factory()->create();
+    $pdl = createShiftTemplateHttpUser('PDL', $location);
+
+    ShiftTemplate::query()->create([
+        'location_id' => $location->id,
+        'name' => 'Frühdienst',
+        'code' => 'early',
+        'starts_at' => '06:00',
+        'ends_at' => '14:00',
+        'duration_minutes' => 480,
+        'color' => '#ABCDEF',
+        'active' => true,
+    ]);
+
+    $second = ShiftTemplate::query()->create([
+        'location_id' => $location->id,
+        'name' => 'Spätdienst',
+        'code' => 'late',
+        'starts_at' => '14:00',
+        'ends_at' => '22:00',
+        'duration_minutes' => 480,
+        'color' => '#111111',
+        'active' => true,
+    ]);
+
+    $this->actingAs($pdl)
+        ->from('/shift-templates')
+        ->patch("/shift-templates/{$second->id}", [
+            'name' => 'Spätdienst',
+            'starts_at' => '14:00',
+            'ends_at' => '22:00',
+            'duration_minutes' => 480,
+            'color' => '#ABCDEF',
+        ])
+        ->assertRedirect('/shift-templates')
+        ->assertSessionHasErrors('color');
+
+    expect($second->refresh()->color)->toBe('#111111');
+});
+
+it('allows the same shift color in a different location', function (): void {
+    $locationA = Location::factory()->create();
+    $locationB = Location::factory()->create();
+    $pdl = createShiftTemplateHttpUser('PDL', $locationB);
+
+    ShiftTemplate::query()->create([
+        'location_id' => $locationA->id,
+        'name' => 'Frühdienst A',
+        'code' => 'early',
+        'starts_at' => '06:00',
+        'ends_at' => '14:00',
+        'duration_minutes' => 480,
+        'color' => '#ABCDEF',
+        'active' => true,
+    ]);
+
+    $templateB = ShiftTemplate::query()->create([
+        'location_id' => $locationB->id,
+        'name' => 'Frühdienst B',
+        'code' => 'early',
+        'starts_at' => '06:00',
+        'ends_at' => '14:00',
+        'duration_minutes' => 480,
+        'color' => '#222222',
+        'active' => true,
+    ]);
+
+    $this->actingAs($pdl)
+        ->from('/shift-templates')
+        ->patch("/shift-templates/{$templateB->id}", [
+            'name' => 'Frühdienst B',
+            'starts_at' => '06:00',
+            'ends_at' => '14:00',
+            'duration_minutes' => 480,
+            'color' => '#ABCDEF',
+        ])
+        ->assertRedirect('/shift-templates')
+        ->assertSessionHas('status', 'shift-template-updated');
+
+    expect($templateB->refresh()->color)->toBe('#ABCDEF');
+});
+
 it('lets PDL users update the default staffing rule', function (): void {
     $location = Location::factory()->create();
     $pdl = createShiftTemplateHttpUser('PDL', $location);
@@ -231,7 +314,6 @@ it('blocks non PDL users from updating staffing rules', function (): void {
     expect($defaultRule->required_total_staff)->toBe(5)
         ->and($defaultRule->required_specialists)->toBe(1);
 });
-
 
 it('shows only shift templates from the PDL Wohnbereich', function (): void {
     $location = Location::factory()->create(['name' => 'Wohnbereich A']);

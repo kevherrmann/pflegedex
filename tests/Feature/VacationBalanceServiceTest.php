@@ -37,13 +37,13 @@ it('calculates the vacation balance from employee profile data', function (): vo
     $balance = app(VacationBalanceService::class)->forUser($user);
 
     expect($balance)->toBe([
-        'annualVacationDays' => '30.00',
-        'vacationDaysCarriedOver' => '2.00',
-        'totalVacationDays' => '32.00',
-        'approvedVacationDays' => '0.00',
-        'requestedVacationDays' => '0.00',
-        'remainingVacationDays' => '32.00',
-        'availableVacationDays' => '32.00',
+        'annualVacationDays' => '30',
+        'vacationDaysCarriedOver' => '2',
+        'totalVacationDays' => '32',
+        'approvedVacationDays' => '0',
+        'requestedVacationDays' => '0',
+        'remainingVacationDays' => '32',
+        'availableVacationDays' => '32',
     ]);
 });
 
@@ -63,9 +63,9 @@ it('subtracts approved vacation from remaining vacation days', function (): void
 
     $balance = app(VacationBalanceService::class)->forUser($user);
 
-    expect($balance['remainingVacationDays'])->toBe('27.00')
-        ->and($balance['availableVacationDays'])->toBe('27.00')
-        ->and($balance['approvedVacationDays'])->toBe('5.00');
+    expect($balance['remainingVacationDays'])->toBe('27')
+        ->and($balance['availableVacationDays'])->toBe('27')
+        ->and($balance['approvedVacationDays'])->toBe('5');
 });
 
 it('subtracts requested vacation only from available vacation days', function (): void {
@@ -84,9 +84,9 @@ it('subtracts requested vacation only from available vacation days', function ()
 
     $balance = app(VacationBalanceService::class)->forUser($user);
 
-    expect($balance['remainingVacationDays'])->toBe('32.00')
-        ->and($balance['availableVacationDays'])->toBe('29.00')
-        ->and($balance['requestedVacationDays'])->toBe('3.00');
+    expect($balance['remainingVacationDays'])->toBe('32')
+        ->and($balance['availableVacationDays'])->toBe('29')
+        ->and($balance['requestedVacationDays'])->toBe('3');
 });
 
 it('ignores rejected vacation requests', function (): void {
@@ -105,10 +105,32 @@ it('ignores rejected vacation requests', function (): void {
 
     $balance = app(VacationBalanceService::class)->forUser($user);
 
-    expect($balance['remainingVacationDays'])->toBe('32.00')
-        ->and($balance['availableVacationDays'])->toBe('32.00')
-        ->and($balance['approvedVacationDays'])->toBe('0.00')
-        ->and($balance['requestedVacationDays'])->toBe('0.00');
+    expect($balance['remainingVacationDays'])->toBe('32')
+        ->and($balance['availableVacationDays'])->toBe('32')
+        ->and($balance['approvedVacationDays'])->toBe('0')
+        ->and($balance['requestedVacationDays'])->toBe('0');
+});
+
+it('formats whole days without decimals and half days with a comma', function (): void {
+    $user = createVacationBalanceUser();
+
+    AbsenceRequest::query()->create([
+        'user_id' => $user->id,
+        'location_id' => $user->location_id,
+        'type' => AbsenceRequestType::Vacation,
+        'starts_on' => '2026-06-01',
+        'ends_on' => '2026-06-03',
+        'days_count' => 2.5,
+        'status' => AbsenceRequestStatus::Approved,
+        'requested_by' => $user->id,
+    ]);
+
+    $balance = app(VacationBalanceService::class)->forUser($user);
+
+    expect($balance['annualVacationDays'])->toBe('30')
+        ->and($balance['approvedVacationDays'])->toBe('2,5')
+        ->and($balance['remainingVacationDays'])->toBe('29,5')
+        ->and($balance['availableVacationDays'])->toBe('29,5');
 });
 
 it('ignores overtime compensation requests for vacation balance', function (): void {
@@ -127,8 +149,8 @@ it('ignores overtime compensation requests for vacation balance', function (): v
 
     $balance = app(VacationBalanceService::class)->forUser($user);
 
-    expect($balance['remainingVacationDays'])->toBe('32.00')
-        ->and($balance['availableVacationDays'])->toBe('32.00')
-        ->and($balance['approvedVacationDays'])->toBe('0.00')
-        ->and($balance['requestedVacationDays'])->toBe('0.00');
+    expect($balance['remainingVacationDays'])->toBe('32')
+        ->and($balance['availableVacationDays'])->toBe('32')
+        ->and($balance['approvedVacationDays'])->toBe('0')
+        ->and($balance['requestedVacationDays'])->toBe('0');
 });

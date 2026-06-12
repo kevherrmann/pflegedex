@@ -52,26 +52,26 @@ class CareReportController extends Controller
             : collect();
 
         $reportsByCategory = collect($categories)
-            ->mapWithKeys(fn(string $category): array => [
+            ->mapWithKeys(fn (string $category): array => [
                 $category => $selectedReports
                     ->where('category', $category)
                     ->values()
-                    ->map(fn(CareReport $report): array => $this->reportPayload($report))
+                    ->map(fn (CareReport $report): array => $this->reportPayload($report))
                     ->values(),
             ]);
 
         return Inertia::render('CareReports/Index', [
-            'reports' => $reportModels->map(fn(CareReport $report): array => $this->reportPayload($report))->values(),
+            'reports' => $reportModels->map(fn (CareReport $report): array => $this->reportPayload($report))->values(),
             'reportsByCategory' => $reportsByCategory,
-            'categoryTabs' => collect($categories)->map(fn(string $category): array => [
+            'categoryTabs' => collect($categories)->map(fn (string $category): array => [
                 'name' => $category,
                 'reportCount' => $selectedReports->where('category', $category)->count(),
                 'completed' => $selectedReports->where('category', $category)->isNotEmpty(),
             ])->values(),
             'selectedResident' => $selectedResident ? $this->residentPayload($selectedResident, $reportModels, $categories) : null,
             'selectedDate' => $selectedDate,
-            'residents' => $residents->map(fn(Resident $resident): array => $this->residentPayload($resident, $reportModels, $categories))->values(),
-            'locations' => $locations->map(fn(Location $location): array => [
+            'residents' => $residents->map(fn (Resident $resident): array => $this->residentPayload($resident, $reportModels, $categories))->values(),
+            'locations' => $locations->map(fn (Location $location): array => [
                 'id' => $location->id,
                 'name' => $location->name,
             ])->values(),
@@ -96,7 +96,7 @@ class CareReportController extends Controller
             ->whereIn('location_id', $locationIds)
             ->find($validated['resident_id']);
 
-        if (!$resident) {
+        if (! $resident) {
             throw ValidationException::withMessages([
                 'resident_id' => 'Du hast keinen Zugriff auf diesen Bewohner.',
             ]);
@@ -130,7 +130,7 @@ class CareReportController extends Controller
         $locations = $this->careReportLocations($request);
         $locationIds = $locations->pluck('id')->all();
 
-        if (!in_array($careReport->location_id, $locationIds, true)) {
+        if (! in_array($careReport->location_id, $locationIds, true)) {
             abort(403);
         }
 
@@ -161,7 +161,7 @@ class CareReportController extends Controller
         $locations = $this->careReportLocations($request);
         $locationIds = $locations->pluck('id')->all();
 
-        if (!in_array($careReport->location_id, $locationIds, true)) {
+        if (! in_array($careReport->location_id, $locationIds, true)) {
             abort(403);
         }
 
@@ -200,7 +200,7 @@ class CareReportController extends Controller
     {
         $user = $request->user();
 
-        if (!$user) {
+        if (! $user) {
             return collect();
         }
 
@@ -246,6 +246,7 @@ class CareReportController extends Controller
         return [
             'id' => $resident->id,
             'fullName' => $resident->full_name,
+            'locationId' => $resident->location_id,
             'locationName' => $resident->location?->name,
             'reportCount' => $residentReports->count(),
             'completedCategoryCount' => $completedCategoryCount,

@@ -12,6 +12,8 @@ type EmployeeProfile = {
     employmentArea: string;
     employmentAreaLabel: string;
     isNursingSpecialist: boolean;
+    qualificationLevel: string | null;
+    qualificationLevelLabel: string | null;
     weeklyHours: string;
     regularWorkDaysPerWeek: number | null;
     annualVacationDays: number;
@@ -46,6 +48,7 @@ export default function Edit({ staffUser, locations, roles }: StaffEditProps) {
         role: string;
         location_ids: string[];
         is_nursing_specialist: boolean;
+        qualification_level: string;
         weekly_hours: string;
         regular_work_days_per_week: string;
         annual_vacation_days: string;
@@ -60,8 +63,12 @@ export default function Edit({ staffUser, locations, roles }: StaffEditProps) {
         email: staffUser.email,
         password: '',
         role: staffUser.role,
-        location_ids: staffUser.locationIds, is_nursing_specialist:
+        location_ids: staffUser.locationIds,
+        is_nursing_specialist:
             staffUser.employeeProfile?.isNursingSpecialist ?? false,
+        qualification_level:
+            staffUser.employeeProfile?.qualificationLevel ??
+            (staffUser.employeeProfile?.isNursingSpecialist ? 'specialist' : 'aide'),
         weekly_hours: staffUser.employeeProfile?.weeklyHours ?? '39',
         regular_work_days_per_week:
             staffUser.employeeProfile?.regularWorkDaysPerWeek?.toString() ?? '',
@@ -123,11 +130,26 @@ export default function Edit({ staffUser, locations, roles }: StaffEditProps) {
                                 <select id="role" value={data.role} onChange={(event) => {
                                     const role = event.target.value;
 
-                                    setData('role', role);
+                                    setData((currentData) => {
+                                        // WBL ist immer Pflegefachkraft.
+                                        if (role === 'WBL') {
+                                            return {
+                                                ...currentData,
+                                                role,
+                                                qualification_level: 'specialist',
+                                                is_nursing_specialist: true,
+                                            };
+                                        }
 
-                                    if (role !== 'Pflegekraft') {
-                                        setData('is_nursing_specialist', false);
-                                    }
+                                        return {
+                                            ...currentData,
+                                            role,
+                                            is_nursing_specialist:
+                                                role === 'Pflegekraft'
+                                                    ? currentData.is_nursing_specialist
+                                                    : false,
+                                        };
+                                    });
                                 }} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]">
                                     {roles.map((role) => <option key={role} value={role}>{role}</option>)}
                                 </select>

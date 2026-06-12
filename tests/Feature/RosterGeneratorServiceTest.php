@@ -780,7 +780,7 @@ it('uses planned minutes as tie breaker when relative utilization is equal', fun
 it('sorts employees without target hours behind employees with target hours', function (): void {
     $location = Location::factory()->create();
     $pdl = User::factory()->for($location)->create();
-    createRosterGeneratorEmployee($location, ['weekly_hours' => 0.00], ['name' => 'Anna Ohne Soll']);
+    createRosterGeneratorEmployee($location, ['weekly_hours' => 0.00, 'regular_work_days_per_week' => 0], ['name' => 'Anna Ohne Soll']);
     $withTargetHours = createRosterGeneratorEmployee($location, ['weekly_hours' => 40.00], ['name' => 'Berta Mit Soll']);
     $roster = createRosterGeneratorRoster($location, $pdl);
     $targetShiftTemplate = createRosterGeneratorShiftTemplate($location, [

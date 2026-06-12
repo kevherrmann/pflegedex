@@ -3,29 +3,37 @@
 namespace App\Services\Rosters;
 
 use App\Enums\AbsenceRequestStatus;
+use App\Enums\EmploymentArea;
 use App\Models\AbsenceRequest;
 use App\Models\Roster;
 use App\Models\Shift;
 use App\Models\ShiftStaffingRule;
 use App\Models\ShiftTemplate;
+use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 
 class RosterValidator
 {
-    public function __construct(private readonly RosterDateService $rosterDateService)
-    {
-    }
+    public function __construct(private readonly RosterDateService $rosterDateService) {}
 
     private const REQUIRED_REST_MINUTES = 660;
+
     private const PLANNED_WORKING_HOURS_TOLERANCE_MINUTES = 60;
+
     private const MAX_ALLOWED_CONSECUTIVE_WORK_DAYS = 6;
+
     private const MAX_ALLOWED_WEEKENDS = 2;
+
+    private const DEFAULT_SHIFT_MINUTES = 480;
+
+    // Unter diesem Anteil der Soll-Kapazitaet gilt ein Mitarbeiter als deutlich unter Soll geplant.
+    private const UNDER_PLANNED_FACTOR = 0.5;
 
     public function validate(Roster $roster): RosterValidationResult
     {
-        $result = new RosterValidationResult();
+        $result = new RosterValidationResult;
 
         $roster->loadMissing([
             'location',
@@ -42,7 +50,7 @@ class RosterValidator
 
         $this->validateStaffing($roster, $shiftTemplates, $result);
         $this->validateAbsenceConflicts($roster, $result);
-        $this->validatePlannedWorkingHours($roster, $result);
+        $this->validatePlannedWorkingHours($roster, $shiftTemplates, $result);
         $this->validateConsecutiveWorkDays($roster, $result);
         $this->validateWeekendLoad($roster, $result);
         $this->validateMonthlyFreeDays($roster, $result);
@@ -467,47 +475,108 @@ class RosterValidator
         }
     }
 
-    private function validatePlannedWorkingHours(Roster $roster, RosterValidationResult $result): void
-    {
+    /**
+     * @param  EloquentCollection<int, ShiftTemplate>  $shiftTemplates
+     */
+    private function validatePlannedWorkingHours(
+        Roster $roster,
+        EloquentCollection $shiftTemplates,
+        RosterValidationResult $result,
+    ): void {
         $daysInMonth = CarbonImmutable::create($roster->year, $roster->month, 1)->daysInMonth;
+        $weeksFactor = $daysInMonth / 7;
 
-        $roster->shifts
+        $shiftMinutes = (int) round((float) ($shiftTemplates->avg('duration_minutes') ?? 0));
+        $shiftMinutes = $shiftMinutes > 0 ? $shiftMinutes : self::DEFAULT_SHIFT_MINUTES;
+
+        // Alle berechtigten Mitarbeiter betrachten, damit auch gar nicht oder
+        // kaum eingeplante Personen erkannt werden (nicht nur die mit Diensten).
+        $eligibleEmployees = User::query()
+            ->with('employeeProfile')
+            ->where('location_id', $roster->location_id)
+            ->whereHas('employeeProfile', fn ($query) => $query
+                ->where('active', true)
+                ->where('employment_area', EmploymentArea::Nursing->value))
+            ->get();
+
+        $plannedByUser = $roster->shifts
             ->groupBy('user_id')
-            ->each(function (Collection $shifts, string $userId) use ($daysInMonth, $roster, $result): void {
-                /** @var Shift|null $firstShift */
-                $firstShift = $shifts->first();
-                $employeeProfile = $firstShift?->user?->employeeProfile;
+            ->map(fn (Collection $shifts): int => (int) $shifts->sum(
+                fn (Shift $shift): int => (int) $shift->starts_at->diffInMinutes($shift->ends_at),
+            ));
 
-                if ($employeeProfile === null || $employeeProfile->weekly_hours === null) {
-                    return;
-                }
+        foreach ($eligibleEmployees as $employee) {
+            $targetMinutes = $this->targetMinutesForEmployee($employee, $weeksFactor, $shiftMinutes);
 
-                $plannedMinutes = (int) $shifts->sum(
-                    fn (Shift $shift): int => (int) $shift->starts_at->diffInMinutes($shift->ends_at),
-                );
-                $weeklyHours = (float) $employeeProfile->weekly_hours;
-                $targetMinutes = (int) round($weeklyHours * 60 / 7 * $daysInMonth);
+            if ($targetMinutes <= 0) {
+                continue;
+            }
 
-                if ($plannedMinutes <= $targetMinutes + self::PLANNED_WORKING_HOURS_TOLERANCE_MINUTES) {
-                    return;
-                }
+            $plannedMinutes = (int) ($plannedByUser->get($employee->id) ?? 0);
 
+            if ($plannedMinutes > $targetMinutes + self::PLANNED_WORKING_HOURS_TOLERANCE_MINUTES) {
                 $result->addWarning(
                     'employee_over_planned_hours',
                     'Der Mitarbeiter ist über seiner Soll-Arbeitszeit geplant.',
                     [
-                        'userId' => $userId,
-                        'employeeName' => $firstShift?->user?->name,
+                        'userId' => $employee->id,
+                        'employeeName' => $employee->name,
                         'plannedMinutes' => $plannedMinutes,
                         'targetMinutes' => $targetMinutes,
                         'overtimeMinutes' => $plannedMinutes - $targetMinutes,
-                        'weeklyHours' => $weeklyHours,
+                        'weeklyHours' => (float) ($employee->employeeProfile?->weekly_hours ?? 0),
                         'month' => $roster->month,
                         'year' => $roster->year,
                     ],
                     'Soll-Arbeitszeit überschritten',
                     'Der Mitarbeiter ist über seiner monatlichen Soll-Arbeitszeit geplant.',
                 );
-            });
+
+                continue;
+            }
+
+            if ($plannedMinutes < (int) round($targetMinutes * self::UNDER_PLANNED_FACTOR)) {
+                $result->addWarning(
+                    'employee_under_planned_hours',
+                    'Der Mitarbeiter ist deutlich unter seiner Soll-Arbeitszeit geplant.',
+                    [
+                        'userId' => $employee->id,
+                        'employeeName' => $employee->name,
+                        'plannedMinutes' => $plannedMinutes,
+                        'targetMinutes' => $targetMinutes,
+                        'missingMinutes' => $targetMinutes - $plannedMinutes,
+                        'weeklyHours' => (float) ($employee->employeeProfile?->weekly_hours ?? 0),
+                        'regularWorkDaysPerWeek' => $employee->employeeProfile?->regular_work_days_per_week,
+                        'month' => $roster->month,
+                        'year' => $roster->year,
+                    ],
+                    'Deutlich unter Soll-Arbeitszeit',
+                    'Der Mitarbeiter ist deutlich unter seiner monatlichen Soll-Arbeitszeit (Wochenstunden bzw. Regel-Arbeitstage) geplant.',
+                );
+            }
+        }
+    }
+
+    /**
+     * Monatliche Soll-Kapazitaet in Minuten = das Strengere aus Wochenstunden
+     * und Regel-Arbeitstagen (Schichten sind feste Bloecke).
+     */
+    private function targetMinutesForEmployee(User $employee, float $weeksFactor, int $shiftMinutes): int
+    {
+        $profile = $employee->employeeProfile;
+
+        $targets = [];
+
+        $weeklyHours = (float) ($profile?->weekly_hours ?? 0);
+        if ($weeklyHours > 0) {
+            $targets[] = (int) round($weeklyHours * 60 * $weeksFactor);
+        }
+
+        $regularDays = (int) ($profile?->regular_work_days_per_week ?? 0);
+        if ($regularDays > 0 && $shiftMinutes > 0) {
+            $targets[] = (int) round($regularDays * $shiftMinutes * $weeksFactor);
+        }
+
+        return $targets === [] ? 0 : min($targets);
     }
 }

@@ -24,35 +24,25 @@ afterEach(function (): void {
     Carbon::setTestNow();
 });
 
-it('laesst PDL den Audit-Log oeffnen', function (): void {
+it('laesst Admin den Audit-Log oeffnen', function (): void {
     $location = Location::factory()->create();
-    $pdl = User::factory()->for($location)->create();
-    $pdl->assignRole('PDL');
+    $admin = User::factory()->for($location)->create();
+    $admin->assignRole('Admin');
 
-    $this->actingAs($pdl)
+    $this->actingAs($admin)
         ->get(route('audit.index'))
         ->assertOk()
-        ->assertInertia(fn(Assert $page) => $page->component('Audit/Index'));
+        ->assertInertia(fn (Assert $page) => $page->component('Audit/Index'));
 });
 
-it('laesst Pflegekraft den Audit-Log read-only sehen', function (): void {
-    $location = Location::factory()->create();
-    $nurse = User::factory()->for($location)->create();
-    $nurse->assignRole('Pflegekraft');
-
-    $this->actingAs($nurse)
-        ->get(route('audit.index'))
-        ->assertOk();
-});
-
-it('verbietet Admin/Putzkraft/Hausmeister den Zugriff', function (string $role): void {
+it('verbietet allen Nicht-Admin-Rollen den Zugriff', function (string $role): void {
     $user = User::factory()->create();
     $user->assignRole($role);
 
     $this->actingAs($user)
         ->get(route('audit.index'))
         ->assertForbidden();
-})->with(['Admin', 'Putzkraft', 'Hausmeister']);
+})->with(['PDL', 'Pflegekraft', 'Putzkraft', 'Hausmeister']);
 
 it('zeigt Audit-Eintraege chronologisch absteigend', function (): void {
     $location = Location::factory()->create();
@@ -66,13 +56,13 @@ it('zeigt Audit-Eintraege chronologisch absteigend', function (): void {
     $resident2->update(['first_name' => 'Zweiter-Updated']);
 
     $pdl = User::factory()->for($location)->create();
-    $pdl->assignRole('PDL');
+    $pdl->assignRole('Admin');
 
     $this->actingAs($pdl)
         ->get(route('audit.index'))
-        ->assertInertia(fn(Assert $page) => $page
+        ->assertInertia(fn (Assert $page) => $page
             ->component('Audit/Index')
-            ->where('pagination.total', fn(int $n) => $n >= 4)
+            ->where('pagination.total', fn (int $n) => $n >= 4)
         );
 });
 
@@ -82,14 +72,14 @@ it('filtert nach Modell-Typ', function (): void {
     $resident->update(['first_name' => 'Geaendert']);
 
     $pdl = User::factory()->for($location)->create();
-    $pdl->assignRole('PDL');
+    $pdl->assignRole('Admin');
 
     $this->actingAs($pdl)
         ->get(route('audit.index', ['model' => 'resident']))
-        ->assertInertia(fn(Assert $page) => $page
+        ->assertInertia(fn (Assert $page) => $page
             ->component('Audit/Index')
             ->where('filters.model', 'resident')
-            ->has('audits', fn(Assert $list) => $list->each(fn(Assert $a) => $a
+            ->has('audits', fn (Assert $list) => $list->each(fn (Assert $a) => $a
                 ->where('modelKey', 'resident')
                 ->etc()
             ))
@@ -99,7 +89,7 @@ it('filtert nach Modell-Typ', function (): void {
 it('filtert nach Benutzer', function (): void {
     $location = Location::factory()->create();
     $pdl = User::factory()->for($location)->create();
-    $pdl->assignRole('PDL');
+    $pdl->assignRole('Admin');
 
     // PDL selbst aendert einen Bewohner -> Audit mit user_id=pdl
     $resident = Resident::factory()->for($location)->create();
@@ -107,10 +97,10 @@ it('filtert nach Benutzer', function (): void {
     $resident->update(['first_name' => 'Geaendert']);
 
     $this->get(route('audit.index', ['user_id' => $pdl->id]))
-        ->assertInertia(fn(Assert $page) => $page
+        ->assertInertia(fn (Assert $page) => $page
             ->component('Audit/Index')
             ->where('filters.userId', $pdl->id)
-            ->has('audits', fn(Assert $list) => $list->each(fn(Assert $a) => $a
+            ->has('audits', fn (Assert $list) => $list->each(fn (Assert $a) => $a
                 ->where('userName', $pdl->name)
                 ->etc()
             ))
@@ -127,22 +117,22 @@ it('filtert nach Datum', function (): void {
     $resident->update(['first_name' => 'Spaet']);
 
     $pdl = User::factory()->for($location)->create();
-    $pdl->assignRole('PDL');
+    $pdl->assignRole('Admin');
 
     $this->actingAs($pdl)
         ->get(route('audit.index', ['from' => '2026-05-03', 'to' => '2026-05-05']))
-        ->assertInertia(fn(Assert $page) => $page
+        ->assertInertia(fn (Assert $page) => $page
             ->component('Audit/Index')
             ->where('filters.from', '2026-05-03')
             ->where('filters.to', '2026-05-05')
-            ->has('audits', fn(Assert $list) => $list->each(fn(Assert $a) => $a->etc()))
+            ->has('audits', fn (Assert $list) => $list->each(fn (Assert $a) => $a->etc()))
         );
 });
 
 it('paginiert mit 25 Eintraegen pro Seite', function (): void {
     $location = Location::factory()->create();
     $pdl = User::factory()->for($location)->create();
-    $pdl->assignRole('PDL');
+    $pdl->assignRole('Admin');
 
     // 30 Audit-Eintraege erzeugen via Resident-Updates
     $resident = Resident::factory()->for($location)->create();
@@ -152,16 +142,16 @@ it('paginiert mit 25 Eintraegen pro Seite', function (): void {
 
     $this->actingAs($pdl)
         ->get(route('audit.index'))
-        ->assertInertia(fn(Assert $page) => $page
+        ->assertInertia(fn (Assert $page) => $page
             ->component('Audit/Index')
             ->where('pagination.perPage', 25)
             ->has('audits', 25)
-            ->where('pagination.lastPage', fn(int $n) => $n >= 2)
+            ->where('pagination.lastPage', fn (int $n) => $n >= 2)
         );
 
     $this->actingAs($pdl)
         ->get(route('audit.index', ['page' => 2]))
-        ->assertInertia(fn(Assert $page) => $page
+        ->assertInertia(fn (Assert $page) => $page
             ->component('Audit/Index')
             ->where('pagination.currentPage', 2)
         );

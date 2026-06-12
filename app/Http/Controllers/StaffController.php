@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\EmploymentArea;
+use App\Enums\QualificationLevel;
 use App\Models\Location;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -13,12 +15,20 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
 use Inertia\Response;
-use App\Enums\EmploymentArea;
+use Spatie\Permission\Models\Role;
 
 class StaffController extends Controller
 {
     /** @var list<string> */
-    private const STAFF_ROLES = ['Pflegekraft', 'Putzkraft', 'Hausmeister'];
+    private const STAFF_ROLES = ['WBL', 'Pflegekraft', 'Putzkraft', 'Hausmeister'];
+
+    /**
+     * Rollen, die im Pflegebereich arbeiten und daher eine Qualifikationsstufe
+     * sowie das Fachkraft-Flag tragen.
+     *
+     * @var list<string>
+     */
+    private const NURSING_ROLES = ['WBL', 'Pflegekraft'];
 
     public function index(Request $request): Response
     {
@@ -26,22 +36,23 @@ class StaffController extends Controller
 
         $locations = $request->user()?->accessibleLocations() ?? collect();
         $locationIds = $locations->pluck('id')->all();
+        $staffRoles = $this->existingStaffRoles();
 
         return Inertia::render('Staff/Index', [
-            'staffUsers' => empty($locationIds)
+            'staffUsers' => empty($locationIds) || empty($staffRoles)
                 ? []
                 : User::query()
-                    ->role(self::STAFF_ROLES)
+                    ->role($staffRoles)
                     ->where(function (Builder $query) use ($locationIds): void {
                         $query->whereIn('location_id', $locationIds)
-                            ->orWhereHas('locations', fn(Builder $query) => $query->whereIn('locations.id', $locationIds));
+                            ->orWhereHas('locations', fn (Builder $query) => $query->whereIn('locations.id', $locationIds));
                     })
                     ->with(['roles', 'location', 'locations', 'employeeProfile'])
                     ->orderBy('name')
                     ->get()
-                    ->map(fn(User $user): array => $this->staffPayload($user))
+                    ->map(fn (User $user): array => $this->staffPayload($user))
                     ->values(),
-            'locations' => $locations->map(fn(Location $location): array => [
+            'locations' => $locations->map(fn (Location $location): array => [
                 'id' => $location->id,
                 'name' => $location->name,
             ])->values(),
@@ -82,7 +93,7 @@ class StaffController extends Controller
 
         return Inertia::render('Staff/Edit', [
             'staffUser' => $this->staffPayload($staff->load(['roles', 'location', 'locations', 'employeeProfile'])),
-            'locations' => $locations->map(fn(Location $location): array => [
+            'locations' => $locations->map(fn (Location $location): array => [
                 'id' => $location->id,
                 'name' => $location->name,
             ])->values(),
@@ -103,7 +114,7 @@ class StaffController extends Controller
                 'name' => $validated['name'],
                 'email' => $validated['email'],
                 'location_id' => $locationIds[0],
-                ...(!empty($validated['password']) ? ['password' => Hash::make($validated['password'])] : []),
+                ...(! empty($validated['password']) ? ['password' => Hash::make($validated['password'])] : []),
             ])->save();
 
             $staff->syncRoles([$validated['role']]);
@@ -135,13 +146,14 @@ class StaffController extends Controller
                 function (string $attribute, mixed $value, \Closure $fail) use ($accessibleLocationIds): void {
                     $submittedIds = is_array($value) ? array_map('strval', $value) : [];
 
-                    if (!empty(array_diff($submittedIds, $accessibleLocationIds))) {
+                    if (! empty(array_diff($submittedIds, $accessibleLocationIds))) {
                         $fail('Bitte wähle nur Wohnbereiche aus, auf die du Zugriff hast.');
                     }
                 },
             ],
             'location_ids.*' => ['string', 'uuid'],
             'is_nursing_specialist' => ['sometimes', 'boolean'],
+            'qualification_level' => ['sometimes', 'nullable', Rule::enum(QualificationLevel::class)],
             'weekly_hours' => ['sometimes', 'numeric', 'min:0', 'max:99.99'],
             'regular_work_days_per_week' => ['nullable', 'integer', 'min:1', 'max:7'],
             'annual_vacation_days' => ['sometimes', 'integer', 'min:0', 'max:366'],
@@ -168,12 +180,30 @@ class StaffController extends Controller
         $accessibleLocationIds = $request->user()?->accessibleLocations()->pluck('id')->all() ?? [];
         $staffLocationIds = $staff->accessibleLocations()->pluck('id')->all();
 
-        abort_unless(!empty(array_intersect($accessibleLocationIds, $staffLocationIds)), 403);
+        abort_unless(! empty(array_intersect($accessibleLocationIds, $staffLocationIds)), 403);
     }
 
     private function hasStaffRole(User $user): bool
     {
         return $user->hasAnyRole(self::STAFF_ROLES);
+    }
+
+    /**
+     * Liefert nur die Mitarbeiter-Rollen, die tatsaechlich existieren.
+     *
+     * Der Rollen-Scope von Spatie wirft sonst eine RoleDoesNotExist-Ausnahme,
+     * sobald eine erwartete Rolle (z. B. Putzkraft) noch nicht angelegt wurde.
+     * So bleibt die Mitarbeiterseite auch bei unvollstaendigen Rollen bedienbar.
+     *
+     * @return list<string>
+     */
+    private function existingStaffRoles(): array
+    {
+        return Role::query()
+            ->where('guard_name', 'web')
+            ->whereIn('name', self::STAFF_ROLES)
+            ->pluck('name')
+            ->all();
     }
 
     /** @return array<string, mixed> */
@@ -191,7 +221,7 @@ class StaffController extends Controller
                 ->whereIn('id', $locationIds)
                 ->orderBy('name')
                 ->get(['id', 'name'])
-                ->map(fn(Location $location): array => [
+                ->map(fn (Location $location): array => [
                     'id' => $location->id,
                     'name' => $location->name,
                 ])
@@ -200,6 +230,8 @@ class StaffController extends Controller
                 'employmentArea' => $user->employeeProfile->employment_area->value,
                 'employmentAreaLabel' => $user->employeeProfile->employment_area->label(),
                 'isNursingSpecialist' => $user->employeeProfile->is_nursing_specialist,
+                'qualificationLevel' => $user->employeeProfile->qualification_level?->value,
+                'qualificationLevelLabel' => $user->employeeProfile->qualification_level?->label(),
                 'weeklyHours' => $user->employeeProfile->weekly_hours,
                 'regularWorkDaysPerWeek' => $user->employeeProfile->regular_work_days_per_week,
                 'annualVacationDays' => $user->employeeProfile->annual_vacation_days,
@@ -219,13 +251,36 @@ class StaffController extends Controller
      */
     private function employeeProfileData(array $validated): array
     {
-        $employmentArea = $this->employmentAreaForRole((string) $validated['role']);
+        $role = (string) $validated['role'];
+        $employmentArea = $this->employmentAreaForRole($role);
+        $isNursing = $employmentArea === EmploymentArea::Nursing;
+
+        // Eine Wohnbereichsleitung ist immer examinierte Pflegefachkraft.
+        $isWbl = $role === 'WBL';
+
+        // Die Qualifikationsstufe gilt nur fuer Pflegerollen.
+        $qualificationLevel = match (true) {
+            $isWbl => QualificationLevel::Specialist->value,
+            $isNursing => $validated['qualification_level'] ?? null,
+            default => null,
+        };
+
+        // is_nursing_specialist bleibt das vom Generator/Validator genutzte
+        // Fachkraft-Flag. Liegt eine Qualifikationsstufe vor, leiten wir es
+        // konsistent daraus ab; sonst fallen wir abwaertskompatibel auf die
+        // explizite Markierung zurueck.
+        $isSpecialist = match (true) {
+            $isWbl => true,
+            $isNursing => $qualificationLevel !== null
+                ? $qualificationLevel === QualificationLevel::Specialist->value
+                : (bool) ($validated['is_nursing_specialist'] ?? false),
+            default => false,
+        };
 
         return [
             'employment_area' => $employmentArea,
-            'is_nursing_specialist' => $employmentArea === EmploymentArea::Nursing
-                ? (bool) ($validated['is_nursing_specialist'] ?? false)
-                : false,
+            'qualification_level' => $qualificationLevel,
+            'is_nursing_specialist' => $isSpecialist,
             'weekly_hours' => $validated['weekly_hours'] ?? 39.00,
             'regular_work_days_per_week' => $validated['regular_work_days_per_week'] ?? null,
             'annual_vacation_days' => $validated['annual_vacation_days'] ?? 30,
@@ -241,7 +296,7 @@ class StaffController extends Controller
     private function employmentAreaForRole(string $role): EmploymentArea
     {
         return match ($role) {
-            'Pflegekraft' => EmploymentArea::Nursing,
+            'WBL', 'Pflegekraft' => EmploymentArea::Nursing,
             'Putzkraft' => EmploymentArea::Cleaning,
             'Hausmeister' => EmploymentArea::Caretaker,
             default => EmploymentArea::Nursing,

@@ -6,6 +6,19 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, useForm } from '@inertiajs/react';
 import { FormEventHandler } from 'react';
 
+// Schnellauswahl typischer Schichtfarben; per Color-Picker bleibt jede Farbe moeglich.
+const SHIFT_COLOR_PRESETS = [
+    '#F59E0B', // Frühdienst
+    '#3B82F6', // Spätdienst
+    '#6366F1', // Nachtdienst
+    '#10B981', // Grün
+    '#EF4444', // Rot
+    '#9B1C3B', // Akzent
+    '#6B7280', // Grau
+];
+
+const DEFAULT_SHIFT_COLOR = '#9B1C3B';
+
 type LocationItem = {
     id: string;
     name: string;
@@ -36,7 +49,13 @@ type Props = {
     shiftTemplates: ShiftTemplateItem[];
 };
 
-function ShiftTemplateCard({ shiftTemplate }: { shiftTemplate: ShiftTemplateItem }) {
+function ShiftTemplateCard({
+    shiftTemplate,
+    takenColors,
+}: {
+    shiftTemplate: ShiftTemplateItem;
+    takenColors: string[];
+}) {
     const shiftForm = useForm({
         name: shiftTemplate.name,
         starts_at: shiftTemplate.startsAt,
@@ -45,6 +64,10 @@ function ShiftTemplateCard({ shiftTemplate }: { shiftTemplate: ShiftTemplateItem
         color: shiftTemplate.color ?? '',
         active: shiftTemplate.active,
     });
+
+    // Farben, die andere Schichten im selben Wohnbereich bereits belegen.
+    const currentColor = (shiftForm.data.color || '').toLowerCase();
+    const colorTaken = currentColor !== '' && takenColors.includes(currentColor);
 
     const staffingForm = useForm({
         required_total_staff: String(
@@ -128,8 +151,16 @@ function ShiftTemplateCard({ shiftTemplate }: { shiftTemplate: ShiftTemplateItem
                     </div>
                     <div>
                         <dt className="text-gray-500">Farbe</dt>
-                        <dd className="font-medium text-gray-900">
-                            {shiftTemplate.color ?? '-'}
+                        <dd className="mt-1 font-medium text-gray-900">
+                            {shiftTemplate.color ? (
+                                <span
+                                    className="inline-block h-5 w-10 rounded-md border border-gray-300"
+                                    style={{ backgroundColor: shiftTemplate.color }}
+                                    title="Schichtfarbe"
+                                />
+                            ) : (
+                                '–'
+                            )}
                         </dd>
                     </div>
                     <div>
@@ -239,14 +270,58 @@ function ShiftTemplateCard({ shiftTemplate }: { shiftTemplate: ShiftTemplateItem
                                 htmlFor={`color_${shiftTemplate.id}`}
                                 value="Farbe"
                             />
-                            <TextInput
-                                id={`color_${shiftTemplate.id}`}
-                                value={shiftForm.data.color}
-                                onChange={(event) =>
-                                    shiftForm.setData('color', event.target.value)
-                                }
-                                className="mt-1 block w-full"
-                            />
+                            <div className="mt-1 flex items-center gap-3">
+                                <input
+                                    id={`color_${shiftTemplate.id}`}
+                                    type="color"
+                                    value={shiftForm.data.color || DEFAULT_SHIFT_COLOR}
+                                    onChange={(event) =>
+                                        shiftForm.setData('color', event.target.value)
+                                    }
+                                    className="h-10 w-14 cursor-pointer rounded-md border border-gray-300 bg-white p-1"
+                                    aria-label="Farbe wählen"
+                                />
+                                <div className="flex flex-wrap gap-1.5">
+                                    {SHIFT_COLOR_PRESETS.map((preset) => {
+                                        const presetLower = preset.toLowerCase();
+                                        const selected = currentColor === presetLower;
+                                        const taken =
+                                            !selected && takenColors.includes(presetLower);
+
+                                        return (
+                                            <button
+                                                key={preset}
+                                                type="button"
+                                                disabled={taken}
+                                                onClick={() =>
+                                                    shiftForm.setData('color', preset)
+                                                }
+                                                className={`h-6 w-6 rounded-full border ${
+                                                    selected
+                                                        ? 'border-gray-900 ring-2 ring-gray-400 ring-offset-1'
+                                                        : 'border-gray-300'
+                                                } ${
+                                                    taken
+                                                        ? 'cursor-not-allowed opacity-30'
+                                                        : ''
+                                                }`}
+                                                style={{ backgroundColor: preset }}
+                                                title={
+                                                    taken
+                                                        ? `${preset} – im Wohnbereich bereits vergeben`
+                                                        : preset
+                                                }
+                                                aria-label={`Farbe ${preset}`}
+                                            />
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                            {colorTaken && (
+                                <p className="mt-2 text-sm text-red-700">
+                                    Diese Farbe ist in diesem Wohnbereich bereits vergeben.
+                                </p>
+                            )}
                             <InputError
                                 message={shiftForm.errors.color}
                                 className="mt-2"
@@ -267,7 +342,7 @@ function ShiftTemplateCard({ shiftTemplate }: { shiftTemplate: ShiftTemplateItem
                     </label>
 
                     <div className="flex justify-end">
-                        <PrimaryButton disabled={shiftForm.processing}>
+                        <PrimaryButton disabled={shiftForm.processing || colorTaken}>
                             Schicht speichern
                         </PrimaryButton>
                     </div>
@@ -381,6 +456,14 @@ export default function ShiftTemplatesIndex({
                                 <ShiftTemplateCard
                                     key={shiftTemplate.id}
                                     shiftTemplate={shiftTemplate}
+                                    takenColors={shiftTemplates
+                                        .filter(
+                                            (other) =>
+                                                other.id !== shiftTemplate.id &&
+                                                other.locationId === shiftTemplate.locationId &&
+                                                other.color,
+                                        )
+                                        .map((other) => (other.color as string).toLowerCase())}
                                 />
                             ))}
                         </div>

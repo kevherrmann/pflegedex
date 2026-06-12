@@ -11,8 +11,8 @@ use App\Models\User;
 use App\Services\Rosters\PdlRosterAccess;
 use App\Services\Rosters\RosterGeneratorService;
 use App\Services\Rosters\RosterService;
-use App\Services\Rosters\RosterValidator;
 use App\Services\Rosters\RosterValidationResult;
+use App\Services\Rosters\RosterValidator;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -210,7 +210,7 @@ class RosterController extends Controller
     private function mapShifts(Roster $roster): Collection
     {
         return $roster->shifts
-            ->sortBy(fn (Shift $shift): string => $shift->date->toDateString() . ' ' . $shift->starts_at->toDateTimeString())
+            ->sortBy(fn (Shift $shift): string => $shift->date->toDateString().' '.$shift->starts_at->toDateTimeString())
             ->map(fn (Shift $shift): array => $this->mapShift($shift, includeDate: true))
             ->values();
     }
@@ -260,7 +260,7 @@ class RosterController extends Controller
             $dayShifts = $roster->shifts
                 ->filter(fn (Shift $shift): bool => $shift->date->toDateString() === $date->toDateString())
                 ->sortBy(fn (Shift $shift): string => $shift->starts_at->toDateTimeString())
-                ->map(fn (Shift $shift): array => $this->mapShift($shift))
+                ->map(fn (Shift $shift): array => $this->mapShift($shift, includeDate: true))
                 ->values();
 
             $days->push([

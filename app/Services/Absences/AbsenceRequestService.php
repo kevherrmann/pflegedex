@@ -24,7 +24,7 @@ class AbsenceRequestService
      */
     public function request(User $employee, User $requestedBy, array $data): AbsenceRequest
     {
-        if (!$employee->canRequestAbsence()) {
+        if (! $employee->canRequestAbsence()) {
             throw ValidationException::withMessages([
                 'user_id' => 'Dieser Mitarbeiter darf über dieses Modul keinen Urlaub beantragen.',
             ]);
@@ -42,7 +42,9 @@ class AbsenceRequestService
             ]);
         }
 
-        $this->ensureNoRosterBlackoutDay($type, $locationId, $startsOn->toDateString(), $endsOn->toDateString());
+        // Eine Urlaubssperre blockiert den Antrag nicht mehr hart. Der Antrag
+        // wird angelegt und kann von der PDL individuell geprueft und nur mit
+        // dokumentierter Begruendung als Ausnahme genehmigt werden.
         $this->ensureNoOverlappingRequest($employee, $startsOn->toDateString(), $endsOn->toDateString());
 
         $daysCount = $data['days_count'] ?? $startsOn->diffInDays($endsOn) + 1;
@@ -76,42 +78,77 @@ class AbsenceRequestService
         }
     }
 
-private function ensureNoRosterBlackoutDay(
-    AbsenceRequestType $type,
-    ?string $locationId,
-    string $startsOn,
-    string $endsOn,
-): void {
-    if ($locationId === null) {
-        return;
-    }
-
-    $query = RosterBlackoutDay::query()
-        ->forLocation($locationId)
-        ->betweenDates($startsOn, $endsOn);
-
-    if ($type === AbsenceRequestType::Vacation) {
-        $query->blockingVacation();
-    }
-
-    if ($type === AbsenceRequestType::OvertimeCompensation) {
-        $query->blockingOvertimeCompensation();
-    }
-
-    if (! $query->exists()) {
-        return;
-    }
-
-    throw ValidationException::withMessages([
-        'starts_on' => 'Im gewählten Zeitraum liegt eine Urlaubssperre.',
-    ]);
-}
-
-    public function approve(AbsenceRequest $absenceRequest, User $decidedBy): AbsenceRequest
+    /**
+     * Faellt dieser Antrag in eine Urlaubssperre, die auf den Mitarbeiter
+     * zutrifft? Dient als Hinweis in der Verwaltung und als Ausloeser fuer die
+     * Begruendungspflicht bei der Genehmigung.
+     */
+    public function hitsBlackout(AbsenceRequest $absenceRequest): bool
     {
-        if (!$absenceRequest->isOpen()) {
+        $employee = $absenceRequest->user;
+
+        if (! $employee instanceof User) {
+            return false;
+        }
+
+        return $this->applicableBlackoutExists(
+            $employee,
+            $absenceRequest->type,
+            $absenceRequest->location_id,
+            $absenceRequest->starts_on->toDateString(),
+            $absenceRequest->ends_on->toDateString(),
+        );
+    }
+
+    private function applicableBlackoutExists(
+        User $employee,
+        AbsenceRequestType $type,
+        ?string $locationId,
+        string $startsOn,
+        string $endsOn,
+    ): bool {
+        if ($locationId === null) {
+            return false;
+        }
+
+        $query = RosterBlackoutDay::query()
+            ->forLocation($locationId)
+            ->betweenDates($startsOn, $endsOn)
+            ->with('employees:id');
+
+        if ($type === AbsenceRequestType::Vacation) {
+            $query->blockingVacation();
+        }
+
+        if ($type === AbsenceRequestType::OvertimeCompensation) {
+            $query->blockingOvertimeCompensation();
+        }
+
+        // Nur Sperren betrachten, die tatsaechlich auf diesen Mitarbeiter zutreffen
+        // (ganzer Wohnbereich, passende Qualifikation oder benannte Person).
+        $employee->loadMissing('employeeProfile');
+
+        return $query->get()->contains(
+            fn (RosterBlackoutDay $blackoutDay): bool => $blackoutDay->appliesTo($employee),
+        );
+    }
+
+    public function approve(AbsenceRequest $absenceRequest, User $decidedBy, ?string $overrideReason = null): AbsenceRequest
+    {
+        if (! $absenceRequest->isOpen()) {
             throw ValidationException::withMessages([
                 'status' => 'Nur offene Anträge können genehmigt werden.',
+            ]);
+        }
+
+        $hitsBlackout = $this->hitsBlackout($absenceRequest);
+        $overrideReason = $overrideReason !== null ? trim($overrideReason) : null;
+
+        // Faellt der Antrag in eine Urlaubssperre, ist eine Genehmigung nur als
+        // dokumentierte Ausnahme mit Begruendung moeglich (Einzelfallpruefung).
+        if ($hitsBlackout && ($overrideReason === null || $overrideReason === '')) {
+            throw ValidationException::withMessages([
+                'override_reason' => 'Dieser Antrag fällt in eine Urlaubssperre. Bitte begründe die Ausnahme.',
             ]);
         }
 
@@ -120,6 +157,7 @@ private function ensureNoRosterBlackoutDay(
             'decided_by' => $decidedBy->id,
             'decided_at' => now(),
             'rejection_reason' => null,
+            'override_reason' => $hitsBlackout ? $overrideReason : null,
         ])->save();
 
         return $absenceRequest->refresh();
@@ -127,7 +165,7 @@ private function ensureNoRosterBlackoutDay(
 
     public function reject(AbsenceRequest $absenceRequest, User $decidedBy, string $reason): AbsenceRequest
     {
-        if (!$absenceRequest->isOpen()) {
+        if (! $absenceRequest->isOpen()) {
             throw ValidationException::withMessages([
                 'status' => 'Nur offene Anträge können abgelehnt werden.',
             ]);

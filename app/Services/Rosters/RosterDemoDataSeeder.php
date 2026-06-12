@@ -5,10 +5,12 @@ namespace App\Services\Rosters;
 use App\Enums\AbsenceRequestStatus;
 use App\Enums\AbsenceRequestType;
 use App\Enums\EmploymentArea;
+use App\Enums\QualificationLevel;
 use App\Enums\RosterStatus;
 use App\Models\AbsenceRequest;
 use App\Models\EmployeeProfile;
 use App\Models\Location;
+use App\Models\Resident;
 use App\Models\Roster;
 use App\Models\ShiftStaffingRule;
 use App\Models\ShiftTemplate;
@@ -18,13 +20,61 @@ use Illuminate\Support\Collection;
 use InvalidArgumentException;
 use Spatie\Permission\Models\Role;
 
+/**
+ * Erzeugt ein realistisches Demo-Pflegeheim fuer Dienstplan- und
+ * Urlaubsplanung. Orientiert sich am Personalbemessungsverfahren (PeBeM nach
+ * Paragraph 113c SGB XI): zwei Wohnbereiche mit je 20 Bewohnern und einem
+ * Qualifikationsmix aus Pflegefachkraeften, Pflegeassistenten und
+ * Pflegehilfskraeften, dazu Wohnbereichsleitungen, eine uebergreifende PDL
+ * sowie Hauswirtschaft und Technik.
+ */
 class RosterDemoDataSeeder
 {
-    private const LOCATION_NAME = 'Wohnbereich A';
+    /** @var list<array{name: string, short: string, key: string}> */
+    private const LOCATIONS = [
+        ['name' => 'Wohnbereich A', 'short' => 'A', 'key' => 'a'],
+        ['name' => 'Wohnbereich B', 'short' => 'B', 'key' => 'b'],
+    ];
 
     private const PDL_EMAIL = 'demo.pdl.dienstplan@pflegedex.local';
 
     private const PASSWORD = 'password';
+
+    private const RESIDENTS_PER_AREA = 20;
+
+    /** Vornamen fuer Demo-Mitarbeiter (gemischt). */
+    private const STAFF_FIRST_NAMES = [
+        'Lena', 'Jonas', 'Sarah', 'Lukas', 'Marie', 'Felix', 'Anna', 'David',
+        'Laura', 'Tim', 'Julia', 'Niklas', 'Katharina', 'Florian', 'Sabine',
+        'Sebastian', 'Christine', 'Daniel', 'Petra', 'Markus', 'Andrea',
+        'Stefan', 'Johanna', 'Andreas', 'Nina', 'Thomas', 'Claudia', 'Michael',
+    ];
+
+    private const STAFF_LAST_NAMES = [
+        'Müller', 'Schmidt', 'Schneider', 'Fischer', 'Weber', 'Meyer', 'Wagner',
+        'Becker', 'Schulz', 'Hoffmann', 'Schäfer', 'Koch', 'Bauer', 'Richter',
+        'Klein', 'Wolf', 'Neumann', 'Schwarz', 'Braun', 'Krüger', 'Hofmann',
+        'Hartmann', 'Lange', 'Werner', 'Krause', 'Lehmann', 'Köhler', 'Walter',
+    ];
+
+    /** Eher zeittypische Vornamen fuer Bewohner. */
+    private const RESIDENT_FEMALE_NAMES = [
+        'Erika', 'Helga', 'Ingrid', 'Ursula', 'Renate', 'Gisela', 'Edith',
+        'Hannelore', 'Waltraud', 'Hildegard', 'Christa', 'Margarete', 'Else',
+        'Gertrud', 'Irmgard', 'Elfriede', 'Brigitte', 'Inge', 'Käthe', 'Lieselotte',
+    ];
+
+    private const RESIDENT_MALE_NAMES = [
+        'Karl', 'Hans', 'Werner', 'Gerhard', 'Heinz', 'Walter', 'Helmut',
+        'Günter', 'Horst', 'Kurt', 'Wolfgang', 'Dieter', 'Manfred', 'Herbert',
+        'Rudolf', 'Friedrich', 'Otto', 'Erwin', 'Wilhelm', 'Alfred',
+    ];
+
+    private const RESIDENT_LAST_NAMES = [
+        'Albrecht', 'Brandt', 'Engel', 'Förster', 'Götz', 'Henkel', 'Jäger',
+        'Kühn', 'Linde', 'Mertens', 'Naumann', 'Ostermann', 'Pfeiffer', 'Reuter',
+        'Sander', 'Thiele', 'Ullrich', 'Voss', 'Winkler', 'Ziegler',
+    ];
 
     /**
      * @return array<string, int|string>
@@ -32,25 +82,63 @@ class RosterDemoDataSeeder
     public function seed(string $month): array
     {
         $monthDate = $this->parseMonth($month);
-        $location = $this->createLocation();
-        $pdl = $this->createPdl($location);
-        $employees = $this->createEmployees($location);
-        $absenceRequestsCount = $this->createAbsenceRequests($location, $pdl, $employees, $monthDate);
-        $shiftTemplates = $this->createShiftTemplates($location);
-        $staffingRulesCount = $this->createStaffingRules($location, $shiftTemplates);
-        $roster = $this->createRoster($location, $pdl, $monthDate);
+        $this->ensureRoles();
+
+        $locations = $this->createLocations();
+        $pdl = $this->createPdl($locations);
+
+        $nursingStaff = collect();
+        $cleaningStaff = collect();
+        $residentsCount = 0;
+        $shiftTemplatesCount = 0;
+        $staffingRulesCount = 0;
+        $absenceRequestsCount = 0;
+        $rosters = collect();
+        $nameOffset = 0;
+
+        foreach (self::LOCATIONS as $index => $config) {
+            $location = $locations[$index];
+
+            $areaStaff = $this->createNursingStaff($location, $config['key'], $nameOffset);
+            $nameOffset += $areaStaff->count();
+            $nursingStaff = $nursingStaff->merge($areaStaff);
+
+            $cleaningStaff = $cleaningStaff->merge(
+                $this->createCleaningStaff($location, $config['key'], $nameOffset),
+            );
+            $nameOffset += 1;
+
+            $residentsCount += $this->createResidents($location, $config['key'], $index);
+
+            $absenceRequestsCount += $this->createAbsenceRequests($location, $pdl, $areaStaff, $monthDate);
+
+            $templates = $this->createShiftTemplates($location);
+            $shiftTemplatesCount += $templates->count();
+            $staffingRulesCount += $this->createStaffingRules($location, $templates);
+
+            $rosters->push($this->createRoster($location, $pdl, $monthDate));
+        }
+
+        $caretaker = $this->createCaretaker($locations[0], $nameOffset);
 
         return [
-            'locationName' => $location->name,
+            'locationsCount' => count($locations),
             'month' => $monthDate->format('Y-m'),
             'pdlEmail' => self::PDL_EMAIL,
             'pdlPassword' => self::PASSWORD,
-            'employeesCount' => $employees->count(),
-            'shiftTemplatesCount' => $shiftTemplates->count(),
+            'wblCount' => $nursingStaff->where('isWbl', true)->count(),
+            'nursingStaffCount' => $nursingStaff->count(),
+            'specialistCount' => $nursingStaff->where('qualification', QualificationLevel::Specialist)->count(),
+            'assistantCount' => $nursingStaff->where('qualification', QualificationLevel::Assistant)->count(),
+            'aideCount' => $nursingStaff->where('qualification', QualificationLevel::Aide)->count(),
+            'cleaningStaffCount' => $cleaningStaff->count(),
+            'caretakerCount' => $caretaker === null ? 0 : 1,
+            'residentsCount' => $residentsCount,
+            'shiftTemplatesCount' => $shiftTemplatesCount,
             'staffingRulesCount' => $staffingRulesCount,
             'absenceRequestsCount' => $absenceRequestsCount,
-            'rosterId' => $roster->id,
-            'rosterStatus' => $roster->status->label(),
+            'rostersCount' => $rosters->count(),
+            'rosterStatus' => $rosters->first()?->status->label() ?? RosterStatus::Draft->label(),
         ];
     }
 
@@ -69,90 +157,233 @@ class RosterDemoDataSeeder
         return CarbonImmutable::create($year, $monthNumber, 1)->startOfDay();
     }
 
-    private function createLocation(): Location
+    private function ensureRoles(): void
     {
-        return Location::firstOrCreate(
-            ['name' => self::LOCATION_NAME],
+        foreach (['PDL', 'WBL', 'Pflegekraft', 'Putzkraft', 'Hausmeister'] as $role) {
+            Role::findOrCreate($role, 'web');
+        }
+    }
+
+    /**
+     * @return array<int, Location>
+     */
+    private function createLocations(): array
+    {
+        return array_map(fn (array $config): Location => Location::firstOrCreate(
+            ['name' => $config['name']],
             [
-                'short_name' => 'A',
+                'short_name' => $config['short'],
                 'description' => 'Demo-Wohnbereich für Dienstplanung und Urlaubsplanung.',
                 'active' => true,
             ],
-        );
+        ), self::LOCATIONS);
     }
 
-    private function createPdl(Location $location): User
+    /**
+     * @param  array<int, Location>  $locations
+     */
+    private function createPdl(array $locations): User
     {
-        Role::findOrCreate('PDL', 'web');
-
         $pdl = User::firstOrNew(['email' => self::PDL_EMAIL]);
         $pdl->forceFill([
-            'location_id' => $location->id,
+            'location_id' => $locations[0]->id,
             'name' => 'Demo PDL Dienstplan',
             'password' => self::PASSWORD,
             'email_verified_at' => now(),
         ])->save();
 
         $pdl->syncRoles(['PDL']);
-        $pdl->locations()->syncWithoutDetaching([$location->id]);
+        // Die PDL arbeitet wohnbereichsuebergreifend.
+        $pdl->locations()->syncWithoutDetaching(collect($locations)->pluck('id')->all());
 
         return $pdl;
     }
 
     /**
+     * Qualifikationsmix eines Wohnbereichs: 1 WBL, 4 weitere Fachkraefte
+     * (davon 1 Nachtwache), 3 Pflegeassistenten, 4 Pflegehilfskraefte (davon
+     * 1 Nachtwache). Schichtprofile bilden Voll-/Teilzeit und reine Nacht ab.
+     *
+     * @return list<array{slug: string, role: string, qualification: QualificationLevel, hours: float, days: int, early: bool, late: bool, night: bool}>
+     */
+    private function nursingProfiles(): array
+    {
+        $fk = QualificationLevel::Specialist;
+        $as = QualificationLevel::Assistant;
+        $hi = QualificationLevel::Aide;
+
+        return [
+            ['slug' => 'wbl', 'role' => 'WBL', 'qualification' => $fk, 'hours' => 19.5, 'days' => 5, 'early' => true, 'late' => false, 'night' => false],
+            ['slug' => 'fk01', 'role' => 'Pflegekraft', 'qualification' => $fk, 'hours' => 39, 'days' => 5, 'early' => true, 'late' => true, 'night' => true],
+            ['slug' => 'fk02', 'role' => 'Pflegekraft', 'qualification' => $fk, 'hours' => 39, 'days' => 5, 'early' => true, 'late' => true, 'night' => false],
+            ['slug' => 'fk03', 'role' => 'Pflegekraft', 'qualification' => $fk, 'hours' => 25, 'days' => 4, 'early' => true, 'late' => false, 'night' => false],
+            ['slug' => 'as01', 'role' => 'Pflegekraft', 'qualification' => $as, 'hours' => 39, 'days' => 5, 'early' => true, 'late' => true, 'night' => false],
+            ['slug' => 'as02', 'role' => 'Pflegekraft', 'qualification' => $as, 'hours' => 30, 'days' => 4, 'early' => true, 'late' => true, 'night' => false],
+            ['slug' => 'as03', 'role' => 'Pflegekraft', 'qualification' => $as, 'hours' => 20, 'days' => 3, 'early' => true, 'late' => false, 'night' => false],
+            ['slug' => 'hi01', 'role' => 'Pflegekraft', 'qualification' => $hi, 'hours' => 39, 'days' => 5, 'early' => true, 'late' => true, 'night' => false],
+            ['slug' => 'hi02', 'role' => 'Pflegekraft', 'qualification' => $hi, 'hours' => 25, 'days' => 4, 'early' => true, 'late' => true, 'night' => false],
+            ['slug' => 'hi03', 'role' => 'Pflegekraft', 'qualification' => $hi, 'hours' => 20, 'days' => 3, 'early' => true, 'late' => false, 'night' => false],
+            ['slug' => 'nf01', 'role' => 'Pflegekraft', 'qualification' => $fk, 'hours' => 30, 'days' => 4, 'early' => false, 'late' => false, 'night' => true],
+            ['slug' => 'nh01', 'role' => 'Pflegekraft', 'qualification' => $hi, 'hours' => 30, 'days' => 4, 'early' => false, 'late' => false, 'night' => true],
+        ];
+    }
+
+    /**
      * @return Collection<int, User>
      */
-    private function createEmployees(Location $location): Collection
+    private function createNursingStaff(Location $location, string $areaKey, int $nameOffset): Collection
     {
-        Role::findOrCreate('Pflegekraft', 'web');
-
-        $profiles = [
-            ['specialist' => true, 'hours' => 39, 'days' => 5, 'night' => true, 'vacation' => 30, 'carried' => 2, 'overtime' => 120],
-            ['specialist' => true, 'hours' => 39, 'days' => 5, 'night' => true, 'vacation' => 30, 'carried' => 0, 'overtime' => -60],
-            ['specialist' => true, 'hours' => 30, 'days' => 4, 'night' => false, 'vacation' => 28, 'carried' => 1, 'overtime' => 30],
-            ['specialist' => true, 'hours' => 20, 'days' => 3, 'night' => false, 'vacation' => 26, 'carried' => 0, 'overtime' => 0],
-            ['specialist' => true, 'hours' => 40, 'days' => 5, 'night' => true, 'vacation' => 30, 'carried' => 3, 'overtime' => 90],
-            ['specialist' => false, 'hours' => 39, 'days' => 5, 'night' => false, 'vacation' => 30, 'carried' => 0, 'overtime' => 45],
-            ['specialist' => false, 'hours' => 30, 'days' => 4, 'night' => false, 'vacation' => 28, 'carried' => 0, 'overtime' => -30],
-            ['specialist' => false, 'hours' => 20, 'days' => 3, 'night' => false, 'vacation' => 26, 'carried' => 0, 'overtime' => 0],
-            ['specialist' => false, 'hours' => 39, 'days' => 5, 'night' => true, 'vacation' => 30, 'carried' => 1, 'overtime' => 60],
-            ['specialist' => false, 'hours' => 30, 'days' => 4, 'night' => false, 'vacation' => 28, 'carried' => 2, 'overtime' => 15],
-            ['specialist' => true, 'hours' => 30, 'days' => 4, 'night' => true, 'vacation' => 29, 'carried' => 0, 'overtime' => -15],
-            ['specialist' => false, 'hours' => 20, 'days' => 3, 'night' => false, 'vacation' => 26, 'carried' => 0, 'overtime' => 0],
-        ];
-
-        return collect($profiles)->map(function (array $profile, int $index) use ($location): User {
-            $number = $index + 1;
-            $employee = User::firstOrNew(['email' => sprintf('demo.pflege.%02d@pflegedex.local', $number)]);
+        return collect($this->nursingProfiles())->map(function (array $profile, int $index) use ($location, $areaKey, $nameOffset): User {
+            $email = sprintf('demo.%s.%s@pflegedex.local', $areaKey, $profile['slug']);
+            $employee = User::firstOrNew(['email' => $email]);
             $employee->forceFill([
                 'location_id' => $location->id,
-                'name' => sprintf('Demo Pflege %02d', $number),
+                'name' => $this->staffName($nameOffset + $index),
                 'password' => self::PASSWORD,
                 'email_verified_at' => now(),
             ])->save();
 
-            $employee->syncRoles(['Pflegekraft']);
+            $employee->syncRoles([$profile['role']]);
             $employee->locations()->syncWithoutDetaching([$location->id]);
 
             EmployeeProfile::updateOrCreate(
                 ['user_id' => $employee->id],
                 [
                     'employment_area' => EmploymentArea::Nursing,
-                    'is_nursing_specialist' => $profile['specialist'],
+                    'qualification_level' => $profile['qualification'],
+                    'is_nursing_specialist' => $profile['qualification']->isSpecialist(),
                     'weekly_hours' => $profile['hours'],
                     'regular_work_days_per_week' => $profile['days'],
-                    'annual_vacation_days' => $profile['vacation'],
-                    'vacation_days_carried_over' => $profile['carried'],
-                    'overtime_minutes_balance' => $profile['overtime'],
-                    'can_work_early' => true,
-                    'can_work_late' => true,
+                    'annual_vacation_days' => 30,
+                    'vacation_days_carried_over' => $index % 3,
+                    'overtime_minutes_balance' => ($index % 4 - 1) * 30,
+                    'can_work_early' => $profile['early'],
+                    'can_work_late' => $profile['late'],
                     'can_work_night' => $profile['night'],
                     'active' => true,
                 ],
             );
 
+            // Zusatzinfos fuer die Zusammenfassung, nicht persistiert.
+            $employee->setAttribute('isWbl', $profile['role'] === 'WBL');
+            $employee->setAttribute('qualification', $profile['qualification']);
+
             return $employee;
         });
+    }
+
+    /**
+     * @return Collection<int, User>
+     */
+    private function createCleaningStaff(Location $location, string $areaKey, int $nameOffset): Collection
+    {
+        $email = sprintf('demo.%s.putz@pflegedex.local', $areaKey);
+        $employee = User::firstOrNew(['email' => $email]);
+        $employee->forceFill([
+            'location_id' => $location->id,
+            'name' => $this->staffName($nameOffset),
+            'password' => self::PASSWORD,
+            'email_verified_at' => now(),
+        ])->save();
+
+        $employee->syncRoles(['Putzkraft']);
+        $employee->locations()->syncWithoutDetaching([$location->id]);
+
+        EmployeeProfile::updateOrCreate(
+            ['user_id' => $employee->id],
+            [
+                'employment_area' => EmploymentArea::Cleaning,
+                'qualification_level' => null,
+                'is_nursing_specialist' => false,
+                'weekly_hours' => 20,
+                'regular_work_days_per_week' => 5,
+                'annual_vacation_days' => 28,
+                'vacation_days_carried_over' => 0,
+                'overtime_minutes_balance' => 0,
+                'can_work_early' => true,
+                'can_work_late' => false,
+                'can_work_night' => false,
+                'active' => true,
+            ],
+        );
+
+        return collect([$employee]);
+    }
+
+    private function createCaretaker(Location $location, int $nameOffset): User
+    {
+        $employee = User::firstOrNew(['email' => 'demo.hausmeister@pflegedex.local']);
+        $employee->forceFill([
+            'location_id' => $location->id,
+            'name' => $this->staffName($nameOffset),
+            'password' => self::PASSWORD,
+            'email_verified_at' => now(),
+        ])->save();
+
+        $employee->syncRoles(['Hausmeister']);
+        $employee->locations()->syncWithoutDetaching([$location->id]);
+
+        EmployeeProfile::updateOrCreate(
+            ['user_id' => $employee->id],
+            [
+                'employment_area' => EmploymentArea::Caretaker,
+                'qualification_level' => null,
+                'is_nursing_specialist' => false,
+                'weekly_hours' => 39,
+                'regular_work_days_per_week' => 5,
+                'annual_vacation_days' => 30,
+                'vacation_days_carried_over' => 0,
+                'overtime_minutes_balance' => 0,
+                'can_work_early' => true,
+                'can_work_late' => false,
+                'can_work_night' => false,
+                'active' => true,
+            ],
+        );
+
+        return $employee;
+    }
+
+    /**
+     * Legt Bewohner mit gemischten Pflegegraden (2 bis 5) an. Auditing wird
+     * dabei abgeschaltet, damit der Demo-Seeder keinen Audit-Laerm erzeugt.
+     */
+    private function createResidents(Location $location, string $areaKey, int $areaIndex): int
+    {
+        $areaLetter = strtoupper($areaKey);
+
+        Resident::withoutAuditing(function () use ($location, $areaLetter, $areaIndex): void {
+            for ($number = 1; $number <= self::RESIDENTS_PER_AREA; $number++) {
+                // Fortlaufender Index ueber beide Bereiche, damit sich die Namen
+                // zwischen Wohnbereich A und B nicht wiederholen.
+                $globalIndex = $areaIndex * self::RESIDENTS_PER_AREA + ($number - 1);
+                $isFemale = ($globalIndex % 2) === 0;
+                $genderSeq = intdiv($globalIndex, 2);
+
+                $firstName = $isFemale
+                    ? self::RESIDENT_FEMALE_NAMES[$genderSeq % count(self::RESIDENT_FEMALE_NAMES)]
+                    : self::RESIDENT_MALE_NAMES[$genderSeq % count(self::RESIDENT_MALE_NAMES)];
+                // Zusaetzlicher, je Bereich verschobener Offset, damit auch die
+                // Nachnamen zwischen A und B nicht zeilenweise zusammenfallen.
+                $lastName = self::RESIDENT_LAST_NAMES[($globalIndex * 7 + $areaIndex * 13 + 3) % count(self::RESIDENT_LAST_NAMES)];
+
+                Resident::updateOrCreate(
+                    ['pseudonym' => sprintf('P-DEMO-%s%02d', $areaLetter, $number)],
+                    [
+                        'location_id' => $location->id,
+                        'salutation' => $isFemale ? 'frau' : 'herr',
+                        'first_name' => $firstName,
+                        'last_name' => $lastName,
+                        'birth_date' => sprintf('19%02d-%02d-%02d', 35 + ($number % 18), ($number % 12) + 1, ($number % 27) + 1),
+                        'room_number' => sprintf('%s-1%02d', $areaLetter, $number),
+                        'care_level' => 2 + ($number % 4),
+                        'active' => true,
+                    ],
+                );
+            }
+        });
+
+        return self::RESIDENTS_PER_AREA;
     }
 
     /**
@@ -160,43 +391,59 @@ class RosterDemoDataSeeder
      */
     private function createAbsenceRequests(Location $location, User $pdl, Collection $employees, CarbonImmutable $monthDate): int
     {
+        // Bezieht sich auf die Position im Qualifikationsmix dieses Bereichs.
         $absences = [
-            ['employeeNumber' => 1, 'startDay' => 8, 'endDay' => 12, 'note' => 'Demo-Urlaub Januar'],
-            ['employeeNumber' => 5, 'startDay' => 20, 'endDay' => 22, 'note' => 'Demo-Urlaub kurz'],
-            ['employeeNumber' => 8, 'startDay' => 26, 'endDay' => 26, 'note' => 'Demo einzelner freier Tag'],
+            ['index' => 1, 'startDay' => 8, 'endDay' => 12, 'note' => 'Demo-Urlaub Fachkraft'],
+            ['index' => 4, 'startDay' => 18, 'endDay' => 20, 'note' => 'Demo-Urlaub Assistent'],
+            ['index' => 7, 'startDay' => 25, 'endDay' => 25, 'note' => 'Demo einzelner freier Tag'],
         ];
 
+        $created = 0;
+
         foreach ($absences as $absence) {
-            $employee = $employees->get($absence['employeeNumber'] - 1);
+            $employee = $employees->get($absence['index']);
 
             if (! $employee instanceof User) {
-                throw new InvalidArgumentException(sprintf('Demo-Pflegekraft %02d existiert nicht.', $absence['employeeNumber']));
+                continue;
             }
 
             $startsOn = $monthDate->setDay($absence['startDay']);
             $endsOn = $monthDate->setDay($absence['endDay']);
 
-            AbsenceRequest::updateOrCreate(
-                [
-                    'user_id' => $employee->id,
-                    'type' => AbsenceRequestType::Vacation,
-                    'starts_on' => $startsOn->toDateString(),
-                    'ends_on' => $endsOn->toDateString(),
-                ],
-                [
-                    'location_id' => $location->id,
-                    'days_count' => $startsOn->diffInDays($endsOn) + 1,
-                    'status' => AbsenceRequestStatus::Approved,
-                    'requested_by' => $pdl->id,
-                    'decided_by' => $pdl->id,
-                    'decided_at' => now(),
-                    'rejection_reason' => null,
-                    'note' => $absence['note'],
-                ],
-            );
+            // whereDate haelt den Seeder unabhaengig vom Speicherformat der
+            // Datumsspalten (PostgreSQL date vs. SQLite Text) idempotent.
+            $existing = AbsenceRequest::query()
+                ->where('user_id', $employee->id)
+                ->where('type', AbsenceRequestType::Vacation)
+                ->whereDate('starts_on', $startsOn->toDateString())
+                ->whereDate('ends_on', $endsOn->toDateString())
+                ->first();
+
+            $attributes = [
+                'user_id' => $employee->id,
+                'type' => AbsenceRequestType::Vacation,
+                'starts_on' => $startsOn->toDateString(),
+                'ends_on' => $endsOn->toDateString(),
+                'location_id' => $location->id,
+                'days_count' => $startsOn->diffInDays($endsOn) + 1,
+                'status' => AbsenceRequestStatus::Approved,
+                'requested_by' => $pdl->id,
+                'decided_by' => $pdl->id,
+                'decided_at' => now(),
+                'rejection_reason' => null,
+                'note' => $absence['note'],
+            ];
+
+            if ($existing === null) {
+                AbsenceRequest::query()->create($attributes);
+            } else {
+                $existing->update($attributes);
+            }
+
+            $created++;
         }
 
-        return count($absences);
+        return $created;
     }
 
     /**
@@ -277,5 +524,13 @@ class RosterDemoDataSeeder
                 'created_by' => $pdl->id,
             ],
         );
+    }
+
+    private function staffName(int $index): string
+    {
+        $first = self::STAFF_FIRST_NAMES[$index % count(self::STAFF_FIRST_NAMES)];
+        $last = self::STAFF_LAST_NAMES[($index * 3 + 1) % count(self::STAFF_LAST_NAMES)];
+
+        return $first.' '.$last;
     }
 }

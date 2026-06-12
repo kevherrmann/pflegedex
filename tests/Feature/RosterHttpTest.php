@@ -717,9 +717,11 @@ it('flashes green status for a green validation result', function (): void {
     ]);
 
     foreach (rosterHttpJanuary2027Dates() as $date) {
+        // Aushilfen ohne vertragliches Soll: Tag besetzt, aber keine Soll-Warnung.
         $employee = createRosterHttpEmployee($location, [
             'is_nursing_specialist' => true,
-            'weekly_hours' => 80.00,
+            'weekly_hours' => 0.00,
+            'regular_work_days_per_week' => 0,
         ]);
 
         createRosterHttpShift($roster, $employee, $shiftTemplate, $date);

@@ -17,6 +17,8 @@ type AbsenceRequestItem = {
     statusLabel: string;
     note: string | null;
     rejectionReason: string | null;
+    overrideReason: string | null;
+    hitsBlackout: boolean;
     createdAt: string | null;
 };
 
@@ -340,18 +342,32 @@ export default function AbsenceRequestsIndex({
                                                         {request.daysCount}
                                                     </td>
                                                     <td className="py-3 pr-4">
-                                                        <span
-                                                            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(
-                                                                request.status,
-                                                            )}`}
-                                                        >
-                                                            {request.statusLabel}
-                                                        </span>
+                                                        <div className="flex flex-wrap items-center gap-1.5">
+                                                            <span
+                                                                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(
+                                                                    request.status,
+                                                                )}`}
+                                                            >
+                                                                {request.statusLabel}
+                                                            </span>
+                                                            {request.status === 'requested' && request.hitsBlackout && (
+                                                                <span
+                                                                    className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-800"
+                                                                    title="Fällt in eine Urlaubssperre. Genehmigung nur als Ausnahme durch die PDL."
+                                                                >
+                                                                    Urlaubssperre
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </td>
                                                     <td className="py-3 pr-4 text-gray-700">
                                                         {request.rejectionReason ? (
                                                             <span className="text-red-700">
                                                                 {request.rejectionReason}
+                                                            </span>
+                                                        ) : request.overrideReason ? (
+                                                            <span className="text-amber-700">
+                                                                Ausnahme: {request.overrideReason}
                                                             </span>
                                                         ) : (
                                                             request.note ?? '—'

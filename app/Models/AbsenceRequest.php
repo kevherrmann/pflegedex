@@ -31,6 +31,7 @@ class AbsenceRequest extends Model
         'decided_by',
         'decided_at',
         'rejection_reason',
+        'override_reason',
         'note',
     ];
 

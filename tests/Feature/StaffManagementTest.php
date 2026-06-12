@@ -1,17 +1,18 @@
 <?php
 
+use App\Enums\EmploymentArea;
+use App\Enums\QualificationLevel;
 use App\Models\Location;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
-use App\Enums\EmploymentArea;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    foreach (['Admin', 'PDL', 'Pflegekraft', 'Putzkraft', 'Hausmeister'] as $role) {
+    foreach (['Admin', 'PDL', 'WBL', 'Pflegekraft', 'Putzkraft', 'Hausmeister'] as $role) {
         Role::findOrCreate($role, 'web');
     }
 });
@@ -31,7 +32,7 @@ it('allows only PDL users to open staff management', function () {
         ->get('/staff')
         ->assertOk()
         ->assertInertia(
-            fn(Assert $page) => $page
+            fn (Assert $page) => $page
                 ->component('Staff/Index')
                 ->has('staffUsers', 1)
                 ->has('locations', 1)
@@ -110,8 +111,8 @@ it('prevents PDL users from creating admin or PDL accounts through staff managem
     foreach (['Admin', 'PDL'] as $role) {
         $this->actingAs($pdl)
             ->post('/staff', [
-                'name' => 'Verboten ' . $role,
-                'email' => strtolower($role) . '@pflegedex.local',
+                'name' => 'Verboten '.$role,
+                'email' => strtolower($role).'@pflegedex.local',
                 'password' => 'sicheres-passwort',
                 'role' => $role,
                 'location_ids' => [$location->id],
@@ -132,17 +133,17 @@ it('lets PDL users edit staff in their Wohnbereiche', function () {
     $staff->locations()->attach([$first->id]);
 
     $this->actingAs($pdl)
-        ->get('/staff/' . $staff->id . '/edit')
+        ->get('/staff/'.$staff->id.'/edit')
         ->assertOk()
         ->assertInertia(
-            fn(Assert $page) => $page
+            fn (Assert $page) => $page
                 ->component('Staff/Edit')
                 ->where('staffUser.name', 'Alter Name')
                 ->has('locations', 2)
         );
 
     $this->actingAs($pdl)
-        ->patch('/staff/' . $staff->id, [
+        ->patch('/staff/'.$staff->id, [
             'name' => 'Neuer Name',
             'email' => 'neu@pflegedex.local',
             'password' => 'neues-passwort',
@@ -191,10 +192,10 @@ it('prevents PDL users from editing staff outside their Wohnbereiche', function 
     $staff->assignRole('Pflegekraft');
     $staff->locations()->attach([$foreign->id]);
 
-    $this->actingAs($pdl)->get('/staff/' . $staff->id . '/edit')->assertForbidden();
+    $this->actingAs($pdl)->get('/staff/'.$staff->id.'/edit')->assertForbidden();
 
     $this->actingAs($pdl)
-        ->patch('/staff/' . $staff->id, [
+        ->patch('/staff/'.$staff->id, [
             'name' => 'Verboten',
             'email' => 'verboten@pflegedex.local',
             'role' => 'Pflegekraft',
@@ -300,10 +301,10 @@ it('passes employee profile data to the staff edit page', function (): void {
     ]);
 
     $this->actingAs($pdl)
-        ->get('/staff/' . $staff->id . '/edit')
+        ->get('/staff/'.$staff->id.'/edit')
         ->assertOk()
         ->assertInertia(
-            fn(Assert $page) => $page
+            fn (Assert $page) => $page
                 ->component('Staff/Edit')
                 ->where('staffUser.employeeProfile.employmentArea', EmploymentArea::Nursing->value)
                 ->where('staffUser.employeeProfile.employmentAreaLabel', 'Pflege')
@@ -319,3 +320,93 @@ it('passes employee profile data to the staff edit page', function (): void {
                 ->where('staffUser.employeeProfile.active', true)
         );
 });
+
+it('creates a WBL as nursing specialist with a specialist qualification level', function (): void {
+    $location = Location::factory()->create();
+
+    $pdl = User::factory()->for($location)->create();
+    $pdl->assignRole('PDL');
+
+    $this->actingAs($pdl)
+        ->post('/staff', [
+            'name' => 'Wohnbereichsleitung Eins',
+            'email' => 'wbl@pflegedex.local',
+            'password' => 'sicheres-passwort',
+            'role' => 'WBL',
+            'location_ids' => [$location->id],
+            'qualification_level' => 'specialist',
+            'weekly_hours' => 19.5,
+            'can_work_early' => true,
+            'can_work_late' => false,
+            'can_work_night' => false,
+        ])
+        ->assertRedirect('/staff');
+
+    $staff = User::query()
+        ->where('email', 'wbl@pflegedex.local')
+        ->with('employeeProfile')
+        ->firstOrFail();
+
+    expect($staff->hasRole('WBL'))->toBeTrue()
+        ->and($staff->employeeProfile->employment_area)->toBe(EmploymentArea::Nursing)
+        ->and($staff->employeeProfile->qualification_level)->toBe(QualificationLevel::Specialist)
+        ->and($staff->employeeProfile->is_nursing_specialist)->toBeTrue();
+});
+
+it('forces a WBL to be a specialist even if another qualification is submitted', function (): void {
+    $location = Location::factory()->create();
+
+    $pdl = User::factory()->for($location)->create();
+    $pdl->assignRole('PDL');
+
+    $this->actingAs($pdl)
+        ->post('/staff', [
+            'name' => 'Wohnbereichsleitung Zwei',
+            'email' => 'wbl2@pflegedex.local',
+            'password' => 'sicheres-passwort',
+            'role' => 'WBL',
+            'location_ids' => [$location->id],
+            // Bewusst widerspruechlich: eine WBL ist immer Fachkraft.
+            'qualification_level' => 'aide',
+            'is_nursing_specialist' => false,
+            'weekly_hours' => 20,
+        ])
+        ->assertRedirect('/staff');
+
+    $staff = User::query()
+        ->where('email', 'wbl2@pflegedex.local')
+        ->with('employeeProfile')
+        ->firstOrFail();
+
+    expect($staff->employeeProfile->qualification_level)->toBe(QualificationLevel::Specialist)
+        ->and($staff->employeeProfile->is_nursing_specialist)->toBeTrue();
+});
+
+it('derives is_nursing_specialist from the qualification level for assistants and aides', function (string $level): void {
+    $location = Location::factory()->create();
+
+    $pdl = User::factory()->for($location)->create();
+    $pdl->assignRole('PDL');
+
+    $this->actingAs($pdl)
+        ->post('/staff', [
+            'name' => 'Pflege '.$level,
+            'email' => $level.'@pflegedex.local',
+            'password' => 'sicheres-passwort',
+            'role' => 'Pflegekraft',
+            'location_ids' => [$location->id],
+            'qualification_level' => $level,
+            // Bewusst widerspruechlich gesetzt: die Qualifikationsstufe gewinnt.
+            'is_nursing_specialist' => true,
+            'weekly_hours' => 30,
+        ])
+        ->assertRedirect('/staff');
+
+    $staff = User::query()
+        ->where('email', $level.'@pflegedex.local')
+        ->with('employeeProfile')
+        ->firstOrFail();
+
+    expect($staff->employeeProfile->qualification_level->value)->toBe($level)
+        ->and($staff->employeeProfile->is_nursing_specialist)->toBeFalse();
+})->with(['assistant', 'aide']);

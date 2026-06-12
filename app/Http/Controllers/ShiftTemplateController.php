@@ -70,7 +70,27 @@ class ShiftTemplateController extends Controller
             'starts_at' => ['required', 'date_format:H:i'],
             'ends_at' => ['required', 'date_format:H:i'],
             'duration_minutes' => ['required', 'integer', 'min:1', 'max:1440'],
-            'color' => ['nullable', 'string', 'max:20'],
+            'color' => [
+                'nullable',
+                'string',
+                'max:20',
+                // Schichtfarben muessen innerhalb eines Wohnbereichs eindeutig sein.
+                function (string $attribute, mixed $value, \Closure $fail) use ($shiftTemplate): void {
+                    if (! is_string($value) || $value === '') {
+                        return;
+                    }
+
+                    $taken = ShiftTemplate::query()
+                        ->where('location_id', $shiftTemplate->location_id)
+                        ->whereKeyNot($shiftTemplate->id)
+                        ->whereRaw('LOWER(color) = ?', [strtolower($value)])
+                        ->exists();
+
+                    if ($taken) {
+                        $fail('Diese Farbe ist in diesem Wohnbereich bereits vergeben.');
+                    }
+                },
+            ],
             'active' => ['sometimes', 'boolean'],
         ]);
 
@@ -83,7 +103,7 @@ class ShiftTemplateController extends Controller
             'active' => $request->has('active')
                 ? $request->boolean('active')
                 : $shiftTemplate->active,
-        ]); 
+        ]);
 
         return back()->with('status', 'shift-template-updated');
     }

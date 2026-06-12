@@ -87,8 +87,8 @@ function createRosterValidatorShift(
     string $date,
 ): Shift {
     $shiftDate = CarbonImmutable::parse($date)->startOfDay();
-    $startsAt = CarbonImmutable::parse($shiftDate->toDateString() . ' ' . $shiftTemplate->starts_at);
-    $endsAt = CarbonImmutable::parse($shiftDate->toDateString() . ' ' . $shiftTemplate->ends_at);
+    $startsAt = CarbonImmutable::parse($shiftDate->toDateString().' '.$shiftTemplate->starts_at);
+    $endsAt = CarbonImmutable::parse($shiftDate->toDateString().' '.$shiftTemplate->ends_at);
 
     if ($endsAt->lessThanOrEqualTo($startsAt)) {
         $endsAt = $endsAt->addDay();
@@ -153,9 +153,12 @@ it('is green when every shift in the month meets staffing and specialist require
     ]);
 
     foreach (rosterValidatorDatesForJanuary2027() as $date) {
+        // Jeweils eine eigene Aushilfe ohne vertragliches Soll (weder Stunden
+        // noch Regeltage), damit der Tag besetzt ist und keine Soll-Warnung entsteht.
         $specialist = createRosterValidatorEmployee($location, [
             'is_nursing_specialist' => true,
-            'weekly_hours' => 80.00,
+            'weekly_hours' => 0.00,
+            'regular_work_days_per_week' => 0,
         ]);
 
         createRosterValidatorShift($roster, $specialist, $shiftTemplate, $date);
@@ -313,9 +316,9 @@ it('does not add rest period errors when rest is sufficient', function (): void 
 });
 
 it('reports green yellow and red result states', function (): void {
-    $green = new RosterValidationResult();
-    $yellow = new RosterValidationResult();
-    $red = new RosterValidationResult();
+    $green = new RosterValidationResult;
+    $yellow = new RosterValidationResult;
+    $red = new RosterValidationResult;
 
     $yellow->addWarning('warning', 'Hinweis');
     $red->addError('error', 'Fehler');
@@ -332,7 +335,7 @@ it('reports green yellow and red result states', function (): void {
 });
 
 it('stores title and details for validation errors', function (): void {
-    $result = new RosterValidationResult();
+    $result = new RosterValidationResult;
 
     $result->addError(
         'test_error',
@@ -352,7 +355,7 @@ it('stores title and details for validation errors', function (): void {
 });
 
 it('stores title and details for validation warnings', function (): void {
-    $result = new RosterValidationResult();
+    $result = new RosterValidationResult;
 
     $result->addWarning(
         'test_warning',
@@ -372,7 +375,7 @@ it('stores title and details for validation warnings', function (): void {
 });
 
 it('stores null title and details when they are omitted', function (): void {
-    $result = new RosterValidationResult();
+    $result = new RosterValidationResult;
 
     $result->addError('test_error', 'Fehler');
     $result->addWarning('test_warning', 'Hinweis');
@@ -537,6 +540,49 @@ it('ignores planned working hours for employees without employee profiles', func
     $result = app(RosterValidator::class)->validate($roster);
 
     expect(rosterValidatorCodes($result->warnings))->not->toContain('employee_over_planned_hours');
+});
+
+it('adds an under planned warning when an employee is planned well below capacity', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $roster = createRosterValidatorRoster($location, $createdBy);
+    $shiftTemplate = createRosterValidatorShiftTemplate($location, ['active' => false]);
+
+    // Voller Vertrag (39 h / 5 Tage), aber nur ein einziger Dienst geplant.
+    $employee = createRosterValidatorEmployee($location, [
+        'weekly_hours' => 39.00,
+        'regular_work_days_per_week' => 5,
+    ]);
+
+    createRosterValidatorShift($roster, $employee, $shiftTemplate, '2027-01-05');
+
+    $result = app(RosterValidator::class)->validate($roster);
+
+    $warning = collect($result->warnings)
+        ->first(fn (array $warning): bool => $warning['code'] === 'employee_under_planned_hours');
+
+    expect($warning)->not->toBeNull()
+        ->and($warning['context']['userId'])->toBe($employee->id)
+        ->and($result->isYellow())->toBeTrue();
+});
+
+it('does not add an under planned warning for employees without contractual capacity', function (): void {
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $roster = createRosterValidatorRoster($location, $createdBy);
+    $shiftTemplate = createRosterValidatorShiftTemplate($location, ['active' => false]);
+
+    // Aushilfe ohne vertragliches Soll (weder Stunden noch Regeltage).
+    $employee = createRosterValidatorEmployee($location, [
+        'weekly_hours' => 0.00,
+        'regular_work_days_per_week' => 0,
+    ]);
+
+    createRosterValidatorShift($roster, $employee, $shiftTemplate, '2027-01-05');
+
+    $result = app(RosterValidator::class)->validate($roster);
+
+    expect(rosterValidatorCodes($result->warnings))->not->toContain('employee_under_planned_hours');
 });
 
 it('adds a too many consecutive work days warning for seven planned days in a row', function (): void {

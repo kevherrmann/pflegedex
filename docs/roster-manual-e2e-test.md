@@ -42,19 +42,24 @@ Der getestete Stand wird bewusst mit seinen bekannten Grenzen dokumentiert (sieh
 
 ### Erwartete Demo-Daten
 
-- Wohnbereich A
-- Demo-PDL
-- 12 Pflegekräfte
-- Schichtvorlagen:
+- 2 Wohnbereiche (A und B) mit je 20 Bewohnern (Pflegegrade 2–5), insgesamt 40 Bewohner
+- Demo-PDL (wohnbereichsübergreifend)
+- Pflegepersonal je Bereich (12 Personen) als Qualifikationsmix:
+  - 1 Wohnbereichsleitung (WBL, Pflegefachkraft, ~50 % Stunden)
+  - 4 weitere Pflegefachkräfte (davon 1 Nachtwache)
+  - 3 Pflegeassistenten
+  - 4 Pflegehilfskräfte (davon 1 Nachtwache)
+- je Bereich 1 Putzkraft (2 gesamt) und 1 Hausmeister
+- Schichtvorlagen je Bereich:
   - Frühdienst 06:00–14:00
   - Spätdienst 14:00–22:00
   - Nachtdienst 22:00–06:00
-- Besetzungsregeln:
+- Besetzungsregeln je Bereich:
   - Frühdienst: 2 Mitarbeiter, davon 1 Fachkraft
   - Spätdienst: 2 Mitarbeiter, davon 1 Fachkraft
   - Nachtdienst: 1 Mitarbeiter, davon 1 Fachkraft
-- genehmigte Abwesenheiten im Januar 2027
-- Draft-Dienstplan Januar 2027
+- genehmigte Abwesenheiten im Januar 2027 (je Bereich)
+- Draft-Dienstplan Januar 2027 je Bereich
 
 ## 3. Login und Rechteprüfung
 
@@ -90,11 +95,13 @@ Für jeden Filter prüfen, ob die angezeigte Auswahl plausibel zur Auswahlbeding
   - [ ] Spätdienst: 2 Mitarbeiter, davon 1 Fachkraft
   - [ ] Nachtdienst: 1 Mitarbeiter, davon 1 Fachkraft
 - [ ] **Pflegekräfte** prüfen:
-  - [ ] Fachkräfte korrekt gekennzeichnet
-  - [ ] Nicht-Fachkräfte korrekt gekennzeichnet
+  - [ ] Qualifikationsstufen korrekt (Pflegefachkraft / Pflegeassistent / Pflegehilfskraft)
+  - [ ] WBL als Pflegefachkraft gekennzeichnet
+  - [ ] nur Pflegefachkräfte zählen im Dienstplan als Fachkraft
   - [ ] Wochenstunden plausibel hinterlegt
-  - [ ] Nachtfähigkeit korrekt gesetzt
+  - [ ] Nachtfähigkeit korrekt gesetzt (nur Nachtwachen-Profile)
   - [ ] aktive Profile (keine inaktiven/gesperrten Mitarbeiter im Plan)
+- [ ] **Beide Wohnbereiche** prüfen: Bereich A und Bereich B haben je eigenes Personal, Schichtvorlagen, Besetzungsregeln und einen eigenen Dienstplan.
 
 ## 6. Auto-Planung testen
 

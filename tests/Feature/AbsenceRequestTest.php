@@ -2,7 +2,9 @@
 
 use App\Enums\AbsenceRequestStatus;
 use App\Enums\AbsenceRequestType;
+use App\Enums\BlackoutScope;
 use App\Enums\EmploymentArea;
+use App\Enums\QualificationLevel;
 use App\Models\AbsenceRequest;
 use App\Models\EmployeeProfile;
 use App\Models\Location;
@@ -157,7 +159,7 @@ it('stores the location of the employee by default', function (): void {
     expect($request->location_id)->toBe($employee->location_id);
 });
 
-it('blocks vacation when a matching roster blackout day exists in the requested period', function (): void {
+it('records a vacation request inside a blackout but flags it instead of blocking', function (): void {
     $employee = createEmployeeWithProfile(EmploymentArea::Nursing);
 
     createRosterBlackoutDayForAbsenceRequestTest(
@@ -168,13 +170,17 @@ it('blocks vacation when a matching roster blackout day exists in the requested 
         blocksOvertimeCompensation: false,
     );
 
-    expect(fn () => app(AbsenceRequestService::class)->request($employee, $employee, [
+    $service = app(AbsenceRequestService::class);
+
+    $request = $service->request($employee, $employee, [
         'type' => AbsenceRequestType::Vacation,
         'starts_on' => '2026-12-20',
         'ends_on' => '2026-12-27',
-    ]))->toThrow(ValidationException::class);
+    ]);
 
-    expect(AbsenceRequest::query()->count())->toBe(0);
+    expect($request)->toBeInstanceOf(AbsenceRequest::class)
+        ->and(AbsenceRequest::query()->count())->toBe(1)
+        ->and($service->hitsBlackout($request))->toBeTrue();
 });
 
 it('allows vacation when only non-vacation roster blackout days exist in the requested period', function (): void {
@@ -198,7 +204,7 @@ it('allows vacation when only non-vacation roster blackout days exist in the req
         ->and($request->type)->toBe(AbsenceRequestType::Vacation);
 });
 
-it('blocks overtime compensation when a matching roster blackout day exists in the requested period', function (): void {
+it('records an overtime compensation request inside a blackout but flags it', function (): void {
     $employee = createEmployeeWithProfile(EmploymentArea::Nursing);
 
     createRosterBlackoutDayForAbsenceRequestTest(
@@ -209,13 +215,17 @@ it('blocks overtime compensation when a matching roster blackout day exists in t
         blocksOvertimeCompensation: true,
     );
 
-    expect(fn () => app(AbsenceRequestService::class)->request($employee, $employee, [
+    $service = app(AbsenceRequestService::class);
+
+    $request = $service->request($employee, $employee, [
         'type' => AbsenceRequestType::OvertimeCompensation,
         'starts_on' => '2027-01-01',
         'ends_on' => '2027-01-03',
-    ]))->toThrow(ValidationException::class);
+    ]);
 
-    expect(AbsenceRequest::query()->count())->toBe(0);
+    expect($request)->toBeInstanceOf(AbsenceRequest::class)
+        ->and(AbsenceRequest::query()->count())->toBe(1)
+        ->and($service->hitsBlackout($request))->toBeTrue();
 });
 
 it('allows overtime compensation when only vacation roster blackout days exist in the requested period', function (): void {
@@ -259,4 +269,134 @@ it('does not block absence requests with roster blackout days from other locatio
 
     expect($request)->toBeInstanceOf(AbsenceRequest::class)
         ->and($request->location_id)->toBe($employee->location_id);
+});
+
+it('applies a qualification-scoped blackout only to matching qualifications', function (): void {
+    $specialist = createEmployeeWithProfile(EmploymentArea::Nursing);
+    $specialist->employeeProfile->update(['qualification_level' => QualificationLevel::Specialist]);
+
+    $location = Location::query()->findOrFail($specialist->location_id);
+
+    $aide = User::factory()->for($location)->create();
+    EmployeeProfile::query()->create([
+        'user_id' => $aide->id,
+        'employment_area' => EmploymentArea::Nursing,
+        'qualification_level' => QualificationLevel::Aide,
+        'active' => true,
+    ]);
+
+    RosterBlackoutDay::query()->create([
+        'location_id' => $location->id,
+        'date' => '2026-12-24',
+        'scope' => BlackoutScope::Qualification,
+        'qualification_levels' => [QualificationLevel::Specialist->value],
+        'created_by' => $specialist->id,
+    ]);
+
+    $service = app(AbsenceRequestService::class);
+
+    // Fachkraft -> Antrag faellt in die Sperre (markiert).
+    $specialistRequest = $service->request($specialist, $specialist, [
+        'type' => AbsenceRequestType::Vacation,
+        'starts_on' => '2026-12-20',
+        'ends_on' => '2026-12-27',
+    ]);
+
+    // Hilfskraft im selben Wohnbereich -> nicht betroffen.
+    $aideRequest = $service->request($aide, $aide, [
+        'type' => AbsenceRequestType::Vacation,
+        'starts_on' => '2026-12-20',
+        'ends_on' => '2026-12-27',
+    ]);
+
+    expect($service->hitsBlackout($specialistRequest))->toBeTrue()
+        ->and($service->hitsBlackout($aideRequest))->toBeFalse();
+});
+
+it('applies an employee-scoped blackout only to the named employees', function (): void {
+    $blocked = createEmployeeWithProfile(EmploymentArea::Nursing);
+    $location = Location::query()->findOrFail($blocked->location_id);
+
+    $other = User::factory()->for($location)->create();
+    EmployeeProfile::query()->create([
+        'user_id' => $other->id,
+        'employment_area' => EmploymentArea::Nursing,
+        'active' => true,
+    ]);
+
+    $blackoutDay = RosterBlackoutDay::query()->create([
+        'location_id' => $location->id,
+        'date' => '2026-12-24',
+        'scope' => BlackoutScope::Employees,
+        'created_by' => $blocked->id,
+    ]);
+    $blackoutDay->employees()->sync([$blocked->id]);
+
+    $service = app(AbsenceRequestService::class);
+
+    // Benannter Mitarbeiter -> Antrag faellt in die Sperre (markiert).
+    $blockedRequest = $service->request($blocked, $blocked, [
+        'type' => AbsenceRequestType::Vacation,
+        'starts_on' => '2026-12-20',
+        'ends_on' => '2026-12-27',
+    ]);
+
+    // Anderer Mitarbeiter im selben Wohnbereich -> nicht betroffen.
+    $otherRequest = $service->request($other, $other, [
+        'type' => AbsenceRequestType::Vacation,
+        'starts_on' => '2026-12-20',
+        'ends_on' => '2026-12-27',
+    ]);
+
+    expect($service->hitsBlackout($blockedRequest))->toBeTrue()
+        ->and($service->hitsBlackout($otherRequest))->toBeFalse();
+});
+
+it('requires a documented reason to approve a request that falls into a blackout', function (): void {
+    $employee = createEmployeeWithProfile(EmploymentArea::Nursing);
+    $pdl = User::factory()->for(Location::query()->findOrFail($employee->location_id))->create();
+
+    createRosterBlackoutDayForAbsenceRequestTest(
+        locationId: $employee->location_id,
+        date: '2026-12-24',
+        createdBy: $pdl,
+        blocksVacation: true,
+        blocksOvertimeCompensation: false,
+    );
+
+    $service = app(AbsenceRequestService::class);
+
+    $request = $service->request($employee, $employee, [
+        'type' => AbsenceRequestType::Vacation,
+        'starts_on' => '2026-12-20',
+        'ends_on' => '2026-12-27',
+    ]);
+
+    // Ohne Begruendung -> Ausnahme nicht moeglich.
+    expect(fn () => $service->approve($request, $pdl))->toThrow(ValidationException::class);
+    expect($request->fresh()->status)->toBe(AbsenceRequestStatus::Requested);
+
+    // Mit Begruendung -> genehmigt und dokumentiert.
+    $approved = $service->approve($request, $pdl, 'Dringender familiärer Grund, Besetzung gesichert.');
+
+    expect($approved->status)->toBe(AbsenceRequestStatus::Approved)
+        ->and($approved->override_reason)->toBe('Dringender familiärer Grund, Besetzung gesichert.');
+});
+
+it('does not require a reason to approve a request outside any blackout', function (): void {
+    $employee = createEmployeeWithProfile(EmploymentArea::Nursing);
+    $pdl = User::factory()->for(Location::query()->findOrFail($employee->location_id))->create();
+
+    $service = app(AbsenceRequestService::class);
+
+    $request = $service->request($employee, $employee, [
+        'type' => AbsenceRequestType::Vacation,
+        'starts_on' => '2026-12-20',
+        'ends_on' => '2026-12-27',
+    ]);
+
+    $approved = $service->approve($request, $pdl);
+
+    expect($approved->status)->toBe(AbsenceRequestStatus::Approved)
+        ->and($approved->override_reason)->toBeNull();
 });

@@ -22,7 +22,7 @@ use Inertia\Response;
  * Filtern auf User, Modell-Typ und Datum. Paginiert mit 25 Eintraegen pro
  * Seite.
  *
- * Zugriff: PDL + Pflegekraft (read-only). Admin/Putzkraft/Hausmeister 403.
+ * Zugriff: nur Admin (read-only). Alle anderen Rollen 403.
  */
 class AuditController extends Controller
 {
@@ -82,7 +82,7 @@ class AuditController extends Controller
         $page = $query->paginate(self::PER_PAGE)->withQueryString();
 
         return Inertia::render('Audit/Index', [
-            'audits' => $page->getCollection()->map(fn(Audit $a): array => $this->auditPayload($a))->values(),
+            'audits' => $page->getCollection()->map(fn (Audit $a): array => $this->auditPayload($a))->values(),
             'pagination' => [
                 'currentPage' => $page->currentPage(),
                 'lastPage' => $page->lastPage(),
@@ -100,14 +100,14 @@ class AuditController extends Controller
                 'users' => User::query()
                     ->orderBy('name')
                     ->get(['id', 'name', 'email'])
-                    ->map(fn(User $u): array => [
+                    ->map(fn (User $u): array => [
                         'id' => $u->id,
                         'name' => $u->name,
                         'email' => $u->email,
                     ])
                     ->values(),
                 'models' => collect(self::MODEL_LABELS)
-                    ->map(fn(string $label, string $key): array => ['key' => $key, 'label' => $label])
+                    ->map(fn (string $label, string $key): array => ['key' => $key, 'label' => $label])
                     ->values(),
                 'events' => [
                     ['key' => 'created', 'label' => 'Angelegt'],
@@ -121,7 +121,7 @@ class AuditController extends Controller
 
     private function authorizeAccess(Request $request): void
     {
-        abort_unless($request->user()?->hasAnyRole(['PDL', 'Pflegekraft']), 403);
+        abort_unless($request->user()?->hasRole('Admin'), 403);
     }
 
     /**

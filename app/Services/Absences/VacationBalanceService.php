@@ -53,6 +53,14 @@ class VacationBalanceService
 
     private function formatDays(float $days): string
     {
-        return number_format($days, 2, '.', '');
+        // Auf halbe Tage runden. Ganze Tage ohne Nachkommastellen ("30"),
+        // halbe Tage mit einer Stelle und deutschem Komma ("26,5").
+        $rounded = round($days * 2) / 2;
+
+        if ($rounded === floor($rounded)) {
+            return (string) (int) $rounded;
+        }
+
+        return number_format($rounded, 1, ',', '');
     }
 }
