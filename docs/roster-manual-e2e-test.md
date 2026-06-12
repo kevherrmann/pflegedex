@@ -149,19 +149,27 @@ Für jeden Filter prüfen, ob die angezeigte Auswahl plausibel zur Auswahlbeding
 
 Die folgenden Grenzen sind dem aktuellen Stand bekannt und beim Testen zu berücksichtigen. Auffälligkeiten in diesen Bereichen sind erwartbar und kein Fehler:
 
-- Der Generator ist kein globaler Optimierer. Er erzeugt eine brauchbare, aber nicht zwingend optimale Belegung.
-- Es gibt keinen Vorschau-Modus. Die Auto-Planung schreibt direkt in den Entwurf.
-- Monatsgrenzen werden noch nicht vollständig berücksichtigt:
-  - Ruhezeiten über den Monatswechsel
-  - Sonntagsausgleich über den Monatswechsel
-  - Arbeitstage am Stück über den Monatswechsel
-  - Wochenendlast über den Monatswechsel
-- Mitarbeiterwünsche (Wunschfrei / Wunschdienst) fehlen.
 - Die Mitarbeiteransicht „Mein Dienstplan" fehlt.
 - Die Ansicht „Mit wem arbeite ich zusammen?" fehlt.
 - Mehrfachzuordnung zu Wohnbereichen ist noch nicht abschließend geprüft (später prüfen).
 - Das historische Löschverhalten ist noch nicht abschließend geprüft (später prüfen).
-- Harte Regeln und weiche Warnungen sind noch nicht konfigurierbar (später ermöglichen).
+- Das Wochenend-Limit (max. 2 Wochenenden/Monat) darf zugunsten der Besetzung
+  weichen, wenn ein Slot sonst unbesetzt bliebe (konfigurierbar über
+  `rostering.relax_weekend_limit_for_coverage`). Der Validator meldet die
+  Mehrbelastung dann als Hinweis — das ist erwartet, kein Fehler.
+
+Frühere Grenzen, die inzwischen behoben sind:
+
+- Der Generator optimiert jetzt zweiphasig (Konstruktion nach weichen Zielen,
+  anschließend lokale Suche mit Tausch-, Verschiebe- und Wochenendblock-Zügen).
+- Es gibt einen Vorschau-Modus („Vorschau" neben „Automatisch planen"): gleiche
+  Pipeline ohne Persistenz, inkl. projizierter Validierung und Auslastung.
+- Monatsgrenzen werden berücksichtigt (Ruhezeiten, Arbeitstage am Stück,
+  Wochenstunden über den Monatswechsel sowie Dienste in anderen Dienstplänen
+  desselben Mitarbeiters), in Generator und Validator gleichermaßen.
+- Mitarbeiterwünsche (Wunschfrei / Wunschdienst) existieren als eigene
+  Verwaltungsseite und fließen als weiche Ziele in die Planung ein.
+- Schwellwerte und Strafgewichte sind über `config/rostering.php` konfigurierbar.
 
 ## 12. Testergebnis-Vorlage
 
