@@ -100,9 +100,10 @@ class MyRosterController extends Controller
     }
 
     /**
-     * Dienste der Kolleginnen und Kollegen an den eigenen Arbeitstagen und
-     * Standorten — Grundlage fuer "Mit wem arbeite ich zusammen?". Nur aus
-     * veroeffentlichten/gesperrten Plaenen, denn nur die sind verbindlich.
+     * Dienste der Kolleginnen und Kollegen im eigenen Wohnbereich — an allen
+     * Tagen des Monats, damit Diensttausch-Absprachen möglich sind (wie der
+     * ausgehängte Plan am Schwarzen Brett). Nur aus veröffentlichten bzw.
+     * gesperrten Plänen, denn nur die sind verbindlich.
      *
      * @param  Collection<int, Shift>  $ownShifts
      * @param  array<int, string>  $visibleStatuses
@@ -115,14 +116,20 @@ class MyRosterController extends Controller
         CarbonImmutable $monthEnd,
         array $visibleStatuses,
     ) {
-        if ($ownShifts->isEmpty()) {
+        $locationIds = $ownShifts
+            ->pluck('location_id')
+            ->push($user->location_id)
+            ->filter()
+            ->unique();
+
+        if ($locationIds->isEmpty()) {
             return collect();
         }
 
         return Shift::query()
             ->with(['shiftTemplate', 'user'])
             ->where('user_id', '!=', $user->id)
-            ->whereIn('location_id', $ownShifts->pluck('location_id')->unique())
+            ->whereIn('location_id', $locationIds)
             ->whereDate('date', '>=', $monthStart->toDateString())
             ->whereDate('date', '<=', $monthEnd->toDateString())
             ->whereHas('roster', fn ($query) => $query->whereIn('status', $visibleStatuses))
@@ -196,9 +203,10 @@ class MyRosterController extends Controller
     }
 
     /**
-     * "Mit wem arbeite ich zusammen?": Kollegen am selben Tag und Standort,
-     * nach Schichtvorlage gruppiert. Nur an eigenen Arbeitstagen — an freien
-     * Tagen ist die Besetzung anderer nicht relevant.
+     * Tagesbesetzung des Wohnbereichs, nach Schichtvorlage gruppiert. An
+     * eigenen Arbeitstagen beantwortet sie "Mit wem arbeite ich zusammen?",
+     * an freien Tagen "Wer ist im Dienst?" — beides braucht es, damit
+     * Kolleginnen und Kollegen Diensttausche absprechen können.
      *
      * @param  Collection<int, Shift>  $ownDayShifts
      * @param  Collection<int, Shift>  $dayTeamShifts
@@ -206,15 +214,9 @@ class MyRosterController extends Controller
      */
     private function buildTeamForDay($ownDayShifts, $dayTeamShifts): array
     {
-        if ($ownDayShifts->isEmpty()) {
-            return [];
-        }
-
-        $ownLocationIds = $ownDayShifts->pluck('location_id')->unique();
         $ownTemplateIds = $ownDayShifts->pluck('shift_template_id')->unique();
 
         return $dayTeamShifts
-            ->filter(fn (Shift $shift): bool => $ownLocationIds->contains($shift->location_id))
             ->groupBy('shift_template_id')
             ->map(fn ($templateShifts): array => [
                 'shiftTemplateName' => $templateShifts->first()->shiftTemplate?->name,

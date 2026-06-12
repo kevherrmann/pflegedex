@@ -273,7 +273,7 @@ it('shows colleagues working the same day grouped by shift', function (): void {
             ->where('days.4.team.1.colleagues', [$colleagueLateShift->name]));
 });
 
-it('shows no team on free days', function (): void {
+it('shows the on-duty team on free days for shift swap planning', function (): void {
     $location = Location::factory()->create();
     $pdl = User::factory()->for($location)->create();
     $employee = myRosterEmployee($location);
@@ -281,14 +281,18 @@ it('shows no team on free days', function (): void {
     $roster = myRosterRoster($location, $pdl, RosterStatus::Published);
     $template = myRosterTemplate($location);
 
-    // Nur der Kollege arbeitet am 5.1. — der Mitarbeiter hat frei.
+    // Nur der Kollege arbeitet am 5.1. — der Mitarbeiter hat frei, sieht
+    // die Besetzung aber trotzdem (Grundlage für Diensttausch-Absprachen).
     myRosterShift($roster, $colleague, $template, '2027-01-05');
 
     $this->actingAs($employee)
         ->get(route('my-roster.show', ['month' => '2027-01']))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
-            ->where('days.4.team', []));
+            ->where('days.4.shifts', [])
+            ->has('days.4.team', 1)
+            ->where('days.4.team.0.isOwnShift', false)
+            ->where('days.4.team.0.colleagues', [$colleague->name]));
 });
 
 it('excludes colleagues from draft rosters and other locations from the team', function (): void {

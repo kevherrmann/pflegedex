@@ -138,21 +138,34 @@ function DayRow({ day }: { day: MyDay }) {
                     <ShiftRow key={shift.id} shift={shift} />
                 ))}
 
-                {day.team.length > 0 && <TeamBlock team={day.team} />}
-
                 {!hasContent && (
                     <p className="pt-1 text-sm text-gray-400">frei</p>
+                )}
+
+                {day.team.length > 0 && (
+                    <TeamBlock
+                        team={day.team}
+                        hasOwnShift={day.shifts.length > 0}
+                    />
                 )}
             </div>
         </div>
     );
 }
 
-function TeamBlock({ team }: { team: TeamGroup[] }) {
+function TeamBlock({
+    team,
+    hasOwnShift,
+}: {
+    team: TeamGroup[];
+    hasOwnShift: boolean;
+}) {
     return (
         <div className="rounded-lg bg-gray-50 px-3 py-2 ring-1 ring-gray-200">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-                Mit wem arbeite ich zusammen?
+                {hasOwnShift
+                    ? 'Mit wem arbeite ich zusammen?'
+                    : 'Wer ist im Dienst?'}
             </p>
             <div className="mt-1.5 space-y-1">
                 {team.map((group, index) => (
