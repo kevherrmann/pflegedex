@@ -52,15 +52,17 @@ it('generates fully staffed and rule-conform rosters on realistic demo data', fu
         expect($guaranteedRuleWarnings)->toBeEmpty();
 
         // Wochenend-Warnungen sind in diesem Monat strukturell unvermeidbar:
-        // Pro Wochenendtag braucht jede der drei Schichten eine Fachkraft
-        // (24 Fachkraft-Wochenendtage), die 5 Fachkräfte decken mit maximal
-        // zwei Wochenenden aber nur 20 ab. Die Lockerung verteilt die
-        // Mehrbelastung — niemand arbeitet mehr als drei Wochenenden.
+        // Pro in-Monat-Wochenendtag braucht jede der drei Schichten eine
+        // Fachkraft (Früh, Spät und – nach PDL-Vorgabe – auch die Nacht). Den
+        // Nachtdienst können je Bereich aber nur die drei Nachtwachen-Fachkräfte
+        // abdecken; bei vier Wochenenden im Monat lässt die Besetzung-vor-
+        // Empfehlung-Lockerung daher im Einzelfall ein viertes Wochenende zu —
+        // niemand arbeitet mehr als vier Wochenenden.
         $weekendWarnings = collect($validationResult->warnings)
             ->where('code', 'employee_too_many_weekends');
 
         expect($weekendWarnings->every(
-            fn (array $warning): bool => $warning['context']['workedWeekends'] <= 3,
+            fn (array $warning): bool => $warning['context']['workedWeekends'] <= 4,
         ))->toBeTrue();
     }
 });

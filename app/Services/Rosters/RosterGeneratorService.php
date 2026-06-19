@@ -607,12 +607,21 @@ class RosterGeneratorService
      */
     private function sortedCandidates(PlanningContext $context): Collection
     {
+        // Hinweis: Collection::sortBy([...Closures]) ruft jede Closure als
+        // Komparator ($a, $b) auf (sortByMany), nicht als Schlüssel — einargumentige
+        // Schlüsselfunktionen liefern dort eine willkürliche Reihenfolge. Daher ein
+        // expliziter Vergleich über das lexikographische Array der Fairness-Schlüssel.
         return $context->employees
-            ->sortBy([
-                fn (User $employee): int => $context->utilizationPermilleFor($employee),
-                fn (User $employee): int => $context->plannedMinutesFor($employee),
-                fn (User $employee): int => $context->shiftCountFor($employee),
-                fn (User $employee): string => $employee->name,
+            ->sort(fn (User $a, User $b): int => [
+                $context->utilizationPermilleFor($a),
+                $context->plannedMinutesFor($a),
+                $context->shiftCountFor($a),
+                $a->name,
+            ] <=> [
+                $context->utilizationPermilleFor($b),
+                $context->plannedMinutesFor($b),
+                $context->shiftCountFor($b),
+                $b->name,
             ])
             ->values();
     }

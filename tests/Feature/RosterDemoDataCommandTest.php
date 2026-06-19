@@ -56,10 +56,13 @@ it('creates a realistic two-area care home and is idempotent', function (): void
         ->where('employment_area', EmploymentArea::Nursing->value)
         ->get();
 
+    // Pro Bereich: 7 Fachkraefte (1 WBL, 3 Tag, 3 Nachtwachen-Team), 3
+    // Assistenten, 2 Hilfskraefte. Der Nachtdienst verlangt eine Fachkraft,
+    // daher ein dreikoepfiges Nachtwachen-Team statt nachtfaehiger Hilfskraefte.
     expect($nursingProfiles)->toHaveCount(24)
-        ->and($nursingProfiles->where('qualification_level', QualificationLevel::Specialist)->count())->toBe(10)
+        ->and($nursingProfiles->where('qualification_level', QualificationLevel::Specialist)->count())->toBe(14)
         ->and($nursingProfiles->where('qualification_level', QualificationLevel::Assistant)->count())->toBe(6)
-        ->and($nursingProfiles->where('qualification_level', QualificationLevel::Aide)->count())->toBe(8);
+        ->and($nursingProfiles->where('qualification_level', QualificationLevel::Aide)->count())->toBe(4);
 
     // is_nursing_specialist wird konsistent aus der Qualifikationsstufe abgeleitet.
     expect($nursingProfiles->every(
@@ -89,7 +92,7 @@ it('creates a realistic two-area care home and is idempotent', function (): void
     foreach ([$locationA, $locationB] as $location) {
         $templates = ShiftTemplate::query()
             ->where('location_id', $location->id)
-            ->whereIn('code', ['F', 'S', 'N'])
+            ->whereIn('code', ['early', 'late', 'night'])
             ->get();
 
         expect($templates)->toHaveCount(3)

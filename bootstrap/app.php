@@ -13,6 +13,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // ngrok-Demo: TLS wird vom Tunnel terminiert und als http weitergereicht.
+        // Proxy-Header vertrauen, damit Laravel https erkennt (verhindert Mixed-Content).
+        $middleware->trustProxies(at: '*');
+
         $middleware->web(append: [
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,

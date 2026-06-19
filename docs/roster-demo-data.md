@@ -19,12 +19,13 @@ Der Befehl baut ein realistisches Demo-Pflegeheim auf, das sich am Personalbemes
 - **1 PDL** (`demo.pdl.dienstplan@pflegedex.local`), wohnbereichsübergreifend mit Zugriff auf beide Bereiche.
 - **Pflegepersonal je Bereich (12 Personen)** als Qualifikationsmix:
   - 1 Wohnbereichsleitung (WBL, examinierte Pflegefachkraft, ~50 % Stunden, kein Nachtdienst)
-  - 4 weitere Pflegefachkräfte (davon 1 Nachtwache)
+  - 3 weitere Tages-Pflegefachkräfte
+  - 3-köpfiges Nachtwachen-Team aus Pflegefachkräften (der Nachtdienst verlangt zwingend eine Fachkraft, eine einzelne deckt keinen vollen Monat ab)
   - 3 Pflegeassistenten
-  - 4 Pflegehilfskräfte (davon 1 Nachtwache)
+  - 2 Pflegehilfskräfte
 - **Hauswirtschaft und Technik**: je Bereich 1 Putzkraft (2 gesamt) sowie 1 Hausmeister.
 - **Schichtprofile**: Voll- und Teilzeit, reine Frühdienst-Profile (Familienschicht) und reine Nachtwachen.
-- **Schichtvorlagen** (Frühdienst, Spätdienst, Nachtdienst) und **Besetzungsregeln** je Bereich.
+- **Schichtvorlagen** (Frühdienst, Spätdienst, Nachtdienst) und **Besetzungsregeln** je Bereich (Frühdienst 2 / 1 Fachkraft, Spätdienst 2 / 1 Fachkraft, Nachtdienst 1 / 1 Fachkraft).
 - **Genehmigte Abwesenheiten** und ein **Draft-Dienstplan je Bereich**.
 
 Der Befehl stellt außerdem sicher, dass die Rollen `PDL`, `WBL`, `Pflegekraft`, `Putzkraft` und `Hausmeister` existieren, damit die Mitarbeiterseite nicht wegen einer fehlenden Rolle abbricht.

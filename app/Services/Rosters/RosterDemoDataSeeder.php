@@ -200,9 +200,13 @@ class RosterDemoDataSeeder
     }
 
     /**
-     * Qualifikationsmix eines Wohnbereichs: 1 WBL, 4 weitere Fachkraefte
-     * (davon 1 Nachtwache), 3 Pflegeassistenten, 4 Pflegehilfskraefte (davon
-     * 1 Nachtwache). Schichtprofile bilden Voll-/Teilzeit und reine Nacht ab.
+     * Qualifikationsmix eines Wohnbereichs: 1 WBL, 3 weitere Tagesfachkraefte,
+     * 3 Pflegeassistenten, 2 Pflegehilfskraefte und ein dreikoepfiges
+     * Nachtwachen-Team aus Fachkraeften (nf01-nf03). Der Nachtdienst verlangt
+     * zwingend eine Fachkraft (PDL-Vorgabe); ein einzelner Nachtwache reicht
+     * fuer einen vollen Monat nicht (max. 6 Tage am Stueck, Wochenstundenkappe),
+     * daher drei nachtfaehige Fachkraefte, die sich Naechte und Wochenenden
+     * teilen. Schichtprofile bilden Voll-/Teilzeit und Nacht ab.
      *
      * @return list<array{slug: string, role: string, qualification: QualificationLevel, hours: float, days: int, early: bool, late: bool, night: bool}>
      */
@@ -214,17 +218,17 @@ class RosterDemoDataSeeder
 
         return [
             ['slug' => 'wbl', 'role' => 'WBL', 'qualification' => $fk, 'hours' => 19.5, 'days' => 5, 'early' => true, 'late' => false, 'night' => false],
-            ['slug' => 'fk01', 'role' => 'Pflegekraft', 'qualification' => $fk, 'hours' => 39, 'days' => 5, 'early' => true, 'late' => true, 'night' => true],
+            ['slug' => 'fk01', 'role' => 'Pflegekraft', 'qualification' => $fk, 'hours' => 39, 'days' => 5, 'early' => true, 'late' => true, 'night' => false],
             ['slug' => 'fk02', 'role' => 'Pflegekraft', 'qualification' => $fk, 'hours' => 39, 'days' => 5, 'early' => true, 'late' => true, 'night' => false],
-            ['slug' => 'fk03', 'role' => 'Pflegekraft', 'qualification' => $fk, 'hours' => 25, 'days' => 4, 'early' => true, 'late' => false, 'night' => false],
+            ['slug' => 'fk03', 'role' => 'Pflegekraft', 'qualification' => $fk, 'hours' => 39, 'days' => 5, 'early' => true, 'late' => false, 'night' => false],
             ['slug' => 'as01', 'role' => 'Pflegekraft', 'qualification' => $as, 'hours' => 39, 'days' => 5, 'early' => true, 'late' => true, 'night' => false],
             ['slug' => 'as02', 'role' => 'Pflegekraft', 'qualification' => $as, 'hours' => 30, 'days' => 4, 'early' => true, 'late' => true, 'night' => false],
             ['slug' => 'as03', 'role' => 'Pflegekraft', 'qualification' => $as, 'hours' => 20, 'days' => 3, 'early' => true, 'late' => false, 'night' => false],
             ['slug' => 'hi01', 'role' => 'Pflegekraft', 'qualification' => $hi, 'hours' => 39, 'days' => 5, 'early' => true, 'late' => true, 'night' => false],
             ['slug' => 'hi02', 'role' => 'Pflegekraft', 'qualification' => $hi, 'hours' => 25, 'days' => 4, 'early' => true, 'late' => true, 'night' => false],
-            ['slug' => 'hi03', 'role' => 'Pflegekraft', 'qualification' => $hi, 'hours' => 20, 'days' => 3, 'early' => true, 'late' => false, 'night' => false],
-            ['slug' => 'nf01', 'role' => 'Pflegekraft', 'qualification' => $fk, 'hours' => 30, 'days' => 4, 'early' => false, 'late' => false, 'night' => true],
-            ['slug' => 'nh01', 'role' => 'Pflegekraft', 'qualification' => $hi, 'hours' => 30, 'days' => 4, 'early' => false, 'late' => false, 'night' => true],
+            ['slug' => 'nf01', 'role' => 'Pflegekraft', 'qualification' => $fk, 'hours' => 30, 'days' => 4, 'early' => false, 'late' => true, 'night' => true],
+            ['slug' => 'nf02', 'role' => 'Pflegekraft', 'qualification' => $fk, 'hours' => 30, 'days' => 4, 'early' => false, 'late' => true, 'night' => true],
+            ['slug' => 'nf03', 'role' => 'Pflegekraft', 'qualification' => $fk, 'hours' => 30, 'days' => 4, 'early' => false, 'late' => true, 'night' => true],
         ];
     }
 
@@ -452,9 +456,9 @@ class RosterDemoDataSeeder
     private function createShiftTemplates(Location $location): Collection
     {
         $templates = [
-            ['code' => 'F', 'name' => 'Frühdienst', 'starts_at' => '06:00', 'ends_at' => '14:00', 'color' => '#F59E0B'],
-            ['code' => 'S', 'name' => 'Spätdienst', 'starts_at' => '14:00', 'ends_at' => '22:00', 'color' => '#3B82F6'],
-            ['code' => 'N', 'name' => 'Nachtdienst', 'starts_at' => '22:00', 'ends_at' => '06:00', 'color' => '#6366F1'],
+            ['code' => 'early', 'name' => 'Frühdienst', 'starts_at' => '06:00', 'ends_at' => '14:00', 'color' => '#F59E0B'],
+            ['code' => 'late', 'name' => 'Spätdienst', 'starts_at' => '14:00', 'ends_at' => '22:00', 'color' => '#3B82F6'],
+            ['code' => 'night', 'name' => 'Nachtdienst', 'starts_at' => '22:00', 'ends_at' => '06:00', 'color' => '#6366F1'],
         ];
 
         return collect($templates)->map(fn (array $template): ShiftTemplate => ShiftTemplate::updateOrCreate(
@@ -479,9 +483,10 @@ class RosterDemoDataSeeder
     private function createStaffingRules(Location $location, Collection $shiftTemplates): int
     {
         $requirements = [
-            'F' => ['total' => 2, 'specialists' => 1],
-            'S' => ['total' => 2, 'specialists' => 1],
-            'N' => ['total' => 1, 'specialists' => 1],
+            'early' => ['total' => 2, 'specialists' => 1],
+            'late' => ['total' => 2, 'specialists' => 1],
+            // Nachtdienst: zwingend eine Fachkraft (PDL-Vorgabe).
+            'night' => ['total' => 1, 'specialists' => 1],
         ];
 
         foreach ($shiftTemplates as $shiftTemplate) {

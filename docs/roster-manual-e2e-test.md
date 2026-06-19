@@ -46,9 +46,10 @@ Der getestete Stand wird bewusst mit seinen bekannten Grenzen dokumentiert (sieh
 - Demo-PDL (wohnbereichsübergreifend)
 - Pflegepersonal je Bereich (12 Personen) als Qualifikationsmix:
   - 1 Wohnbereichsleitung (WBL, Pflegefachkraft, ~50 % Stunden)
-  - 4 weitere Pflegefachkräfte (davon 1 Nachtwache)
+  - 3 weitere Tages-Pflegefachkräfte
+  - 3-köpfiges Nachtwachen-Team aus Pflegefachkräften
   - 3 Pflegeassistenten
-  - 4 Pflegehilfskräfte (davon 1 Nachtwache)
+  - 2 Pflegehilfskräfte
 - je Bereich 1 Putzkraft (2 gesamt) und 1 Hausmeister
 - Schichtvorlagen je Bereich:
   - Frühdienst 06:00–14:00
