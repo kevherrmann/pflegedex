@@ -16,6 +16,7 @@ export type PageProps<T extends Record<string, unknown> = Record<string, unknown
             manageStaff: boolean;
             managePdlAccounts: boolean;
             viewAuditLog: boolean;
+            manageAiModels: boolean;
             canViewAbsenceRequests: boolean;
             canManageAbsenceRequests: boolean;
             canViewOwnRoster: boolean;
@@ -26,5 +27,8 @@ export type PageProps<T extends Record<string, unknown> = Record<string, unknown
         modelPresent: boolean;
         model: string | null;
         reason: string | null;
+    };
+    flash?: {
+        status?: string;
     };
 };

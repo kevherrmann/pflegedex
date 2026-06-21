@@ -45,6 +45,15 @@ it('Nicht-PDL wird vom Dashboard zur Bewohner-Liste umgeleitet', function (): vo
         ->assertRedirect(route('residents.index'));
 });
 
+it('Admin wird vom Dashboard zur Benutzerverwaltung umgeleitet statt 403', function (): void {
+    $admin = User::factory()->create();
+    $admin->assignRole('Admin');
+
+    $this->actingAs($admin)
+        ->get(route('dashboard'))
+        ->assertRedirect(route('users.index'));
+});
+
 it('PDL sieht leeres Dashboard wenn keine Daten existieren', function (): void {
     [$location, $pdl] = dashLocationAndPdl();
 

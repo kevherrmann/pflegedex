@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AbsenceRequestController;
 use App\Http\Controllers\AssessmentController;
+use App\Http\Controllers\AiModelController;
 use App\Http\Controllers\AuditController;
 use App\Http\Controllers\CarePlanController;
 use App\Http\Controllers\CarePlanGenerationController;
@@ -137,6 +138,13 @@ Route::middleware('auth')->group(function () {
     Route::delete('/residents/{resident}/medication-administrations/{administration}', [MedicationController::class, 'destroyAdministration'])->name('residents.medications.administrations.destroy');
 
     Route::get('/audit', [AuditController::class, 'index'])->name('audit.index');
+
+    // KI-Modelle (nur Admin)
+    Route::get('/ai-models', [AiModelController::class, 'index'])->name('ai-models.index');
+    Route::post('/ai-models', [AiModelController::class, 'store'])->name('ai-models.store');
+    Route::patch('/ai-models/{aiModel}/activate', [AiModelController::class, 'activate'])->name('ai-models.activate');
+    Route::post('/ai-models/{aiModel}/test', [AiModelController::class, 'test'])->name('ai-models.test');
+    Route::delete('/ai-models/{aiModel}', [AiModelController::class, 'destroy'])->name('ai-models.destroy');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

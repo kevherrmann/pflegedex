@@ -45,7 +45,20 @@ class DashboardController extends Controller
         $user = $request->user();
 
         if (! $user?->hasRole('PDL')) {
-            return redirect()->route('residents.index');
+            // Sinnvolle Startseite je Rolle, damit niemand auf einer 403-Seite landet.
+            if ($user?->hasRole('Pflegekraft')) {
+                return redirect()->route('residents.index');
+            }
+
+            if ($user?->hasRole('Admin')) {
+                return redirect()->route('users.index');
+            }
+
+            if ($user?->employeeProfile?->active) {
+                return redirect()->route('my-roster.show');
+            }
+
+            return redirect()->route('profile.edit');
         }
 
         $locationIds = $user->accessibleLocations()->pluck('id');

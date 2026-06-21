@@ -4,21 +4,20 @@ declare(strict_types=1);
 
 namespace App\Services\Ai;
 
+use App\Enums\AiProvider;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
- * Duenner Wrapper um die Ollama-/api/generate-API.
+ * LLM-Client für die Textgenerierung. Verwendet das aktuell aktive Modell
+ * (siehe {@see AiModelResolver}) und spricht je nach Anbieter:
+ *  - 'ollama' das lokale /api/generate, oder
+ *  - 'openai' eine OpenAI-kompatible /v1/chat/completions-API (z. B. DeepSeek)
+ *    mit hinterlegtem API-Key.
  *
- * Liest Konfiguration aus env:
- *  - OLLAMA_URL (Basis-URL ohne /api)
- *  - AI_MODEL (Modell-Tag)
- *  - OLLAMA_TIMEOUT_SECONDS (optional, Default 120)
- *
- * Erlaubt es Tests, das Verhalten ohne echten Ollama-Server zu mocken
- * via Http::fake().
+ * Tests mocken das Verhalten via Http::fake().
  */
 class OllamaClient
 {
@@ -28,8 +27,20 @@ class OllamaClient
 
     public function generate(string $prompt, ?string $system = null): string
     {
-        $baseUrl = (string) config('ai.ollama.url');
-        $model = (string) config('ai.ollama.model');
+        $active = app(AiModelResolver::class)->active();
+
+        return $active['provider'] === AiProvider::OpenAi->value
+            ? $this->generateViaOpenAi($active, $prompt, $system)
+            : $this->generateViaOllama($active, $prompt, $system);
+    }
+
+    /**
+     * @param  array{provider: string, model: string, base_url: string, api_key: ?string, label: string}  $active
+     */
+    private function generateViaOllama(array $active, string $prompt, ?string $system): string
+    {
+        $baseUrl = $active['base_url'] !== '' ? $active['base_url'] : (string) config('ai.ollama.url');
+        $model = $active['model'];
         $timeout = (int) config('ai.ollama.timeout', 120);
 
         if ($baseUrl === '' || $model === '') {
@@ -64,6 +75,52 @@ class OllamaClient
         $text = (string) ($response->json('response') ?? '');
         if ($text === '') {
             throw new RuntimeException('Ollama lieferte leere Antwort.');
+        }
+
+        return trim($text);
+    }
+
+    /**
+     * @param  array{provider: string, model: string, base_url: string, api_key: ?string, label: string}  $active
+     */
+    private function generateViaOpenAi(array $active, string $prompt, ?string $system): string
+    {
+        $baseUrl = rtrim($active['base_url'], '/');
+        $model = $active['model'];
+        $apiKey = (string) ($active['api_key'] ?? '');
+        $timeout = (int) config('ai.ollama.timeout', 120);
+
+        if ($baseUrl === '' || $model === '' || $apiKey === '') {
+            throw new RuntimeException('Externes KI-Modell ist nicht vollständig konfiguriert (URL/Modell/API-Key).');
+        }
+
+        $messages = [];
+        if ($system !== null && $system !== '') {
+            $messages[] = ['role' => 'system', 'content' => $system];
+        }
+        $messages[] = ['role' => 'user', 'content' => $prompt];
+
+        $response = $this->client($timeout)
+            ->withToken($apiKey)
+            ->post($baseUrl.'/v1/chat/completions', [
+                'model' => $model,
+                'messages' => $messages,
+                'stream' => false,
+                'temperature' => (float) config('ai.ollama.temperature', 0.3),
+                'top_p' => (float) config('ai.ollama.top_p', 0.9),
+            ]);
+
+        if ($response->failed()) {
+            Log::warning('Externer KI-Aufruf fehlgeschlagen', [
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+            throw new RuntimeException('Das externe KI-Modell lieferte Statuscode '.$response->status());
+        }
+
+        $text = (string) ($response->json('choices.0.message.content') ?? '');
+        if ($text === '') {
+            throw new RuntimeException('Das externe KI-Modell lieferte eine leere Antwort.');
         }
 
         return trim($text);

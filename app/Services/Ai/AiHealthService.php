@@ -60,8 +60,8 @@ class AiHealthService
      */
     private function probe(): array
     {
-        $url = (string) config('ai.ollama.url');
-        $model = (string) config('ai.ollama.model');
+        $active = app(AiModelResolver::class)->active();
+        $model = $active['model'];
 
         $result = [
             'available' => false,
@@ -69,6 +69,23 @@ class AiHealthService
             'model' => $model,
             'reason' => null,
         ];
+
+        // Externe API (z. B. DeepSeek): als verfügbar gewertet, wenn URL + API-Key
+        // hinterlegt sind. Einen echten Probe-Call macht die "Verbindung testen"-Aktion.
+        if ($active['provider'] === \App\Enums\AiProvider::OpenAi->value) {
+            if ($active['base_url'] === '' || ($active['api_key'] ?? '') === '' || $model === '') {
+                $result['reason'] = 'Externes KI-Modell ist nicht vollständig konfiguriert (URL/Modell/API-Key).';
+
+                return $result;
+            }
+
+            $result['available'] = true;
+            $result['modelPresent'] = true;
+
+            return $result;
+        }
+
+        $url = $active['base_url'] !== '' ? $active['base_url'] : (string) config('ai.ollama.url');
 
         if ($url === '' || $model === '') {
             $result['reason'] = 'Ollama ist nicht konfiguriert (OLLAMA_URL/AI_MODEL).';

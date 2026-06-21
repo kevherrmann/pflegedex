@@ -42,12 +42,16 @@ class HandleInertiaRequests extends Middleware
                     'manageStaff' => $request->user()?->hasRole('PDL') ?? false,
                     'managePdlAccounts' => $request->user()?->hasRole('Admin') ?? false,
                     'viewAuditLog' => $request->user()?->hasRole('Admin') ?? false,
+                    'manageAiModels' => $request->user()?->hasRole('Admin') ?? false,
                     'canViewAbsenceRequests' => $request->user()?->canRequestAbsence() ?? false,
                     'canManageAbsenceRequests' => $request->user()?->hasRole('PDL') ?? false,
                     'canViewOwnRoster' => (bool) ($request->user()?->employeeProfile?->active ?? false),
                 ],
             ],
             'ai' => $this->aiStatus($request),
+            'flash' => [
+                'status' => fn () => $request->session()->get('status'),
+            ],
         ];
     }
 
