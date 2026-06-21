@@ -64,13 +64,13 @@ export default function Create({ location, locations, salutations }: ResidentCre
         >
             <Head title="Bewohner anlegen" />
 
-            <div className="bg-[#F8F8F8] py-12">
+            <div className="bg-[#F8F8F8] py-6 sm:py-8 lg:py-12">
                 <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
-                    <section className="mb-8 rounded-2xl bg-white p-8 shadow-sm ring-1 ring-[#E5E7EB]">
+                    <section className="mb-8 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-[#E5E7EB] sm:p-6 lg:p-8">
                         <p className="text-sm font-bold uppercase tracking-[0.22em] text-[#9B1C3B]">
                             {location?.name ?? 'Noch kein Wohnbereich'}
                         </p>
-                        <h1 className="mt-3 text-3xl font-semibold text-[#333333]">
+                        <h1 className="mt-3 text-2xl font-semibold text-[#333333] sm:text-3xl">
                             Neuer Bewohner
                         </h1>
                         <p className="mt-4 leading-7 text-[#54595F]">
@@ -88,7 +88,7 @@ export default function Create({ location, locations, salutations }: ResidentCre
 
                     <form
                         onSubmit={submit}
-                        className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-[#E5E7EB]"
+                        className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-[#E5E7EB] sm:p-6 lg:p-8"
                     >
                         {locations.length > 1 && (
                             <div className="mb-6">

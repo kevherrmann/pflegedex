@@ -30,11 +30,11 @@ export default function Edit({ location }: LocationsEditProps) {
             }
         >
             <Head title="Wohnbereich bearbeiten" />
-            <div className="bg-[#F8F8F8] py-12">
+            <div className="bg-[#F8F8F8] py-6 sm:py-8 lg:py-12">
                 <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
                     <form
                         onSubmit={submit}
-                        className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-[#E5E7EB]"
+                        className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-[#E5E7EB] sm:p-6 lg:p-8"
                     >
                         <div className="space-y-5">
                             <div>

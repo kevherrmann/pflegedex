@@ -125,12 +125,12 @@ export default function Index({ audits, pagination, filters, filterOptions }: Pr
             }
         >
             <Head title="Audit-Log" />
-            <div className="bg-[#F8F8F8] py-12">
+            <div className="bg-[#F8F8F8] py-6 sm:py-8 lg:py-12">
                 <div className="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
                     {/* Filter-Karte */}
                     <form
                         onSubmit={submit}
-                        className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-[#E5E7EB]"
+                        className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-[#E5E7EB] sm:p-6"
                     >
                         <div className="grid gap-4 md:grid-cols-5">
                             <div>
@@ -295,45 +295,94 @@ export default function Index({ audits, pagination, filters, filterOptions }: Pr
                                                             : `${a.changedFields.length} Felder anzeigen`}
                                                     </button>
                                                     {isOpen && (
-                                                        <table className="mt-2 w-full text-xs">
-                                                            <thead className="text-left text-gray-500">
-                                                                <tr>
-                                                                    <th className="py-1 pr-3">
-                                                                        Feld
-                                                                    </th>
-                                                                    <th className="py-1 pr-3">
-                                                                        Alt
-                                                                    </th>
-                                                                    <th className="py-1">Neu</th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
+                                                        <>
+                                                            {/* Tablet/Desktop: Tabelle */}
+                                                            <div className="hidden overflow-x-auto sm:block">
+                                                                <table className="mt-2 w-full text-xs">
+                                                                    <thead className="text-left text-gray-500">
+                                                                        <tr>
+                                                                            <th className="py-1 pr-3">
+                                                                                Feld
+                                                                            </th>
+                                                                            <th className="py-1 pr-3">
+                                                                                Alt
+                                                                            </th>
+                                                                            <th className="py-1">
+                                                                                Neu
+                                                                            </th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        {a.changedFields.map(
+                                                                            (c) => (
+                                                                                <tr
+                                                                                    key={c.field}
+                                                                                    className="border-t border-gray-100 align-top"
+                                                                                >
+                                                                                    <td className="py-1 pr-3 font-medium text-gray-700">
+                                                                                        {c.field}
+                                                                                    </td>
+                                                                                    <td className="py-1 pr-3 text-red-700">
+                                                                                        {c.old ?? (
+                                                                                            <span className="italic text-gray-400">
+                                                                                                —
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </td>
+                                                                                    <td className="py-1 text-green-700">
+                                                                                        {c.new ?? (
+                                                                                            <span className="italic text-gray-400">
+                                                                                                —
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </td>
+                                                                                </tr>
+                                                                            ),
+                                                                        )}
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+
+                                                            {/* Handy: gestapelte Karten */}
+                                                            <ul className="mt-2 space-y-2 sm:hidden">
                                                                 {a.changedFields.map((c) => (
-                                                                    <tr
+                                                                    <li
                                                                         key={c.field}
-                                                                        className="border-t border-gray-100 align-top"
+                                                                        className="rounded-md border border-gray-100 p-2 text-xs"
                                                                     >
-                                                                        <td className="py-1 pr-3 font-medium text-gray-700">
+                                                                        <p className="font-medium text-gray-700">
                                                                             {c.field}
-                                                                        </td>
-                                                                        <td className="py-1 pr-3 text-red-700">
-                                                                            {c.old ?? (
-                                                                                <span className="italic text-gray-400">
-                                                                                    —
-                                                                                </span>
-                                                                            )}
-                                                                        </td>
-                                                                        <td className="py-1 text-green-700">
-                                                                            {c.new ?? (
-                                                                                <span className="italic text-gray-400">
-                                                                                    —
-                                                                                </span>
-                                                                            )}
-                                                                        </td>
-                                                                    </tr>
+                                                                        </p>
+                                                                        <dl className="mt-1 grid grid-cols-2 gap-x-3">
+                                                                            <div>
+                                                                                <dt className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                                                                                    Alt
+                                                                                </dt>
+                                                                                <dd className="text-red-700">
+                                                                                    {c.old ?? (
+                                                                                        <span className="italic text-gray-400">
+                                                                                            —
+                                                                                        </span>
+                                                                                    )}
+                                                                                </dd>
+                                                                            </div>
+                                                                            <div>
+                                                                                <dt className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                                                                                    Neu
+                                                                                </dt>
+                                                                                <dd className="text-green-700">
+                                                                                    {c.new ?? (
+                                                                                        <span className="italic text-gray-400">
+                                                                                            —
+                                                                                        </span>
+                                                                                    )}
+                                                                                </dd>
+                                                                            </div>
+                                                                        </dl>
+                                                                    </li>
                                                                 ))}
-                                                            </tbody>
-                                                        </table>
+                                                            </ul>
+                                                        </>
                                                     )}
                                                 </div>
                                             )}

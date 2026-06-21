@@ -1,7 +1,7 @@
 <?php
 
 use App\Models\Location;
-use App\Models\ShiftStaffingRule;
+use App\Models\ShiftCategoryStaffingRule;
 use App\Models\ShiftTemplate;
 use App\Models\User;
 use App\Services\Rosters\DefaultShiftSetupService;
@@ -86,8 +86,10 @@ it('passes locations and shift templates to inertia', function (): void {
                 ->where('shiftTemplates.0.durationMinutes', 480)
                 ->where('shiftTemplates.0.color', '#F59E0B')
                 ->where('shiftTemplates.0.active', true)
-                ->where('shiftTemplates.0.defaultStaffingRule.requiredTotalStaff', 5)
-                ->where('shiftTemplates.0.defaultStaffingRule.requiredSpecialists', 1)
+                ->where('shiftTemplates.0.category', 'early')
+                ->where('categoryStaffing.0.category', 'early')
+                ->where('categoryStaffing.0.requiredTotalStaff', 5)
+                ->where('categoryStaffing.0.requiredSpecialists', 1)
         );
 });
 
@@ -204,70 +206,63 @@ it('allows the same shift color in a different location', function (): void {
     expect($templateB->refresh()->color)->toBe('#ABCDEF');
 });
 
-it('lets PDL users update the default staffing rule', function (): void {
+it('lets PDL users update the category staffing', function (): void {
     $location = Location::factory()->create();
     $pdl = createShiftTemplateHttpUser('PDL', $location);
-    $shiftTemplate = createShiftTemplateHttpShift($location);
+    createShiftTemplateHttpShift($location);
 
     $this->actingAs($pdl)
         ->from('/shift-templates')
-        ->patch("/shift-templates/{$shiftTemplate->id}/staffing-rule", [
+        ->patch('/shift-templates/category-staffing', [
+            'category' => 'early',
             'required_total_staff' => 7,
             'required_specialists' => 2,
         ])
         ->assertRedirect('/shift-templates')
-        ->assertSessionHas('status', 'shift-staffing-rule-updated');
+        ->assertSessionHas('status', 'category-staffing-updated');
 
-    $defaultRule = $shiftTemplate
-        ->staffingRules()
+    $rule = ShiftCategoryStaffingRule::query()
+        ->where('location_id', $location->id)
+        ->where('category', 'early')
         ->whereNull('weekday')
         ->firstOrFail();
 
-    expect($defaultRule->required_total_staff)->toBe(7)
-        ->and($defaultRule->required_specialists)->toBe(2);
+    expect($rule->required_total_staff)->toBe(7)
+        ->and($rule->required_specialists)->toBe(2);
 });
 
-it('lets PDL users create the default staffing rule when none exists', function (): void {
+it('lets PDL users create the category staffing when none exists', function (): void {
     $location = Location::factory()->create();
     $pdl = createShiftTemplateHttpUser('PDL', $location);
 
-    $shiftTemplate = ShiftTemplate::query()->create([
-        'location_id' => $location->id,
-        'name' => 'Frühdienst',
-        'code' => 'early',
-        'starts_at' => '06:00',
-        'ends_at' => '14:00',
-        'duration_minutes' => 480,
-        'color' => '#F59E0B',
-        'active' => true,
-    ]);
-
     $this->actingAs($pdl)
         ->from('/shift-templates')
-        ->patch("/shift-templates/{$shiftTemplate->id}/staffing-rule", [
+        ->patch('/shift-templates/category-staffing', [
+            'category' => 'early',
             'required_total_staff' => 5,
             'required_specialists' => 1,
         ])
         ->assertRedirect('/shift-templates')
-        ->assertSessionHas('status', 'shift-staffing-rule-updated');
+        ->assertSessionHas('status', 'category-staffing-updated');
 
-    $defaultRule = ShiftStaffingRule::query()->firstOrFail();
+    $rule = ShiftCategoryStaffingRule::query()
+        ->where('location_id', $location->id)
+        ->where('category', 'early')
+        ->firstOrFail();
 
-    expect($defaultRule->location_id)->toBe($location->id)
-        ->and($defaultRule->shift_template_id)->toBe($shiftTemplate->id)
-        ->and($defaultRule->weekday)->toBeNull()
-        ->and($defaultRule->required_total_staff)->toBe(5)
-        ->and($defaultRule->required_specialists)->toBe(1);
+    expect($rule->weekday)->toBeNull()
+        ->and($rule->required_total_staff)->toBe(5)
+        ->and($rule->required_specialists)->toBe(1);
 });
 
-it('rejects staffing rules where required specialists exceed total staff', function (): void {
+it('rejects category staffing where required specialists exceed total staff', function (): void {
     $location = Location::factory()->create();
     $pdl = createShiftTemplateHttpUser('PDL', $location);
-    $shiftTemplate = createShiftTemplateHttpShift($location);
 
     $this->actingAs($pdl)
         ->from('/shift-templates')
-        ->patch("/shift-templates/{$shiftTemplate->id}/staffing-rule", [
+        ->patch('/shift-templates/category-staffing', [
+            'category' => 'early',
             'required_total_staff' => 1,
             'required_specialists' => 2,
         ])
@@ -294,25 +289,18 @@ it('blocks non PDL users from updating shift templates', function (): void {
     expect($shiftTemplate->refresh()->name)->toBe('Frühdienst');
 });
 
-it('blocks non PDL users from updating staffing rules', function (): void {
+it('blocks non PDL users from updating category staffing', function (): void {
     $user = createShiftTemplateHttpUser('Pflegekraft');
     $location = Location::factory()->create();
-    $shiftTemplate = createShiftTemplateHttpShift($location);
+    createShiftTemplateHttpShift($location);
 
     $this->actingAs($user)
-        ->patch("/shift-templates/{$shiftTemplate->id}/staffing-rule", [
+        ->patch('/shift-templates/category-staffing', [
+            'category' => 'early',
             'required_total_staff' => 7,
             'required_specialists' => 2,
         ])
         ->assertForbidden();
-
-    $defaultRule = $shiftTemplate
-        ->staffingRules()
-        ->whereNull('weekday')
-        ->firstOrFail();
-
-    expect($defaultRule->required_total_staff)->toBe(5)
-        ->and($defaultRule->required_specialists)->toBe(1);
 });
 
 it('shows only shift templates from the PDL Wohnbereich', function (): void {
@@ -359,24 +347,89 @@ it('blocks PDL users from updating shift templates from another Wohnbereich', fu
     expect($shiftTemplate->refresh()->name)->toBe('Frühdienst');
 });
 
-it('blocks PDL users from updating staffing rules from another Wohnbereich', function (): void {
+it('lets PDL create an additional shift in a category with its own hours', function (): void {
     $location = Location::factory()->create();
-    $otherLocation = Location::factory()->create();
     $pdl = createShiftTemplateHttpUser('PDL', $location);
-    $shiftTemplate = createShiftTemplateHttpShift($otherLocation);
+    app(DefaultShiftSetupService::class)->createForLocation($location);
 
     $this->actingAs($pdl)
-        ->patch("/shift-templates/{$shiftTemplate->id}/staffing-rule", [
-            'required_total_staff' => 7,
-            'required_specialists' => 2,
+        ->post('/shift-templates', [
+            'category' => 'early',
+            'name' => 'Früh 2',
+            'starts_at' => '07:00',
+            'ends_at' => '13:00',
+            'color' => '#10B981',
         ])
-        ->assertForbidden();
+        ->assertRedirect();
 
-    $defaultRule = $shiftTemplate
-        ->staffingRules()
-        ->whereNull('weekday')
+    $created = ShiftTemplate::query()
+        ->where('location_id', $location->id)
+        ->where('name', 'Früh 2')
         ->firstOrFail();
 
-    expect($defaultRule->required_total_staff)->toBe(5)
-        ->and($defaultRule->required_specialists)->toBe(1);
+    // Besetzung wird pro Kategorie gepflegt – die neue Schicht teilt sich die Früh-Besetzung.
+    expect($created->category)->toBe('early')
+        ->and($created->duration_minutes)->toBe(360)
+        ->and($created->code)->not->toBe('early');
+});
+
+it('computes overnight duration when creating a night shift', function (): void {
+    $location = Location::factory()->create();
+    $pdl = createShiftTemplateHttpUser('PDL', $location);
+    app(DefaultShiftSetupService::class)->createForLocation($location);
+
+    $this->actingAs($pdl)
+        ->post('/shift-templates', [
+            'category' => 'night',
+            'name' => 'Nacht 2',
+            'starts_at' => '22:00',
+            'ends_at' => '06:00',
+            'required_total_staff' => 1,
+            'required_specialists' => 1,
+        ])
+        ->assertRedirect();
+
+    expect(ShiftTemplate::query()->where('name', 'Nacht 2')->value('duration_minutes'))->toBe(480);
+});
+
+it('forbids deleting the last active shift of a category', function (): void {
+    $location = Location::factory()->create();
+    $pdl = createShiftTemplateHttpUser('PDL', $location);
+    app(DefaultShiftSetupService::class)->createForLocation($location);
+
+    $early = ShiftTemplate::query()
+        ->where('location_id', $location->id)
+        ->where('category', 'early')
+        ->firstOrFail();
+
+    $this->actingAs($pdl)
+        ->from('/shift-templates')
+        ->delete('/shift-templates/'.$early->id)
+        ->assertRedirect('/shift-templates')
+        ->assertSessionHasErrors(['shift_template']);
+
+    expect(ShiftTemplate::query()->whereKey($early->id)->exists())->toBeTrue();
+});
+
+it('deletes an additional shift without planned shifts', function (): void {
+    $location = Location::factory()->create();
+    $pdl = createShiftTemplateHttpUser('PDL', $location);
+    app(DefaultShiftSetupService::class)->createForLocation($location);
+
+    $this->actingAs($pdl)->post('/shift-templates', [
+        'category' => 'early',
+        'name' => 'Früh 2',
+        'starts_at' => '07:00',
+        'ends_at' => '13:00',
+        'required_total_staff' => 1,
+        'required_specialists' => 0,
+    ]);
+
+    $extra = ShiftTemplate::query()->where('name', 'Früh 2')->firstOrFail();
+
+    $this->actingAs($pdl)
+        ->delete('/shift-templates/'.$extra->id)
+        ->assertRedirect();
+
+    expect(ShiftTemplate::query()->whereKey($extra->id)->exists())->toBeFalse();
 });

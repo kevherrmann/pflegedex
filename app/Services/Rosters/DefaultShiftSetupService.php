@@ -3,7 +3,7 @@
 namespace App\Services\Rosters;
 
 use App\Models\Location;
-use App\Models\ShiftStaffingRule;
+use App\Models\ShiftCategoryStaffingRule;
 use App\Models\ShiftTemplate;
 
 class DefaultShiftSetupService
@@ -63,6 +63,7 @@ class DefaultShiftSetupService
                 ],
                 [
                     'name' => $defaultShift['name'],
+                    'category' => $defaultShift['code'],
                     'starts_at' => $defaultShift['starts_at'],
                     'ends_at' => $defaultShift['ends_at'],
                     'duration_minutes' => $defaultShift['duration_minutes'],
@@ -71,40 +72,18 @@ class DefaultShiftSetupService
                 ],
             );
 
-            $this->updateOrCreateDefaultStaffingRule(
-                $location,
-                $shiftTemplate,
-                $defaultShift['required_total_staff'],
-                $defaultShift['required_specialists'],
+            // Besetzung pro Kategorie (early/late/night).
+            ShiftCategoryStaffingRule::query()->updateOrCreate(
+                [
+                    'location_id' => $location->id,
+                    'category' => $defaultShift['code'],
+                    'weekday' => null,
+                ],
+                [
+                    'required_total_staff' => $defaultShift['required_total_staff'],
+                    'required_specialists' => $defaultShift['required_specialists'],
+                ],
             );
         }
-    }
-
-    private function updateOrCreateDefaultStaffingRule(
-        Location $location,
-        ShiftTemplate $shiftTemplate,
-        int $requiredTotalStaff,
-        int $requiredSpecialists,
-    ): void {
-        $staffingRule = ShiftStaffingRule::query()
-            ->where('shift_template_id', $shiftTemplate->id)
-            ->whereNull('weekday')
-            ->first();
-
-        $attributes = [
-            'location_id' => $location->id,
-            'shift_template_id' => $shiftTemplate->id,
-            'weekday' => null,
-            'required_total_staff' => $requiredTotalStaff,
-            'required_specialists' => $requiredSpecialists,
-        ];
-
-        if ($staffingRule === null) {
-            ShiftStaffingRule::query()->create($attributes);
-
-            return;
-        }
-
-        $staffingRule->update($attributes);
     }
 }

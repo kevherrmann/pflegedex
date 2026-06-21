@@ -112,10 +112,10 @@ export default function RosterBlackoutDaysIndex({
         >
             <Head title="Urlaubssperren" />
 
-            <div className="py-12">
-                <div className="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
+            <div className="py-6 sm:py-8 lg:py-12">
+                <div className="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
                     <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
-                        <div className="border-b border-gray-200 p-6">
+                        <div className="border-b border-gray-200 p-4 sm:p-6">
                             <h3 className="text-lg font-semibold text-gray-900">
                                 Neue Urlaubssperre
                             </h3>
@@ -126,7 +126,7 @@ export default function RosterBlackoutDaysIndex({
                             </p>
                         </div>
 
-                        <form onSubmit={submit} className="space-y-6 p-6">
+                        <form onSubmit={submit} className="space-y-6 p-4 sm:p-6">
                             <div className="grid gap-4 md:grid-cols-2">
                                 <div>
                                     <InputLabel htmlFor="location_id" value="Wohnbereich" />
@@ -335,7 +335,7 @@ export default function RosterBlackoutDaysIndex({
                     </div>
 
                     <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
-                        <div className="border-b border-gray-200 p-6">
+                        <div className="border-b border-gray-200 p-4 sm:p-6">
                             <h3 className="text-lg font-semibold text-gray-900">
                                 Vorhandene Sperrtage
                             </h3>
@@ -344,93 +344,179 @@ export default function RosterBlackoutDaysIndex({
                             </p>
                         </div>
 
-                        <div className="p-6">
+                        <div className="p-4 sm:p-6">
                             {blackoutDays.length === 0 ? (
                                 <p className="text-sm text-gray-600">
                                     Es sind noch keine Urlaubssperren angelegt.
                                 </p>
                             ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="min-w-full divide-y divide-gray-200">
-                                        <thead>
-                                            <tr>
-                                                <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                                    Datum
-                                                </th>
-                                                <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                                    Wohnbereich
-                                                </th>
-                                                <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                                    Gilt für
-                                                </th>
-                                                <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                                    Blockiert
-                                                </th>
-                                                <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                                    Grund
-                                                </th>
-                                                <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                                    Angelegt
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-200">
-                                            {blackoutDays.map((blackoutDay) => (
-                                                <tr key={blackoutDay.id}>
-                                                    <td className="whitespace-nowrap px-3 py-4 text-sm font-medium text-gray-900">
-                                                        {blackoutDay.date}
-                                                    </td>
-                                                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-700">
-                                                        {blackoutDay.locationName ?? 'Unbekannt'}
-                                                    </td>
-                                                    <td className="px-3 py-4 text-sm text-gray-700">
-                                                        <span className="font-medium">
-                                                            {blackoutDay.scopeLabel}
-                                                        </span>
-                                                        {blackoutDay.qualificationLabels.length >
-                                                            0 && (
-                                                            <span className="block text-xs text-gray-500">
-                                                                {blackoutDay.qualificationLabels.join(
-                                                                    ', ',
-                                                                )}
-                                                            </span>
-                                                        )}
-                                                        {blackoutDay.employeeNames.length > 0 && (
-                                                            <span className="block text-xs text-gray-500">
-                                                                {blackoutDay.employeeNames.join(
-                                                                    ', ',
-                                                                )}
-                                                            </span>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-3 py-4 text-sm text-gray-700">
-                                                        <div className="flex flex-wrap gap-2">
-                                                            {blackoutDay.blocksVacation && (
-                                                                <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
-                                                                    Urlaub
-                                                                </span>
-                                                            )}
-                                                            {blackoutDay.blocksOvertimeCompensation && (
-                                                                <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800">
-                                                                    Überstundenfrei
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                    <td className="max-w-md px-3 py-4 text-sm text-gray-700">
-                                                        {blackoutDay.reason ?? '-'}
-                                                    </td>
-                                                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                                                        {blackoutDay.createdByName ?? 'Unbekannt'}
-                                                        {blackoutDay.createdAt
-                                                            ? ` · ${blackoutDay.createdAt}`
-                                                            : ''}
-                                                    </td>
+                                <>
+                                    <div className="hidden overflow-x-auto md:block">
+                                        <table className="min-w-full divide-y divide-gray-200">
+                                            <thead>
+                                                <tr>
+                                                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                                        Datum
+                                                    </th>
+                                                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                                        Wohnbereich
+                                                    </th>
+                                                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                                        Gilt für
+                                                    </th>
+                                                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                                        Blockiert
+                                                    </th>
+                                                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                                        Grund
+                                                    </th>
+                                                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                                        Angelegt
+                                                    </th>
                                                 </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-200">
+                                                {blackoutDays.map((blackoutDay) => (
+                                                    <tr key={blackoutDay.id}>
+                                                        <td className="whitespace-nowrap px-3 py-4 text-sm font-medium text-gray-900">
+                                                            {blackoutDay.date}
+                                                        </td>
+                                                        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-700">
+                                                            {blackoutDay.locationName ??
+                                                                'Unbekannt'}
+                                                        </td>
+                                                        <td className="px-3 py-4 text-sm text-gray-700">
+                                                            <span className="font-medium">
+                                                                {blackoutDay.scopeLabel}
+                                                            </span>
+                                                            {blackoutDay.qualificationLabels
+                                                                .length > 0 && (
+                                                                <span className="block text-xs text-gray-500">
+                                                                    {blackoutDay.qualificationLabels.join(
+                                                                        ', ',
+                                                                    )}
+                                                                </span>
+                                                            )}
+                                                            {blackoutDay.employeeNames.length >
+                                                                0 && (
+                                                                <span className="block text-xs text-gray-500">
+                                                                    {blackoutDay.employeeNames.join(
+                                                                        ', ',
+                                                                    )}
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-3 py-4 text-sm text-gray-700">
+                                                            <div className="flex flex-wrap gap-2">
+                                                                {blackoutDay.blocksVacation && (
+                                                                    <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                                                                        Urlaub
+                                                                    </span>
+                                                                )}
+                                                                {blackoutDay.blocksOvertimeCompensation && (
+                                                                    <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800">
+                                                                        Überstundenfrei
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td className="max-w-md px-3 py-4 text-sm text-gray-700">
+                                                            {blackoutDay.reason ?? '-'}
+                                                        </td>
+                                                        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                                                            {blackoutDay.createdByName ??
+                                                                'Unbekannt'}
+                                                            {blackoutDay.createdAt
+                                                                ? ` · ${blackoutDay.createdAt}`
+                                                                : ''}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <ul className="divide-y divide-gray-200 md:hidden">
+                                        {blackoutDays.map((blackoutDay) => (
+                                            <li key={blackoutDay.id} className="space-y-3 py-4">
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <p className="font-medium text-gray-900">
+                                                        {blackoutDay.date}
+                                                    </p>
+                                                    <div className="flex flex-wrap justify-end gap-2">
+                                                        {blackoutDay.blocksVacation && (
+                                                            <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                                                                Urlaub
+                                                            </span>
+                                                        )}
+                                                        {blackoutDay.blocksOvertimeCompensation && (
+                                                            <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800">
+                                                                Überstundenfrei
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <dl className="space-y-2 text-sm">
+                                                    <div>
+                                                        <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                                            Wohnbereich
+                                                        </dt>
+                                                        <dd className="text-gray-700">
+                                                            {blackoutDay.locationName ??
+                                                                'Unbekannt'}
+                                                        </dd>
+                                                    </div>
+                                                    <div>
+                                                        <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                                            Gilt für
+                                                        </dt>
+                                                        <dd className="text-gray-700">
+                                                            <span className="font-medium">
+                                                                {blackoutDay.scopeLabel}
+                                                            </span>
+                                                            {blackoutDay.qualificationLabels
+                                                                .length > 0 && (
+                                                                <span className="block text-xs text-gray-500">
+                                                                    {blackoutDay.qualificationLabels.join(
+                                                                        ', ',
+                                                                    )}
+                                                                </span>
+                                                            )}
+                                                            {blackoutDay.employeeNames.length >
+                                                                0 && (
+                                                                <span className="block text-xs text-gray-500">
+                                                                    {blackoutDay.employeeNames.join(
+                                                                        ', ',
+                                                                    )}
+                                                                </span>
+                                                            )}
+                                                        </dd>
+                                                    </div>
+                                                    <div>
+                                                        <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                                            Grund
+                                                        </dt>
+                                                        <dd className="text-gray-700">
+                                                            {blackoutDay.reason ?? '-'}
+                                                        </dd>
+                                                    </div>
+                                                    <div>
+                                                        <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                                            Angelegt
+                                                        </dt>
+                                                        <dd className="text-gray-500">
+                                                            {blackoutDay.createdByName ??
+                                                                'Unbekannt'}
+                                                            {blackoutDay.createdAt
+                                                                ? ` · ${blackoutDay.createdAt}`
+                                                                : ''}
+                                                        </dd>
+                                                    </div>
+                                                </dl>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </>
                             )}
                         </div>
                     </div>

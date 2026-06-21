@@ -7,7 +7,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class ShiftStaffingRule extends Model
+/**
+ * Besetzung pro Schicht-Kategorie (Früh/Spät/Nacht) je Wohnbereich. Pro Tag wird
+ * die Summe aller eingeplanten Personen über alle Schichten dieser Kategorie
+ * gegen diese Zahlen geprüft – die einzelnen Schichten addieren ihre Zahlen NICHT.
+ */
+class ShiftCategoryStaffingRule extends Model
 {
     use HasFactory;
     use HasUuidV7;
@@ -18,7 +23,7 @@ class ShiftStaffingRule extends Model
 
     protected $fillable = [
         'location_id',
-        'shift_template_id',
+        'category',
         'weekday',
         'required_total_staff',
         'target_total_staff',
@@ -41,10 +46,5 @@ class ShiftStaffingRule extends Model
     public function location(): BelongsTo
     {
         return $this->belongsTo(Location::class);
-    }
-
-    public function shiftTemplate(): BelongsTo
-    {
-        return $this->belongsTo(ShiftTemplate::class);
     }
 }

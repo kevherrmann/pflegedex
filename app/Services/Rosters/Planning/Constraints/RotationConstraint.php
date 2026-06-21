@@ -29,7 +29,7 @@ class RotationConstraint implements SoftConstraint
         CarbonImmutable $startsAt,
         CarbonImmutable $endsAt,
     ): int {
-        $addedRank = $context->rotationRankForCode($shiftTemplate->code);
+        $addedRank = $context->rotationRankForCode($shiftTemplate->category);
 
         if ($addedRank === null) {
             return 0;

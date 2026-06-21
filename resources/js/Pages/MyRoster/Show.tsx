@@ -225,7 +225,7 @@ export default function MyRosterShow({ month, days, summary, hasUnpublishedRoste
         >
             <Head title="Mein Dienstplan" />
 
-            <div className="py-12">
+            <div className="py-6 sm:py-8 lg:py-12">
                 <div className="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center justify-between gap-2 rounded-lg bg-white p-3 shadow-sm sm:rounded-lg">
                         <Link
@@ -270,7 +270,7 @@ export default function MyRosterShow({ month, days, summary, hasUnpublishedRoste
                     </div>
 
                     <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
-                        <div className="border-b border-gray-200 p-6">
+                        <div className="border-b border-gray-200 p-4 sm:p-6">
                             <h3 className="text-lg font-semibold text-gray-900">
                                 Dienste im {month.label}
                             </h3>

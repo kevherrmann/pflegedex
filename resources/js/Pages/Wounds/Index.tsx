@@ -150,44 +150,95 @@ function WoundCard({
             </div>
 
             {wound.assessments.length > 0 ? (
-                <div className="mt-3 overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200 text-sm">
-                        <thead>
-                            <tr className="text-left text-gray-500">
-                                <th className="py-2 pr-4 font-medium">Datum</th>
-                                <th className="py-2 pr-4 font-medium">Stadium</th>
-                                <th className="py-2 pr-4 font-medium">Größe (L×B×T)</th>
-                                <th className="py-2 pr-4 font-medium">Schmerz</th>
-                                <th className="py-2 pr-4 font-medium">Maßnahmen</th>
-                                <th className="py-2 pr-4 font-medium">Erfasst von</th>
-                                <th className="py-2 pr-4 font-medium" />
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 text-gray-700">
-                            {wound.assessments.map((a) => (
-                                <tr key={a.id}>
-                                    <td className="whitespace-nowrap py-2 pr-4 font-medium text-gray-900">
-                                        {a.assessedOn}
-                                    </td>
-                                    <td className="py-2 pr-4">{a.stageLabel ?? '–'}</td>
-                                    <td className="whitespace-nowrap py-2 pr-4">{size(a)}</td>
-                                    <td className="py-2 pr-4">{a.pain ?? '–'}</td>
-                                    <td className="py-2 pr-4">{a.measures ?? '–'}</td>
-                                    <td className="py-2 pr-4">{a.assessedByName ?? '–'}</td>
-                                    <td className="py-2 pr-4 text-right">
-                                        <button
-                                            type="button"
-                                            onClick={() => removeAssessment(a)}
-                                            className="text-xs font-semibold text-red-600 hover:underline"
-                                        >
-                                            Entfernen
-                                        </button>
-                                    </td>
+                <>
+                    <div className="mt-3 hidden overflow-x-auto md:block">
+                        <table className="min-w-full divide-y divide-gray-200 text-sm">
+                            <thead>
+                                <tr className="text-left text-gray-500">
+                                    <th className="py-2 pr-4 font-medium">Datum</th>
+                                    <th className="py-2 pr-4 font-medium">Stadium</th>
+                                    <th className="py-2 pr-4 font-medium">Größe (L×B×T)</th>
+                                    <th className="py-2 pr-4 font-medium">Schmerz</th>
+                                    <th className="py-2 pr-4 font-medium">Maßnahmen</th>
+                                    <th className="py-2 pr-4 font-medium">Erfasst von</th>
+                                    <th className="py-2 pr-4 font-medium" />
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 text-gray-700">
+                                {wound.assessments.map((a) => (
+                                    <tr key={a.id}>
+                                        <td className="whitespace-nowrap py-2 pr-4 font-medium text-gray-900">
+                                            {a.assessedOn}
+                                        </td>
+                                        <td className="py-2 pr-4">{a.stageLabel ?? '–'}</td>
+                                        <td className="whitespace-nowrap py-2 pr-4">{size(a)}</td>
+                                        <td className="py-2 pr-4">{a.pain ?? '–'}</td>
+                                        <td className="py-2 pr-4">{a.measures ?? '–'}</td>
+                                        <td className="py-2 pr-4">{a.assessedByName ?? '–'}</td>
+                                        <td className="py-2 pr-4 text-right">
+                                            <button
+                                                type="button"
+                                                onClick={() => removeAssessment(a)}
+                                                className="text-xs font-semibold text-red-600 hover:underline"
+                                            >
+                                                Entfernen
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <ul className="mt-3 divide-y divide-gray-100 md:hidden">
+                        {wound.assessments.map((a) => (
+                            <li key={a.id} className="space-y-3 py-3">
+                                <div className="flex items-start justify-between gap-3">
+                                    <p className="font-medium text-gray-900">{a.assessedOn}</p>
+                                    <button
+                                        type="button"
+                                        onClick={() => removeAssessment(a)}
+                                        className="text-xs font-semibold text-red-600 hover:underline"
+                                    >
+                                        Entfernen
+                                    </button>
+                                </div>
+                                <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm text-gray-700">
+                                    <div>
+                                        <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                            Stadium
+                                        </dt>
+                                        <dd>{a.stageLabel ?? '–'}</dd>
+                                    </div>
+                                    <div>
+                                        <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                            Größe (L×B×T)
+                                        </dt>
+                                        <dd>{size(a)}</dd>
+                                    </div>
+                                    <div>
+                                        <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                            Schmerz
+                                        </dt>
+                                        <dd>{a.pain ?? '–'}</dd>
+                                    </div>
+                                    <div>
+                                        <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                            Erfasst von
+                                        </dt>
+                                        <dd>{a.assessedByName ?? '–'}</dd>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                            Maßnahmen
+                                        </dt>
+                                        <dd>{a.measures ?? '–'}</dd>
+                                    </div>
+                                </dl>
+                            </li>
+                        ))}
+                    </ul>
+                </>
             ) : (
                 <p className="mt-3 text-sm text-gray-500">Noch kein Verlaufseintrag.</p>
             )}
@@ -324,8 +375,8 @@ export default function Index({ resident, wounds, types, statuses, stages }: Pro
         >
             <Head title="Wunddokumentation" />
 
-            <div className="py-12">
-                <div className="mx-auto max-w-5xl space-y-6 sm:px-6 lg:px-8">
+            <div className="py-6 sm:py-8 lg:py-12">
+                <div className="mx-auto max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
                     <Link
                         href={route('residents.index')}
                         className="inline-flex rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
@@ -333,7 +384,7 @@ export default function Index({ resident, wounds, types, statuses, stages }: Pro
                         Zurück zur Bewohner-Übersicht
                     </Link>
 
-                    <div className="overflow-hidden bg-white p-6 shadow-sm sm:rounded-lg">
+                    <div className="overflow-hidden bg-white p-4 shadow-sm sm:rounded-lg sm:p-6">
                         <p className="text-sm text-gray-500">
                             {resident.locationName ?? 'Unbekannter Wohnbereich'}
                         </p>
@@ -342,7 +393,7 @@ export default function Index({ resident, wounds, types, statuses, stages }: Pro
                         </h3>
                     </div>
 
-                    <div className="space-y-4 overflow-hidden bg-white p-6 shadow-sm sm:rounded-lg">
+                    <div className="space-y-4 overflow-hidden bg-white p-4 shadow-sm sm:rounded-lg sm:p-6">
                         <h3 className="text-lg font-semibold text-gray-900">Wunden</h3>
                         {wounds.length === 0 ? (
                             <p className="text-sm text-gray-600">Keine Wunden dokumentiert.</p>
@@ -361,7 +412,7 @@ export default function Index({ resident, wounds, types, statuses, stages }: Pro
 
                     <form
                         onSubmit={submitWound}
-                        className="overflow-hidden bg-white p-6 shadow-sm sm:rounded-lg"
+                        className="overflow-hidden bg-white p-4 shadow-sm sm:rounded-lg sm:p-6"
                     >
                         <h3 className="text-lg font-semibold text-gray-900">Wunde anlegen</h3>
                         <div className="mt-4 grid gap-4 sm:grid-cols-2">

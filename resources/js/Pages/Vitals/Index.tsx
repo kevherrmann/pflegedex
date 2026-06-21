@@ -115,8 +115,8 @@ export default function Index({ resident, vitalSigns }: Props) {
         >
             <Head title="Vitalwerte" />
 
-            <div className="py-12">
-                <div className="mx-auto max-w-6xl space-y-6 sm:px-6 lg:px-8">
+            <div className="py-6 sm:py-8 lg:py-12">
+                <div className="mx-auto max-w-6xl space-y-6 px-4 sm:px-6 lg:px-8">
                     <Link
                         href={route('residents.index')}
                         className="inline-flex rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
@@ -124,7 +124,7 @@ export default function Index({ resident, vitalSigns }: Props) {
                         Zurück zur Bewohner-Übersicht
                     </Link>
 
-                    <div className="overflow-hidden bg-white p-6 shadow-sm sm:rounded-lg">
+                    <div className="overflow-hidden bg-white p-4 shadow-sm sm:rounded-lg sm:p-6">
                         <p className="text-sm text-gray-500">
                             {resident.locationName ?? 'Unbekannter Wohnbereich'}
                         </p>
@@ -135,7 +135,7 @@ export default function Index({ resident, vitalSigns }: Props) {
 
                     <form
                         onSubmit={submit}
-                        className="overflow-hidden bg-white p-6 shadow-sm sm:rounded-lg"
+                        className="overflow-hidden bg-white p-4 shadow-sm sm:rounded-lg sm:p-6"
                     >
                         <h3 className="text-lg font-semibold text-gray-900">Messwert erfassen</h3>
                         <p className="mt-1 text-sm text-gray-600">
@@ -198,64 +198,150 @@ export default function Index({ resident, vitalSigns }: Props) {
                     </form>
 
                     <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
-                        <div className="border-b border-gray-200 p-6">
+                        <div className="border-b border-gray-200 p-4 sm:p-6">
                             <h3 className="text-lg font-semibold text-gray-900">Verlauf</h3>
                         </div>
-                        <div className="overflow-x-auto p-6">
+                        <div className="p-4 sm:p-6">
                             {vitalSigns.length === 0 ? (
                                 <p className="text-sm text-gray-600">
                                     Noch keine Vitalwerte erfasst.
                                 </p>
                             ) : (
-                                <table className="min-w-full divide-y divide-gray-200 text-sm">
-                                    <thead>
-                                        <tr className="text-left text-gray-500">
-                                            <th className="py-2 pr-4 font-medium">Zeitpunkt</th>
-                                            <th className="py-2 pr-4 font-medium">RR</th>
-                                            <th className="py-2 pr-4 font-medium">Puls</th>
-                                            <th className="py-2 pr-4 font-medium">Temp</th>
-                                            <th className="py-2 pr-4 font-medium">SpO₂</th>
-                                            <th className="py-2 pr-4 font-medium">BZ</th>
-                                            <th className="py-2 pr-4 font-medium">AF</th>
-                                            <th className="py-2 pr-4 font-medium">Gewicht</th>
-                                            <th className="py-2 pr-4 font-medium">Erfasst von</th>
-                                            <th className="py-2 pr-4 font-medium" />
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100 text-gray-700">
+                                <>
+                                    <div className="hidden overflow-x-auto md:block">
+                                        <table className="min-w-full divide-y divide-gray-200 text-sm">
+                                            <thead>
+                                                <tr className="text-left text-gray-500">
+                                                    <th className="py-2 pr-4 font-medium">
+                                                        Zeitpunkt
+                                                    </th>
+                                                    <th className="py-2 pr-4 font-medium">RR</th>
+                                                    <th className="py-2 pr-4 font-medium">Puls</th>
+                                                    <th className="py-2 pr-4 font-medium">Temp</th>
+                                                    <th className="py-2 pr-4 font-medium">SpO₂</th>
+                                                    <th className="py-2 pr-4 font-medium">BZ</th>
+                                                    <th className="py-2 pr-4 font-medium">AF</th>
+                                                    <th className="py-2 pr-4 font-medium">
+                                                        Gewicht
+                                                    </th>
+                                                    <th className="py-2 pr-4 font-medium">
+                                                        Erfasst von
+                                                    </th>
+                                                    <th className="py-2 pr-4 font-medium" />
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-100 text-gray-700">
+                                                {vitalSigns.map((v) => (
+                                                    <tr key={v.id}>
+                                                        <td className="whitespace-nowrap py-2 pr-4 font-medium text-gray-900">
+                                                            {v.measuredAt}
+                                                        </td>
+                                                        <td className="py-2 pr-4">
+                                                            {bloodPressure(v)}
+                                                        </td>
+                                                        <td className="py-2 pr-4">
+                                                            {v.pulse ?? '–'}
+                                                        </td>
+                                                        <td className="py-2 pr-4">
+                                                            {v.temperature ?? '–'}
+                                                        </td>
+                                                        <td className="py-2 pr-4">
+                                                            {v.oxygenSaturation ?? '–'}
+                                                        </td>
+                                                        <td className="py-2 pr-4">
+                                                            {v.bloodSugar ?? '–'}
+                                                        </td>
+                                                        <td className="py-2 pr-4">
+                                                            {v.respiratoryRate ?? '–'}
+                                                        </td>
+                                                        <td className="py-2 pr-4">
+                                                            {v.weight ?? '–'}
+                                                        </td>
+                                                        <td className="py-2 pr-4">
+                                                            {v.recordedByName ?? '–'}
+                                                        </td>
+                                                        <td className="py-2 pr-4 text-right">
+                                                            <DangerButton
+                                                                type="button"
+                                                                onClick={() => remove(v)}
+                                                            >
+                                                                Löschen
+                                                            </DangerButton>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <ul className="divide-y divide-gray-100 md:hidden">
                                         {vitalSigns.map((v) => (
-                                            <tr key={v.id}>
-                                                <td className="whitespace-nowrap py-2 pr-4 font-medium text-gray-900">
-                                                    {v.measuredAt}
-                                                </td>
-                                                <td className="py-2 pr-4">{bloodPressure(v)}</td>
-                                                <td className="py-2 pr-4">{v.pulse ?? '–'}</td>
-                                                <td className="py-2 pr-4">
-                                                    {v.temperature ?? '–'}
-                                                </td>
-                                                <td className="py-2 pr-4">
-                                                    {v.oxygenSaturation ?? '–'}
-                                                </td>
-                                                <td className="py-2 pr-4">{v.bloodSugar ?? '–'}</td>
-                                                <td className="py-2 pr-4">
-                                                    {v.respiratoryRate ?? '–'}
-                                                </td>
-                                                <td className="py-2 pr-4">{v.weight ?? '–'}</td>
-                                                <td className="py-2 pr-4">
-                                                    {v.recordedByName ?? '–'}
-                                                </td>
-                                                <td className="py-2 pr-4 text-right">
+                                            <li key={v.id} className="space-y-3 py-4">
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <p className="font-medium text-gray-900">
+                                                        {v.measuredAt}
+                                                    </p>
                                                     <DangerButton
                                                         type="button"
                                                         onClick={() => remove(v)}
                                                     >
                                                         Löschen
                                                     </DangerButton>
-                                                </td>
-                                            </tr>
+                                                </div>
+                                                <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm text-gray-700">
+                                                    <div>
+                                                        <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                                            RR
+                                                        </dt>
+                                                        <dd>{bloodPressure(v)}</dd>
+                                                    </div>
+                                                    <div>
+                                                        <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                                            Puls
+                                                        </dt>
+                                                        <dd>{v.pulse ?? '–'}</dd>
+                                                    </div>
+                                                    <div>
+                                                        <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                                            Temp
+                                                        </dt>
+                                                        <dd>{v.temperature ?? '–'}</dd>
+                                                    </div>
+                                                    <div>
+                                                        <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                                            SpO₂
+                                                        </dt>
+                                                        <dd>{v.oxygenSaturation ?? '–'}</dd>
+                                                    </div>
+                                                    <div>
+                                                        <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                                            BZ
+                                                        </dt>
+                                                        <dd>{v.bloodSugar ?? '–'}</dd>
+                                                    </div>
+                                                    <div>
+                                                        <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                                            AF
+                                                        </dt>
+                                                        <dd>{v.respiratoryRate ?? '–'}</dd>
+                                                    </div>
+                                                    <div>
+                                                        <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                                            Gewicht
+                                                        </dt>
+                                                        <dd>{v.weight ?? '–'}</dd>
+                                                    </div>
+                                                    <div>
+                                                        <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                                            Erfasst von
+                                                        </dt>
+                                                        <dd>{v.recordedByName ?? '–'}</dd>
+                                                    </div>
+                                                </dl>
+                                            </li>
                                         ))}
-                                    </tbody>
-                                </table>
+                                    </ul>
+                                </>
                             )}
                         </div>
                     </div>

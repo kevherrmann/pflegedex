@@ -48,9 +48,12 @@ export default function Create({ resident, topics }: Props) {
         >
             <Head title={`Maßnahmenplan anlegen – ${resident.fullName}`} />
 
-            <div className="py-12">
-                <form onSubmit={submit} className="mx-auto max-w-5xl space-y-6 sm:px-6 lg:px-8">
-                    <div className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-[#E5E7EB]">
+            <div className="py-6 sm:py-8 lg:py-12">
+                <form
+                    onSubmit={submit}
+                    className="mx-auto max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8"
+                >
+                    <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-[#E5E7EB] sm:p-6 lg:p-8">
                         <h3 className="text-base font-bold uppercase tracking-widest text-[#333333]">
                             Grundbotschaft
                         </h3>
@@ -70,7 +73,7 @@ export default function Create({ resident, topics }: Props) {
                         )}
                     </div>
 
-                    <div className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-[#E5E7EB]">
+                    <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-[#E5E7EB] sm:p-6 lg:p-8">
                         <h3 className="text-base font-bold uppercase tracking-widest text-[#333333]">
                             Themenblöcke
                         </h3>
@@ -99,7 +102,7 @@ export default function Create({ resident, topics }: Props) {
                         </div>
                     </div>
 
-                    <div className="flex justify-end gap-3">
+                    <div className="flex flex-wrap justify-end gap-3">
                         <Link
                             href={route('residents.care-plan.show', resident.id)}
                             className="rounded-md px-4 py-2 text-sm font-semibold text-[#54595F] hover:underline"

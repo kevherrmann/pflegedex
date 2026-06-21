@@ -91,12 +91,12 @@ function TodoRow({
             href={target}
             className="flex items-center gap-3 rounded-md px-3 py-2 hover:bg-gray-50"
         >
-            <span className={`h-2 w-2 shrink-0 rounded-full ${dotClass}`} />
-            <span className="flex-1">
+            <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${dotClass}`} />
+            <span className="flex flex-1 flex-wrap items-baseline gap-x-2">
                 <span className="text-sm font-semibold text-gray-800">{item.name}</span>
-                <span className="ml-2 text-xs text-gray-500">{item.pseudonym}</span>
-                <span className="ml-3 text-xs text-gray-600">· {label}</span>
-                {extraText && <span className="ml-2 text-xs text-gray-500">· {extraText}</span>}
+                <span className="text-xs text-gray-500">{item.pseudonym}</span>
+                <span className="text-xs text-gray-600">· {label}</span>
+                {extraText && <span className="text-xs text-gray-500">· {extraText}</span>}
             </span>
         </Link>
     );
@@ -125,11 +125,11 @@ export default function Dashboard({ todo, running, recent }: Props) {
         >
             <Head title="Dashboard" />
 
-            <div className="py-8">
-                <div className="mx-auto max-w-6xl space-y-6 sm:px-6 lg:px-8">
+            <div className="py-6 sm:py-8 lg:py-12">
+                <div className="mx-auto max-w-6xl space-y-6 px-4 sm:px-6 lg:px-8">
                     {/* ============ Block 1: Was muss ich tun? ============ */}
-                    <section className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-[#E5E7EB]">
-                        <div className="flex items-baseline justify-between">
+                    <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-[#E5E7EB] sm:p-6">
+                        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
                             <h3 className="text-base font-bold uppercase tracking-widest text-[#333333]">
                                 Aufgaben
                             </h3>
@@ -252,7 +252,7 @@ export default function Dashboard({ todo, running, recent }: Props) {
 
                     {/* ============ Block 2: Was läuft gerade? ============ */}
                     {anyRunning && (
-                        <section className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-[#E5E7EB]">
+                        <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-[#E5E7EB] sm:p-6">
                             <h3 className="text-base font-bold uppercase tracking-widest text-[#333333]">
                                 KI-Generierungen
                             </h3>
@@ -343,8 +343,8 @@ export default function Dashboard({ todo, running, recent }: Props) {
                     )}
 
                     {/* ============ Block 3: Schnellzugriff ============ */}
-                    <section className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-[#E5E7EB]">
-                        <div className="flex items-baseline justify-between">
+                    <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-[#E5E7EB] sm:p-6">
+                        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
                             <h3 className="text-base font-bold uppercase tracking-widest text-[#333333]">
                                 Zuletzt aufgenommen
                             </h3>

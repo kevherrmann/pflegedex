@@ -251,12 +251,6 @@ export default function Authenticated({
                 active: 'roster-blackout-days.*',
                 icon: 'lock',
             },
-            {
-                label: 'Wunschdienste',
-                href: route('shift-wishes.index'),
-                active: 'shift-wishes.*',
-                icon: 'star',
-            },
         );
     }
     if (canUseAbsenceRequests) {
@@ -265,6 +259,14 @@ export default function Authenticated({
             href: route(absenceRequestsRoute),
             active: 'absence-requests.*',
             icon: 'sun',
+        });
+    }
+    if (auth.permissions.canViewOwnRoster || auth.permissions.canManageAbsenceRequests) {
+        dienstplan.push({
+            label: 'Wunschfrei',
+            href: route('shift-wishes.index'),
+            active: 'shift-wishes.*',
+            icon: 'star',
         });
     }
     if (auth.permissions.manageStaff) {

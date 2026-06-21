@@ -25,6 +25,7 @@ class Roster extends Model
         'status',
         'generated_at',
         'published_at',
+        'overtime_booked_at',
         'created_by',
     ];
 
@@ -40,6 +41,7 @@ class Roster extends Model
             'status' => RosterStatus::class,
             'generated_at' => 'datetime',
             'published_at' => 'datetime',
+            'overtime_booked_at' => 'datetime',
         ];
     }
 

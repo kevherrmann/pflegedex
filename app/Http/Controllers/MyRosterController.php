@@ -255,7 +255,7 @@ class MyRosterController extends Controller
             ->unique();
 
         $nightShifts = $shifts
-            ->filter(fn (Shift $shift): bool => $shift->shiftTemplate?->code === 'night')
+            ->filter(fn (Shift $shift): bool => $shift->shiftTemplate?->category === 'night')
             ->count();
 
         // Repraesentative Schichtlaenge wie in Generator und Validator:

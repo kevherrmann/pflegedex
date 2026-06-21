@@ -9,7 +9,7 @@ use App\Models\EmployeeProfile;
 use App\Models\Location;
 use App\Models\Resident;
 use App\Models\Roster;
-use App\Models\ShiftStaffingRule;
+use App\Models\ShiftCategoryStaffingRule;
 use App\Models\ShiftTemplate;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -96,7 +96,7 @@ it('creates a realistic two-area care home and is idempotent', function (): void
             ->get();
 
         expect($templates)->toHaveCount(3)
-            ->and(ShiftStaffingRule::query()->whereIn('shift_template_id', $templates->pluck('id'))->count())->toBe(3);
+            ->and(ShiftCategoryStaffingRule::query()->where('location_id', $location->id)->count())->toBe(3);
 
         $roster = Roster::query()
             ->where('location_id', $location->id)

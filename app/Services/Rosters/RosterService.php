@@ -10,7 +10,10 @@ use Illuminate\Validation\ValidationException;
 
 class RosterService
 {
-    public function __construct(private readonly RosterValidator $rosterValidator) {}
+    public function __construct(
+        private readonly RosterValidator $rosterValidator,
+        private readonly OvertimeBookingService $overtimeBooking,
+    ) {}
 
     public function createOrGetDraft(Location $location, User $createdBy, int $year, int $month): Roster
     {
@@ -49,6 +52,9 @@ class RosterService
             'published_at' => now(),
         ])->save();
 
+        // Überstunden dieses Plans auf die Mitarbeiterkonten buchen (Carryover).
+        $this->overtimeBooking->bookForRoster($roster);
+
         return $roster->refresh();
     }
 
@@ -74,6 +80,9 @@ class RosterService
                 'status' => 'Nur veröffentlichte Dienstpläne können wieder geöffnet werden.',
             ]);
         }
+
+        // Gebuchte Überstunden zurücknehmen, solange der Plan nicht mehr veröffentlicht ist.
+        $this->overtimeBooking->reverseForRoster($roster);
 
         $roster->forceFill([
             'status' => RosterStatus::Reviewed,

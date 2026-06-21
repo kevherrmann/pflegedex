@@ -1,7 +1,7 @@
 <?php
 
 use App\Models\Location;
-use App\Models\ShiftStaffingRule;
+use App\Models\ShiftCategoryStaffingRule;
 use App\Models\ShiftTemplate;
 use App\Services\Rosters\DefaultShiftSetupService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -45,27 +45,26 @@ it('creates early late and night shift templates for a location', function (): v
         ->and($shifts['night']->active)->toBeTrue();
 });
 
-it('creates the matching default staffing rules', function (): void {
+it('creates the matching default category staffing rules', function (): void {
     $location = Location::factory()->create();
 
     runDefaultShiftSetupForTest($location);
 
-    $rulesByShiftCode = ShiftStaffingRule::query()
-        ->with('shiftTemplate')
+    $rulesByCategory = ShiftCategoryStaffingRule::query()
         ->where('location_id', $location->id)
         ->get()
-        ->keyBy(fn (ShiftStaffingRule $rule): string => $rule->shiftTemplate->code);
+        ->keyBy('category');
 
-    expect($rulesByShiftCode)->toHaveCount(3)
-        ->and($rulesByShiftCode['early']->weekday)->toBeNull()
-        ->and($rulesByShiftCode['early']->required_total_staff)->toBe(5)
-        ->and($rulesByShiftCode['early']->required_specialists)->toBe(1)
-        ->and($rulesByShiftCode['late']->weekday)->toBeNull()
-        ->and($rulesByShiftCode['late']->required_total_staff)->toBe(3)
-        ->and($rulesByShiftCode['late']->required_specialists)->toBe(1)
-        ->and($rulesByShiftCode['night']->weekday)->toBeNull()
-        ->and($rulesByShiftCode['night']->required_total_staff)->toBe(1)
-        ->and($rulesByShiftCode['night']->required_specialists)->toBe(1);
+    expect($rulesByCategory)->toHaveCount(3)
+        ->and($rulesByCategory['early']->weekday)->toBeNull()
+        ->and($rulesByCategory['early']->required_total_staff)->toBe(5)
+        ->and($rulesByCategory['early']->required_specialists)->toBe(1)
+        ->and($rulesByCategory['late']->weekday)->toBeNull()
+        ->and($rulesByCategory['late']->required_total_staff)->toBe(3)
+        ->and($rulesByCategory['late']->required_specialists)->toBe(1)
+        ->and($rulesByCategory['night']->weekday)->toBeNull()
+        ->and($rulesByCategory['night']->required_total_staff)->toBe(1)
+        ->and($rulesByCategory['night']->required_specialists)->toBe(1);
 });
 
 it('is idempotent for one location', function (): void {
@@ -75,7 +74,7 @@ it('is idempotent for one location', function (): void {
     runDefaultShiftSetupForTest($location);
 
     expect(ShiftTemplate::query()->where('location_id', $location->id)->count())->toBe(3)
-        ->and(ShiftStaffingRule::query()->where('location_id', $location->id)->count())->toBe(3);
+        ->and(ShiftCategoryStaffingRule::query()->where('location_id', $location->id)->count())->toBe(3);
 });
 
 it('can run for two different locations', function (): void {
@@ -86,35 +85,32 @@ it('can run for two different locations', function (): void {
     runDefaultShiftSetupForTest($secondLocation);
 
     expect(ShiftTemplate::query()->count())->toBe(6)
-        ->and(ShiftStaffingRule::query()->count())->toBe(6);
+        ->and(ShiftCategoryStaffingRule::query()->count())->toBe(6);
 });
 
-it('requires at least one specialist for the night shift', function (): void {
+it('requires at least one specialist for the night category', function (): void {
     $location = Location::factory()->create();
 
     runDefaultShiftSetupForTest($location);
 
-    $nightShift = ShiftTemplate::query()
+    $nightRule = ShiftCategoryStaffingRule::query()
         ->where('location_id', $location->id)
-        ->where('code', 'night')
-        ->firstOrFail();
-
-    $defaultRule = $nightShift
-        ->staffingRules()
+        ->where('category', 'night')
         ->whereNull('weekday')
         ->firstOrFail();
 
-    expect($defaultRule->required_total_staff)->toBe(1)
-        ->and($defaultRule->required_specialists)->toBe(1);
+    expect($nightRule->required_total_staff)->toBe(1)
+        ->and($nightRule->required_specialists)->toBe(1);
 });
 
-it('updates existing default shifts and staffing rules instead of duplicating them', function (): void {
+it('updates existing default shifts and category staffing instead of duplicating them', function (): void {
     $location = Location::factory()->create();
 
     $earlyShift = ShiftTemplate::query()->create([
         'location_id' => $location->id,
         'name' => 'Alter Frühdienst',
         'code' => 'early',
+        'category' => 'early',
         'starts_at' => '07:00',
         'ends_at' => '15:00',
         'duration_minutes' => 480,
@@ -122,9 +118,9 @@ it('updates existing default shifts and staffing rules instead of duplicating th
         'active' => false,
     ]);
 
-    ShiftStaffingRule::query()->create([
+    ShiftCategoryStaffingRule::query()->create([
         'location_id' => $location->id,
-        'shift_template_id' => $earlyShift->id,
+        'category' => 'early',
         'weekday' => null,
         'required_total_staff' => 2,
         'required_specialists' => 0,
@@ -133,17 +129,21 @@ it('updates existing default shifts and staffing rules instead of duplicating th
     runDefaultShiftSetupForTest($location);
 
     $earlyShift->refresh();
-    $defaultRule = $earlyShift->staffingRules()->whereNull('weekday')->firstOrFail();
+    $earlyRule = ShiftCategoryStaffingRule::query()
+        ->where('location_id', $location->id)
+        ->where('category', 'early')
+        ->whereNull('weekday')
+        ->firstOrFail();
 
     expect(ShiftTemplate::query()->where('location_id', $location->id)->count())->toBe(3)
-        ->and(ShiftStaffingRule::query()->where('location_id', $location->id)->count())->toBe(3)
+        ->and(ShiftCategoryStaffingRule::query()->where('location_id', $location->id)->count())->toBe(3)
         ->and($earlyShift->name)->toBe('Frühdienst')
         ->and($earlyShift->starts_at)->toBe('06:00')
         ->and($earlyShift->ends_at)->toBe('14:00')
         ->and($earlyShift->color)->toBe('#F59E0B')
         ->and($earlyShift->active)->toBeTrue()
-        ->and($defaultRule->required_total_staff)->toBe(5)
-        ->and($defaultRule->required_specialists)->toBe(1);
+        ->and($earlyRule->required_total_staff)->toBe(5)
+        ->and($earlyRule->required_specialists)->toBe(1);
 });
 
 it('creates default shifts for all locations through the artisan command', function (): void {
@@ -154,5 +154,5 @@ it('creates default shifts for all locations through the artisan command', funct
         ->assertSuccessful();
 
     expect(ShiftTemplate::query()->count())->toBe(6)
-        ->and(ShiftStaffingRule::query()->count())->toBe(6);
+        ->and(ShiftCategoryStaffingRule::query()->count())->toBe(6);
 });

@@ -78,10 +78,10 @@ export default function Create({ resident, topics, risks }: Props) {
             }
         >
             <Head title={`SIS anlegen - ${resident.fullName}`} />
-            <div className="bg-[#F8F8F8] py-12">
+            <div className="bg-[#F8F8F8] py-6 sm:py-8 lg:py-12">
                 <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
                     <form onSubmit={submit} className="space-y-6">
-                        <div className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-[#E5E7EB]">
+                        <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-[#E5E7EB] sm:p-6 lg:p-8">
                             <p className="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-[#9B1C3B]">
                                 {resident.pseudonym}
                             </p>
@@ -126,7 +126,7 @@ export default function Create({ resident, topics, risks }: Props) {
                             )}
                         </div>
 
-                        <div className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-[#E5E7EB]">
+                        <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-[#E5E7EB] sm:p-6 lg:p-8">
                             <h3 className="text-base font-bold uppercase tracking-widest text-[#333333]">
                                 Themenfelder
                             </h3>
@@ -151,7 +151,7 @@ export default function Create({ resident, topics, risks }: Props) {
                             </div>
                         </div>
 
-                        <div className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-[#E5E7EB]">
+                        <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-[#E5E7EB] sm:p-6 lg:p-8">
                             <h3 className="text-base font-bold uppercase tracking-widest text-[#333333]">
                                 Risikomatrix
                             </h3>
@@ -215,7 +215,7 @@ export default function Create({ resident, topics, risks }: Props) {
                             <button
                                 type="submit"
                                 disabled={processing}
-                                className="rounded-md bg-[#9B1C3B] px-6 py-2 text-sm font-semibold uppercase tracking-widest text-white hover:bg-[#7A1430] disabled:opacity-50"
+                                className="w-full rounded-md bg-[#9B1C3B] px-6 py-2 text-sm font-semibold uppercase tracking-widest text-white hover:bg-[#7A1430] disabled:opacity-50 sm:w-auto"
                             >
                                 SIS anlegen{aiAvailable ? ' & mit KI ausformulieren' : ''}
                             </button>

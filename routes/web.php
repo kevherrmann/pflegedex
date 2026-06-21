@@ -175,11 +175,18 @@ Route::middleware('auth')->group(function () {
     Route::get('/shift-templates', [ShiftTemplateController::class, 'index'])
         ->name('shift-templates.index');
 
+    Route::post('/shift-templates', [ShiftTemplateController::class, 'store'])
+        ->name('shift-templates.store');
+
+    // Muss VOR der {shiftTemplate}-Route stehen, sonst greift das Model-Binding.
+    Route::patch('/shift-templates/category-staffing', [ShiftTemplateController::class, 'updateCategoryStaffing'])
+        ->name('shift-templates.category-staffing.update');
+
     Route::patch('/shift-templates/{shiftTemplate}', [ShiftTemplateController::class, 'update'])
         ->name('shift-templates.update');
 
-    Route::patch('/shift-templates/{shiftTemplate}/staffing-rule', [ShiftTemplateController::class, 'updateStaffingRule'])
-        ->name('shift-templates.staffing-rule.update');
+    Route::delete('/shift-templates/{shiftTemplate}', [ShiftTemplateController::class, 'destroy'])
+        ->name('shift-templates.destroy');
 
     Route::get('/my-roster', [MyRosterController::class, 'show'])
         ->name('my-roster.show');

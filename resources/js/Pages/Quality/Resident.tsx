@@ -76,8 +76,8 @@ export default function Resident({
         >
             <Head title="Qualitätsindikatoren" />
 
-            <div className="py-12">
-                <div className="mx-auto max-w-4xl space-y-6 sm:px-6 lg:px-8">
+            <div className="py-6 sm:py-8 lg:py-12">
+                <div className="mx-auto max-w-4xl space-y-6 px-4 sm:px-6 lg:px-8">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <Link
                             href={route('residents.index')}
@@ -93,7 +93,7 @@ export default function Resident({
                         </Link>
                     </div>
 
-                    <div className="flex flex-wrap items-center justify-between gap-4 overflow-hidden bg-white p-6 shadow-sm sm:rounded-lg">
+                    <div className="flex flex-wrap items-center justify-between gap-4 overflow-hidden bg-white p-4 shadow-sm sm:rounded-lg sm:p-6">
                         <div>
                             <p className="text-sm text-gray-500">
                                 {resident.locationName ?? 'Unbekannter Wohnbereich'}
@@ -121,7 +121,7 @@ export default function Resident({
 
                     <form
                         onSubmit={submit}
-                        className="space-y-6 overflow-hidden bg-white p-6 shadow-sm sm:rounded-lg"
+                        className="space-y-6 overflow-hidden bg-white p-4 shadow-sm sm:rounded-lg sm:p-6"
                     >
                         <div className="max-w-xs">
                             <InputLabel htmlFor="assessed_on" value="Erhebungsdatum" />

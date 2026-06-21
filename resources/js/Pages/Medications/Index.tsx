@@ -323,8 +323,8 @@ export default function Index({
         >
             <Head title="Medikation" />
 
-            <div className="py-12">
-                <div className="mx-auto max-w-5xl space-y-6 sm:px-6 lg:px-8">
+            <div className="py-6 sm:py-8 lg:py-12">
+                <div className="mx-auto max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
                     <Link
                         href={route('residents.index')}
                         className="inline-flex rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
@@ -332,7 +332,7 @@ export default function Index({
                         Zurück zur Bewohner-Übersicht
                     </Link>
 
-                    <div className="flex flex-wrap items-center justify-between gap-4 overflow-hidden bg-white p-6 shadow-sm sm:rounded-lg">
+                    <div className="flex flex-wrap items-center justify-between gap-4 overflow-hidden bg-white p-4 shadow-sm sm:rounded-lg sm:p-6">
                         <div>
                             <p className="text-sm text-gray-500">
                                 {resident.locationName ?? 'Unbekannter Wohnbereich'}
@@ -341,19 +341,19 @@ export default function Index({
                                 {resident.fullName}
                             </h3>
                         </div>
-                        <div>
+                        <div className="w-full sm:w-auto">
                             <InputLabel htmlFor="date" value="Tag" />
                             <TextInput
                                 id="date"
                                 type="date"
-                                className="mt-1 block"
+                                className="mt-1 block w-full"
                                 value={selectedDate}
                                 onChange={(e) => changeDate(e.target.value)}
                             />
                         </div>
                     </div>
 
-                    <div className="space-y-4 overflow-hidden bg-white p-6 shadow-sm sm:rounded-lg">
+                    <div className="space-y-4 overflow-hidden bg-white p-4 shadow-sm sm:rounded-lg sm:p-6">
                         <h3 className="text-lg font-semibold text-gray-900">
                             Medikationsplan ({selectedDate})
                         </h3>
@@ -378,7 +378,7 @@ export default function Index({
 
                     <form
                         onSubmit={submitMedication}
-                        className="overflow-hidden bg-white p-6 shadow-sm sm:rounded-lg"
+                        className="overflow-hidden bg-white p-4 shadow-sm sm:rounded-lg sm:p-6"
                     >
                         <h3 className="text-lg font-semibold text-gray-900">
                             Medikament hinzufügen

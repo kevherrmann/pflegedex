@@ -63,9 +63,9 @@ export default function Evaluation({
         >
             <Head title="QI-Auswertung" />
 
-            <div className="py-12">
-                <div className="mx-auto max-w-5xl space-y-6 sm:px-6 lg:px-8">
-                    <div className="flex flex-wrap items-end justify-between gap-4 overflow-hidden bg-white p-6 shadow-sm sm:rounded-lg">
+            <div className="py-6 sm:py-8 lg:py-12">
+                <div className="mx-auto max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
+                    <div className="flex flex-wrap items-end justify-between gap-4 overflow-hidden bg-white p-4 shadow-sm sm:rounded-lg sm:p-6">
                         <div>
                             <p className="text-sm text-gray-500">{locationNames.join(', ')}</p>
                             <h3 className="mt-1 text-lg font-semibold text-gray-900">
@@ -93,7 +93,7 @@ export default function Evaluation({
                     </div>
 
                     {residentsAssessed === 0 ? (
-                        <div className="rounded-lg bg-white p-6 text-sm text-gray-600 shadow-sm">
+                        <div className="rounded-lg bg-white p-4 text-sm text-gray-600 shadow-sm sm:p-6">
                             Für dieses Halbjahr liegen noch keine Erhebungen vor. Erfasse die
                             Indikatoren je Bewohner über die Bewohner-Übersicht („Qualität").
                         </div>

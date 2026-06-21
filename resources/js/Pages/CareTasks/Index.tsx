@@ -218,8 +218,8 @@ export default function Index({ resident, tasks, selectedDate, categories, statu
         >
             <Head title="Durchführungsnachweis" />
 
-            <div className="py-12">
-                <div className="mx-auto max-w-5xl space-y-6 sm:px-6 lg:px-8">
+            <div className="py-6 sm:py-8 lg:py-12">
+                <div className="mx-auto max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
                     <Link
                         href={route('residents.index')}
                         className="inline-flex rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
@@ -227,7 +227,7 @@ export default function Index({ resident, tasks, selectedDate, categories, statu
                         Zurück zur Bewohner-Übersicht
                     </Link>
 
-                    <div className="flex flex-wrap items-center justify-between gap-4 overflow-hidden bg-white p-6 shadow-sm sm:rounded-lg">
+                    <div className="flex flex-wrap items-center justify-between gap-4 overflow-hidden bg-white p-4 shadow-sm sm:rounded-lg sm:p-6">
                         <div>
                             <p className="text-sm text-gray-500">
                                 {resident.locationName ?? 'Unbekannter Wohnbereich'}
@@ -248,7 +248,7 @@ export default function Index({ resident, tasks, selectedDate, categories, statu
                         </div>
                     </div>
 
-                    <div className="space-y-4 overflow-hidden bg-white p-6 shadow-sm sm:rounded-lg">
+                    <div className="space-y-4 overflow-hidden bg-white p-4 shadow-sm sm:rounded-lg sm:p-6">
                         <h3 className="text-lg font-semibold text-gray-900">
                             Geplante Maßnahmen ({selectedDate})
                         </h3>
@@ -271,7 +271,7 @@ export default function Index({ resident, tasks, selectedDate, categories, statu
 
                     <form
                         onSubmit={submitTask}
-                        className="overflow-hidden bg-white p-6 shadow-sm sm:rounded-lg"
+                        className="overflow-hidden bg-white p-4 shadow-sm sm:rounded-lg sm:p-6"
                     >
                         <h3 className="text-lg font-semibold text-gray-900">Maßnahme hinzufügen</h3>
                         <div className="mt-4 grid gap-4 sm:grid-cols-2">

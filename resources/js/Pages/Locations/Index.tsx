@@ -48,14 +48,14 @@ export default function Index({ locations }: LocationsIndexProps) {
         >
             <Head title="Wohnbereiche" />
 
-            <div className="bg-[#F8F8F8] py-12">
+            <div className="bg-[#F8F8F8] py-6 sm:py-8 lg:py-12">
                 <div className="mx-auto grid max-w-7xl gap-8 px-4 sm:px-6 lg:grid-cols-[1fr_420px] lg:px-8">
                     <section className="rounded-2xl bg-white shadow-sm ring-1 ring-[#E5E7EB]">
                         <div className="border-b border-[#E5E7EB] px-6 py-5">
                             <p className="text-sm font-bold uppercase tracking-[0.22em] text-[#9B1C3B]">
                                 Verwaltung
                             </p>
-                            <h1 className="mt-2 text-3xl font-semibold text-[#333333]">
+                            <h1 className="mt-2 text-2xl font-semibold text-[#333333] sm:text-3xl">
                                 Angelegte Wohnbereiche
                             </h1>
                             <p className="mt-3 text-[#54595F]">
@@ -119,7 +119,7 @@ export default function Index({ locations }: LocationsIndexProps) {
                         )}
                     </section>
 
-                    <section className="h-fit rounded-2xl bg-white p-6 shadow-sm ring-1 ring-[#E5E7EB]">
+                    <section className="h-fit rounded-2xl bg-white p-4 shadow-sm ring-1 ring-[#E5E7EB] sm:p-6">
                         <h3 className="text-xl font-semibold text-[#333333]">
                             Wohnbereich anlegen
                         </h3>

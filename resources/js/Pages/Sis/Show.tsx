@@ -149,10 +149,10 @@ export default function Show({
             }
         >
             <Head title={`SIS - ${resident.fullName}`} />
-            <div className="bg-[#F8F8F8] py-12">
+            <div className="bg-[#F8F8F8] py-6 sm:py-8 lg:py-12">
                 <div className="mx-auto max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
                     {isRunning && generation !== null && (
-                        <div className="rounded-2xl border border-[#9B1C3B]/30 bg-[#FAE7EC]/40 p-6 shadow-sm">
+                        <div className="rounded-2xl border border-[#9B1C3B]/30 bg-[#FAE7EC]/40 p-4 shadow-sm sm:p-6">
                             <div className="flex items-center gap-4">
                                 <div className="h-3 w-3 animate-pulse rounded-full bg-[#9B1C3B]"></div>
                                 <div className="flex-1">
@@ -187,7 +187,7 @@ export default function Show({
                     )}
 
                     {justFailed && generation !== null && (
-                        <div className="rounded-2xl border border-red-300 bg-red-50 p-6 shadow-sm">
+                        <div className="rounded-2xl border border-red-300 bg-red-50 p-4 shadow-sm sm:p-6">
                             <p className="text-sm font-bold uppercase tracking-widest text-red-800">
                                 KI-Generierung fehlgeschlagen
                             </p>
@@ -215,7 +215,7 @@ export default function Show({
                         </div>
                     )}
                     {sis === null ? (
-                        <div className="rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-[#E5E7EB]">
+                        <div className="rounded-2xl bg-white p-5 text-center shadow-sm ring-1 ring-[#E5E7EB] sm:p-6 lg:p-8">
                             <p className="text-gray-700">
                                 Für diesen Bewohner ist noch keine SIS angelegt.
                             </p>
@@ -231,7 +231,7 @@ export default function Show({
                     ) : (
                         <>
                             {/* Header-Karte mit Fristen */}
-                            <div className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-[#E5E7EB]">
+                            <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-[#E5E7EB] sm:p-6 lg:p-8">
                                 <div className="flex flex-wrap items-start justify-between gap-4">
                                     <div>
                                         <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#9B1C3B]">
@@ -331,7 +331,7 @@ export default function Show({
                             </div>
 
                             {/* Themenfelder */}
-                            <div className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-[#E5E7EB]">
+                            <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-[#E5E7EB] sm:p-6 lg:p-8">
                                 <h3 className="text-base font-bold uppercase tracking-widest text-[#333333]">
                                     Themenfelder
                                 </h3>
@@ -360,48 +360,52 @@ export default function Show({
                             </div>
 
                             {/* Risikomatrix */}
-                            <div className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-[#E5E7EB]">
+                            <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-[#E5E7EB] sm:p-6 lg:p-8">
                                 <h3 className="text-base font-bold uppercase tracking-widest text-[#333333]">
                                     Risikomatrix
                                 </h3>
-                                <table className="mt-4 w-full text-sm">
-                                    <thead>
-                                        <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-widest text-gray-500">
-                                            <th className="py-2">Risiko</th>
-                                            <th className="py-2">Risiko erkannt</th>
-                                            <th className="py-2">Weitere Einschätzung nötig</th>
-                                            <th className="py-2">Notizen</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {risks.map((r) => {
-                                            const entry = riskByKind.get(r.kind);
-                                            return (
-                                                <tr
-                                                    key={r.kind}
-                                                    className="border-b border-gray-100"
-                                                >
-                                                    <td className="py-3 font-medium text-gray-800">
-                                                        {r.label}
-                                                    </td>
-                                                    <td className="py-3">
-                                                        {entry?.isAtRisk ? '✓ ja' : '— nein'}
-                                                    </td>
-                                                    <td className="py-3">
-                                                        {entry?.needsFurtherAssessment
-                                                            ? '✓ ja'
-                                                            : '— nein'}
-                                                    </td>
-                                                    <td className="py-3 text-gray-700">
-                                                        {entry?.notes || (
-                                                            <span className="text-gray-400">—</span>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
+                                <div className="overflow-x-auto">
+                                    <table className="mt-4 w-full min-w-[32rem] text-sm">
+                                        <thead>
+                                            <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-widest text-gray-500">
+                                                <th className="py-2">Risiko</th>
+                                                <th className="py-2">Risiko erkannt</th>
+                                                <th className="py-2">Weitere Einschätzung nötig</th>
+                                                <th className="py-2">Notizen</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {risks.map((r) => {
+                                                const entry = riskByKind.get(r.kind);
+                                                return (
+                                                    <tr
+                                                        key={r.kind}
+                                                        className="border-b border-gray-100"
+                                                    >
+                                                        <td className="py-3 font-medium text-gray-800">
+                                                            {r.label}
+                                                        </td>
+                                                        <td className="py-3">
+                                                            {entry?.isAtRisk ? '✓ ja' : '— nein'}
+                                                        </td>
+                                                        <td className="py-3">
+                                                            {entry?.needsFurtherAssessment
+                                                                ? '✓ ja'
+                                                                : '— nein'}
+                                                        </td>
+                                                        <td className="py-3 text-gray-700">
+                                                            {entry?.notes || (
+                                                                <span className="text-gray-400">
+                                                                    —
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </>
                     )}

@@ -7,7 +7,10 @@ use App\Enums\EmploymentArea;
 use App\Models\AbsenceRequest;
 use App\Models\Roster;
 use App\Models\Shift;
+use App\Enums\ShiftCategory;
+use App\Models\ShiftCategoryStaffingRule;
 use App\Models\ShiftStaffingRule;
+use App\Services\Rosters\CategoryStaffingResolver;
 use App\Models\ShiftTemplate;
 use App\Models\User;
 use App\Services\Rosters\Planning\TargetMinutesCalculator;
@@ -127,44 +130,58 @@ class RosterValidator
         EloquentCollection $shiftTemplates,
         RosterValidationResult $result,
     ): void {
-        foreach ($this->rosterDateService->datesForRosterMonth($roster) as $date) {
-            foreach ($shiftTemplates as $shiftTemplate) {
-                $staffingRule = $this->findStaffingRule($shiftTemplate, $date);
+        // Besetzung gilt PRO KATEGORIE: pro Tag zählt die Summe aller Personen
+        // über alle Schichten einer Kategorie (Früh1 + Früh2 …) gegen die eine
+        // Kategorie-Regel. Die einzelnen Schichten addieren ihre Zahlen NICHT.
+        $categories = $shiftTemplates->pluck('category')->unique()->values();
 
-                if ($staffingRule === null) {
+        $categoryRules = (new CategoryStaffingResolver)
+            ->forLocation($roster->location_id)
+            ->groupBy('category');
+
+        foreach ($this->rosterDateService->datesForRosterMonth($roster) as $date) {
+            $weekday = isset($this->holidayDates[$date->toDateString()]) ? 7 : $date->dayOfWeekIso;
+
+            foreach ($categories as $category) {
+                $label = ShiftCategory::tryFrom($category)?->label() ?? $category;
+                $rule = $this->findCategoryRule($categoryRules->get($category), $weekday);
+
+                if ($rule === null) {
                     $result->addWarning(
                         'missing_staffing_rule',
-                        'Für diese Schicht ist keine Mindestbesetzung hinterlegt.',
+                        'Für diese Kategorie ist keine Mindestbesetzung hinterlegt.',
                         [
                             'date' => $date->toDateString(),
-                            'shiftTemplateId' => $shiftTemplate->id,
-                            'shiftTemplateName' => $shiftTemplate->name,
-                            'shiftTemplateCode' => $shiftTemplate->code,
+                            'category' => $category,
+                            'shiftTemplateName' => $label,
+                            'shiftTemplateCode' => $category,
                         ],
                         'Mindestbesetzung fehlt',
-                        'Für diese aktive Schichtvorlage ist keine Mindestbesetzung hinterlegt.',
+                        'Für diese Kategorie ist keine Mindestbesetzung hinterlegt.',
                     );
 
                     continue;
                 }
 
-                $slotShifts = $this->shiftsForDateAndTemplate($shifts, $date, $shiftTemplate);
+                $slotShifts = $shifts->filter(fn (Shift $shift): bool => $shift->date->toDateString() === $date->toDateString()
+                    && $shift->shiftTemplate?->category === $category);
+
                 $actualTotalStaff = $slotShifts->count();
 
-                if ($actualTotalStaff < $staffingRule->required_total_staff) {
+                if ($actualTotalStaff < $rule->required_total_staff) {
                     $result->addError(
                         'understaffed_shift',
-                        'Die Mindestbesetzung für diese Schicht ist unterschritten.',
+                        'Die Mindestbesetzung dieser Kategorie ist am Tag unterschritten.',
                         [
                             'date' => $date->toDateString(),
-                            'shiftTemplateId' => $shiftTemplate->id,
-                            'shiftTemplateName' => $shiftTemplate->name,
-                            'shiftTemplateCode' => $shiftTemplate->code,
-                            'requiredTotalStaff' => $staffingRule->required_total_staff,
+                            'category' => $category,
+                            'shiftTemplateName' => $label,
+                            'shiftTemplateCode' => $category,
+                            'requiredTotalStaff' => $rule->required_total_staff,
                             'actualTotalStaff' => $actualTotalStaff,
                         ],
                         'Mindestbesetzung unterschritten',
-                        'Für diese Schicht sind weniger Mitarbeiter eingeplant als in der Mindestbesetzung hinterlegt.',
+                        'Über alle Schichten dieser Kategorie sind an diesem Tag insgesamt weniger Personen eingeplant als die Mindestbesetzung.',
                     );
                 }
 
@@ -173,20 +190,20 @@ class RosterValidator
                         && (bool) $shift->user?->employeeProfile?->is_nursing_specialist)
                     ->count();
 
-                if ($actualSpecialists < $staffingRule->required_specialists) {
+                if ($actualSpecialists < $rule->required_specialists) {
                     $result->addError(
                         'missing_specialist',
-                        'Die Mindestanzahl an Fachkräften für diese Schicht ist unterschritten.',
+                        'Die Mindestanzahl an Fachkräften dieser Kategorie ist am Tag unterschritten.',
                         [
                             'date' => $date->toDateString(),
-                            'shiftTemplateId' => $shiftTemplate->id,
-                            'shiftTemplateName' => $shiftTemplate->name,
-                            'shiftTemplateCode' => $shiftTemplate->code,
-                            'requiredSpecialists' => $staffingRule->required_specialists,
+                            'category' => $category,
+                            'shiftTemplateName' => $label,
+                            'shiftTemplateCode' => $category,
+                            'requiredSpecialists' => $rule->required_specialists,
                             'actualSpecialists' => $actualSpecialists,
                         ],
                         'Fachkraft fehlt',
-                        'Für diese Schicht sind weniger Fachkräfte eingeplant als erforderlich.',
+                        'Über alle Schichten dieser Kategorie sind an diesem Tag weniger Fachkräfte eingeplant als erforderlich.',
                     );
                 }
             }
@@ -210,29 +227,19 @@ class RosterValidator
         }
     }
 
-    private function findStaffingRule(ShiftTemplate $shiftTemplate, CarbonImmutable $date): ?ShiftStaffingRule
-    {
-        // ISO weekday: 1 = Montag, 7 = Sonntag. Feiertage zählen wie Sonntag.
-        $weekday = isset($this->holidayDates[$date->toDateString()]) ? 7 : $date->dayOfWeekIso;
-
-        return $shiftTemplate->staffingRules
-            ->first(fn (ShiftStaffingRule $rule): bool => $rule->weekday === $weekday)
-            ?? $shiftTemplate->staffingRules
-                ->first(fn (ShiftStaffingRule $rule): bool => $rule->weekday === null);
-    }
-
     /**
-     * @return Collection<int, Shift>
+     * Kategorie-Besetzungsregel für den Wochentag (Wochentag-spezifisch vor Standard).
+     *
+     * @param  Collection<int, ShiftCategoryStaffingRule>|null  $rules
      */
-    private function shiftsForDateAndTemplate(
-        Collection $shifts,
-        CarbonImmutable $date,
-        ShiftTemplate $shiftTemplate,
-    ): Collection {
-        return $shifts
-            ->filter(fn (Shift $shift): bool => $shift->date->toDateString() === $date->toDateString()
-                && $shift->shift_template_id === $shiftTemplate->id)
-            ->values();
+    private function findCategoryRule(?Collection $rules, int $weekday): ?ShiftCategoryStaffingRule
+    {
+        if ($rules === null) {
+            return null;
+        }
+
+        return $rules->first(fn (ShiftCategoryStaffingRule $rule): bool => $rule->weekday === $weekday)
+            ?? $rules->first(fn (ShiftCategoryStaffingRule $rule): bool => $rule->weekday === null);
     }
 
     /**

@@ -186,11 +186,11 @@ export default function ManageAbsenceRequests({
         >
             <Head title="Abwesenheitsplanung" />
 
-            <div className="py-12">
-                <div className="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
+            <div className="py-6 sm:py-8 lg:py-12">
+                <div className="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
                     <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
                         {/* Kopfzeile mit Monatsnavigation */}
-                        <div className="flex flex-col gap-4 border-b border-gray-200 p-6 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex flex-col gap-4 border-b border-gray-200 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-6">
                             <div>
                                 <h3 className="text-lg font-semibold text-gray-900">
                                     Team-Übersicht · {monthLabel}
@@ -208,7 +208,7 @@ export default function ManageAbsenceRequests({
                                 </p>
                             </div>
 
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                                 <SecondaryButton type="button" onClick={() => goToMonth(prevMonth)}>
                                     ‹ Vormonat
                                 </SecondaryButton>
@@ -252,129 +252,249 @@ export default function ManageAbsenceRequests({
                                 Abwesenheitsanspruch hinterlegt.
                             </p>
                         ) : (
-                            <div className="overflow-x-auto">
-                                <div style={{ minWidth: gridMinWidth }}>
-                                    {/* Tagesleiste */}
-                                    <div
-                                        className="sticky top-0 z-20 grid border-b border-gray-200 bg-gray-50"
-                                        style={{ gridTemplateColumns: gridTemplate }}
-                                    >
-                                        <div className="sticky left-0 z-10 bg-gray-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                            Mitarbeiter
-                                        </div>
-                                        {days.map((day) => {
-                                            const isToday = day.date === today;
-
-                                            return (
-                                                <div
-                                                    key={day.date}
-                                                    className={`border-l border-gray-100 py-1 text-center ${
-                                                        day.isWeekend ? 'bg-gray-100' : ''
-                                                    } ${isToday ? 'bg-amber-100' : ''}`}
-                                                >
-                                                    <div className="text-[10px] uppercase text-gray-400">
-                                                        {day.weekdayShort}
-                                                    </div>
-                                                    <div className="text-xs font-medium text-gray-700">
-                                                        {day.day}
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-
-                                    {/* Gruppen nach Wohnbereich */}
-                                    {groups.map((group) => (
-                                        <div key={group.locationId}>
-                                            <div className="sticky left-0 z-10 bg-[#9B1C3B]/5 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-[#9B1C3B]">
-                                                {group.locationName}
+                            <>
+                                <div className="hidden overflow-x-auto md:block">
+                                    <div style={{ minWidth: gridMinWidth }}>
+                                        {/* Tagesleiste */}
+                                        <div
+                                            className="sticky top-0 z-20 grid border-b border-gray-200 bg-gray-50"
+                                            style={{ gridTemplateColumns: gridTemplate }}
+                                        >
+                                            <div className="sticky left-0 z-10 bg-gray-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                                Mitarbeiter
                                             </div>
+                                            {days.map((day) => {
+                                                const isToday = day.date === today;
 
-                                            {group.employees.length === 0 ? (
-                                                <p className="px-3 py-2 text-xs text-gray-400">
-                                                    Keine Mitarbeiter in diesem Wohnbereich.
-                                                </p>
-                                            ) : (
-                                                group.employees.map((employee) => (
+                                                return (
                                                     <div
-                                                        key={employee.id}
-                                                        className="grid items-center border-b border-gray-100 hover:bg-gray-50/60"
-                                                        style={{
-                                                            gridTemplateColumns: gridTemplate,
-                                                        }}
+                                                        key={day.date}
+                                                        className={`border-l border-gray-100 py-1 text-center ${
+                                                            day.isWeekend ? 'bg-gray-100' : ''
+                                                        } ${isToday ? 'bg-amber-100' : ''}`}
                                                     >
-                                                        <div className="sticky left-0 z-10 truncate bg-white px-3 py-2">
-                                                            <div className="truncate text-sm font-medium text-gray-800">
-                                                                {employee.name}
-                                                            </div>
-                                                            {employee.qualificationLabel && (
-                                                                <div className="truncate text-[11px] text-gray-500">
-                                                                    {employee.qualificationLabel}
-                                                                </div>
-                                                            )}
+                                                        <div className="text-[10px] uppercase text-gray-400">
+                                                            {day.weekdayShort}
                                                         </div>
+                                                        <div className="text-xs font-medium text-gray-700">
+                                                            {day.day}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
 
-                                                        {/* Hintergrund-Tageszellen */}
-                                                        {days.map((day, dayIndex) => {
-                                                            const isToday = day.date === today;
+                                        {/* Gruppen nach Wohnbereich */}
+                                        {groups.map((group) => (
+                                            <div key={group.locationId}>
+                                                <div className="sticky left-0 z-10 bg-[#9B1C3B]/5 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-[#9B1C3B]">
+                                                    {group.locationName}
+                                                </div>
 
-                                                            return (
-                                                                <div
-                                                                    key={day.date}
-                                                                    className={`h-9 border-l border-gray-100 ${
-                                                                        day.isWeekend
-                                                                            ? 'bg-gray-50'
+                                                {group.employees.length === 0 ? (
+                                                    <p className="px-3 py-2 text-xs text-gray-400">
+                                                        Keine Mitarbeiter in diesem Wohnbereich.
+                                                    </p>
+                                                ) : (
+                                                    group.employees.map((employee) => (
+                                                        <div
+                                                            key={employee.id}
+                                                            className="grid items-center border-b border-gray-100 hover:bg-gray-50/60"
+                                                            style={{
+                                                                gridTemplateColumns: gridTemplate,
+                                                            }}
+                                                        >
+                                                            <div className="sticky left-0 z-10 truncate bg-white px-3 py-2">
+                                                                <div className="truncate text-sm font-medium text-gray-800">
+                                                                    {employee.name}
+                                                                </div>
+                                                                {employee.qualificationLabel && (
+                                                                    <div className="truncate text-[11px] text-gray-500">
+                                                                        {
+                                                                            employee.qualificationLabel
+                                                                        }
+                                                                    </div>
+                                                                )}
+                                                            </div>
+
+                                                            {/* Hintergrund-Tageszellen */}
+                                                            {days.map((day, dayIndex) => {
+                                                                const isToday = day.date === today;
+
+                                                                return (
+                                                                    <div
+                                                                        key={day.date}
+                                                                        className={`h-9 border-l border-gray-100 ${
+                                                                            day.isWeekend
+                                                                                ? 'bg-gray-50'
+                                                                                : ''
+                                                                        } ${isToday ? 'bg-amber-50' : ''}`}
+                                                                        style={{
+                                                                            gridColumnStart:
+                                                                                dayIndex + 2,
+                                                                            gridRow: 1,
+                                                                        }}
+                                                                    />
+                                                                );
+                                                            })}
+
+                                                            {/* Abwesenheits-Balken */}
+                                                            {employee.absences.map((absence) => (
+                                                                <button
+                                                                    key={absence.id}
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        openAbsence(
+                                                                            employee,
+                                                                            absence,
+                                                                        )
+                                                                    }
+                                                                    title={`${absence.typeLabel}: ${absence.startsOn} – ${absence.endsOn} (${absence.statusLabel})${
+                                                                        absence.hitsBlackout
+                                                                            ? ' · Urlaubssperre'
                                                                             : ''
-                                                                    } ${isToday ? 'bg-amber-50' : ''}`}
+                                                                    }`}
+                                                                    className={`z-10 mx-0.5 flex h-6 items-center gap-1 overflow-hidden rounded px-1.5 text-[11px] font-medium ring-1 ${barClass(
+                                                                        absence,
+                                                                    )} ${absence.hitsBlackout ? 'ring-2 ring-red-500' : ''} ${
+                                                                        absence.continuesBefore
+                                                                            ? 'rounded-l-none'
+                                                                            : ''
+                                                                    } ${absence.continuesAfter ? 'rounded-r-none' : ''}`}
                                                                     style={{
-                                                                        gridColumnStart:
-                                                                            dayIndex + 2,
+                                                                        gridColumn: `${absence.startDay + 1} / ${absence.endDay + 2}`,
                                                                         gridRow: 1,
                                                                     }}
-                                                                />
-                                                            );
-                                                        })}
-
-                                                        {/* Abwesenheits-Balken */}
-                                                        {employee.absences.map((absence) => (
-                                                            <button
-                                                                key={absence.id}
-                                                                type="button"
-                                                                onClick={() =>
-                                                                    openAbsence(employee, absence)
-                                                                }
-                                                                title={`${absence.typeLabel}: ${absence.startsOn} – ${absence.endsOn} (${absence.statusLabel})${
-                                                                    absence.hitsBlackout
-                                                                        ? ' · Urlaubssperre'
-                                                                        : ''
-                                                                }`}
-                                                                className={`z-10 mx-0.5 flex h-6 items-center gap-1 overflow-hidden rounded px-1.5 text-[11px] font-medium ring-1 ${barClass(
-                                                                    absence,
-                                                                )} ${absence.hitsBlackout ? 'ring-2 ring-red-500' : ''} ${
-                                                                    absence.continuesBefore
-                                                                        ? 'rounded-l-none'
-                                                                        : ''
-                                                                } ${absence.continuesAfter ? 'rounded-r-none' : ''}`}
-                                                                style={{
-                                                                    gridColumn: `${absence.startDay + 1} / ${absence.endDay + 2}`,
-                                                                    gridRow: 1,
-                                                                }}
-                                                            >
-                                                                {absence.hitsBlackout && (
-                                                                    <span aria-hidden>⚠</span>
-                                                                )}
-                                                                <span className="truncate">
-                                                                    {shortTypeLabel(absence)}
-                                                                </span>
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                ))
-                                            )}
-                                        </div>
-                                    ))}
+                                                                >
+                                                                    {absence.hitsBlackout && (
+                                                                        <span aria-hidden>⚠</span>
+                                                                    )}
+                                                                    <span className="truncate">
+                                                                        {shortTypeLabel(absence)}
+                                                                    </span>
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
+
+                                {/* Mobile: nach Wohnbereich gruppierte, antippbare Liste */}
+                                <div className="space-y-5 p-4 md:hidden">
+                                    {groups.map((group) => {
+                                        const employeesWithAbsences = group.employees.filter(
+                                            (employee) => employee.absences.length > 0,
+                                        );
+
+                                        return (
+                                            <div key={group.locationId} className="space-y-3">
+                                                <h4 className="text-xs font-bold uppercase tracking-wide text-[#9B1C3B]">
+                                                    {group.locationName}
+                                                </h4>
+
+                                                {employeesWithAbsences.length === 0 ? (
+                                                    <p className="text-sm text-gray-500">
+                                                        Keine Abwesenheiten in diesem Monat.
+                                                    </p>
+                                                ) : (
+                                                    <ul className="space-y-3">
+                                                        {employeesWithAbsences.map((employee) => (
+                                                            <li
+                                                                key={employee.id}
+                                                                className="rounded-lg border border-gray-200 p-3"
+                                                            >
+                                                                <div className="mb-2">
+                                                                    <p className="text-sm font-semibold text-gray-800">
+                                                                        {employee.name}
+                                                                    </p>
+                                                                    {employee.qualificationLabel && (
+                                                                        <p className="text-[11px] text-gray-500">
+                                                                            {
+                                                                                employee.qualificationLabel
+                                                                            }
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                                <ul className="space-y-2">
+                                                                    {employee.absences.map(
+                                                                        (absence) => (
+                                                                            <li key={absence.id}>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() =>
+                                                                                        openAbsence(
+                                                                                            employee,
+                                                                                            absence,
+                                                                                        )
+                                                                                    }
+                                                                                    className="flex w-full items-center justify-between gap-3 rounded-md border border-gray-100 bg-gray-50 px-3 py-2 text-left transition hover:bg-gray-100"
+                                                                                >
+                                                                                    <span className="min-w-0">
+                                                                                        <span className="flex items-center gap-2">
+                                                                                            <span
+                                                                                                aria-hidden
+                                                                                                className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${
+                                                                                                    absence.type ===
+                                                                                                    'vacation'
+                                                                                                        ? 'bg-emerald-500'
+                                                                                                        : 'bg-indigo-500'
+                                                                                                }`}
+                                                                                            />
+                                                                                            <span className="truncate text-sm font-medium text-gray-900">
+                                                                                                {
+                                                                                                    absence.typeLabel
+                                                                                                }
+                                                                                            </span>
+                                                                                            {absence.hitsBlackout && (
+                                                                                                <span
+                                                                                                    aria-hidden
+                                                                                                    className="text-red-600"
+                                                                                                >
+                                                                                                    ⚠
+                                                                                                </span>
+                                                                                            )}
+                                                                                        </span>
+                                                                                        <span className="mt-0.5 block text-xs text-gray-600">
+                                                                                            {
+                                                                                                absence.startsOn
+                                                                                            }{' '}
+                                                                                            –{' '}
+                                                                                            {
+                                                                                                absence.endsOn
+                                                                                            }{' '}
+                                                                                            ·{' '}
+                                                                                            {
+                                                                                                absence.daysCount
+                                                                                            }{' '}
+                                                                                            Tage
+                                                                                        </span>
+                                                                                    </span>
+                                                                                    <span
+                                                                                        className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusBadgeClass(
+                                                                                            absence.status,
+                                                                                        )}`}
+                                                                                    >
+                                                                                        {
+                                                                                            absence.statusLabel
+                                                                                        }
+                                                                                    </span>
+                                                                                </button>
+                                                                            </li>
+                                                                        ),
+                                                                    )}
+                                                                </ul>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </>
                         )}
                     </div>
                 </div>
@@ -387,7 +507,7 @@ export default function ManageAbsenceRequests({
                     onClick={closeDialog}
                 >
                     <div
-                        className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+                        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-xl sm:p-6"
                         onClick={(event) => event.stopPropagation()}
                     >
                         <div className="flex items-start justify-between gap-4">

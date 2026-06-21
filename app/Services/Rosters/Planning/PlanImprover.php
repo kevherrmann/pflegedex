@@ -357,15 +357,18 @@ class PlanImprover
         PlannedAssignment $assignment,
         User $replacement,
     ): bool {
+        // Fachkraftquote gilt pro Kategorie (über alle Schichten der Kategorie summiert).
+        $category = $assignment->shiftTemplate->category;
+
         $requiredSpecialists = $context
-            ->staffingRuleFor($assignment->shiftTemplate, $assignment->date)
+            ->categoryStaffingFor($category, $assignment->date)
             ?->required_specialists ?? 0;
 
         if ($requiredSpecialists <= 0) {
             return true;
         }
 
-        $specialistsAfter = $context->slotSpecialistCount($assignment->date, $assignment->shiftTemplate)
+        $specialistsAfter = $context->slotCategorySpecialistCount($assignment->date, $category)
             - ($context->isSpecialist($assignment->employee) ? 1 : 0)
             + ($context->isSpecialist($replacement) ? 1 : 0);
 

@@ -145,7 +145,7 @@ class ShiftService
 
     private function ensureEmployeeCanWorkShiftTemplate(EmployeeProfile $employeeProfile, ShiftTemplate $shiftTemplate): void
     {
-        $canWorkShift = match ($shiftTemplate->code) {
+        $canWorkShift = match ($shiftTemplate->category) {
             'early' => $employeeProfile->can_work_early,
             'late' => $employeeProfile->can_work_late,
             'night' => $employeeProfile->can_work_night,

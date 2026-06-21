@@ -64,6 +64,7 @@ function createRosterGeneratorShiftTemplate(Location $location, array $attribute
         'location_id' => $location->id,
         'name' => $attributes['name'] ?? 'Frühdienst',
         'code' => $attributes['code'] ?? 'early',
+        'category' => $attributes['category'] ?? ($attributes['code'] ?? 'early'),
         'starts_at' => $attributes['starts_at'] ?? '06:00',
         'ends_at' => $attributes['ends_at'] ?? '14:00',
         'duration_minutes' => $attributes['duration_minutes'] ?? 480,
@@ -79,6 +80,7 @@ function createRosterGeneratorStaffingRule(ShiftTemplate $shiftTemplate, array $
         'shift_template_id' => $shiftTemplate->id,
         'weekday' => $attributes['weekday'] ?? null,
         'required_total_staff' => $attributes['required_total_staff'] ?? 1,
+        'target_total_staff' => $attributes['target_total_staff'] ?? null,
         'required_specialists' => $attributes['required_specialists'] ?? 0,
     ]);
 }
@@ -1385,4 +1387,171 @@ it('relaxes the weekend limit when the slot would otherwise stay unfilled', func
         ->whereDate('date', '2027-01-16')
         ->exists())->toBeTrue()
         ->and(collect($result->skipped)->where('code', 'no_candidate'))->toBeEmpty();
+});
+
+it('fills beyond the minimum up to the ideal staffing when employees are below target', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+
+    $early = createRosterGeneratorShiftTemplate($location);
+    createRosterGeneratorStaffingRule($early, [
+        'required_total_staff' => 1,
+        'target_total_staff' => 3,
+        'required_specialists' => 0,
+    ]);
+
+    // Genug frühdienstfähige Vollzeit-Mitarbeiter, damit die Idealbesetzung erreichbar ist.
+    foreach (range(1, 10) as $ignored) {
+        createRosterGeneratorEmployee($location);
+    }
+
+    $roster = createRosterGeneratorRoster($location, $pdl);
+    app(RosterGeneratorService::class)->generate($roster);
+
+    $countsPerDay = Shift::query()
+        ->where('roster_id', $roster->id)
+        ->get()
+        ->groupBy(fn (Shift $shift): string => $shift->date->toDateString())
+        ->map(fn ($shifts): int => $shifts->count());
+
+    // Aufgestockt: mehr als die reine Mindestbesetzung (1 * 31 Tage).
+    expect(Shift::query()->where('roster_id', $roster->id)->count())->toBeGreaterThan(31);
+    // Nie über die Idealbesetzung und nie unter die Mindestbesetzung.
+    expect($countsPerDay->max())->toBeLessThanOrEqual(3)
+        ->and($countsPerDay->min())->toBeGreaterThanOrEqual(1);
+    // Mindestens an einem Tag wurde die Idealbesetzung tatsächlich erreicht.
+    expect($countsPerDay->contains(3))->toBeTrue();
+
+    // Kein Mitarbeiter über Monats-Soll: Vollzeit (39h/5 Tage) im Januar 2027
+    // = min(10363, 10629) = 10363 min => höchstens 21 Dienste à 480 min.
+    $shiftsPerEmployee = Shift::query()
+        ->where('roster_id', $roster->id)
+        ->get()
+        ->groupBy(fn (Shift $shift): string => (string) $shift->user_id)
+        ->map(fn ($shifts): int => $shifts->count());
+
+    expect($shiftsPerEmployee->max())->toBeLessThanOrEqual(21);
+});
+
+it('plans only the minimum staffing when no ideal staffing is configured', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+
+    $early = createRosterGeneratorShiftTemplate($location);
+    // Kein target_total_staff -> keine Aufstockung (Rückwärtskompatibilität).
+    createRosterGeneratorStaffingRule($early, [
+        'required_total_staff' => 1,
+        'required_specialists' => 0,
+    ]);
+
+    foreach (range(1, 10) as $ignored) {
+        createRosterGeneratorEmployee($location);
+    }
+
+    $roster = createRosterGeneratorRoster($location, $pdl);
+    app(RosterGeneratorService::class)->generate($roster);
+
+    // Genau ein Dienst pro Tag im Januar (31 Tage), keine Aufstockung.
+    expect(Shift::query()->where('roster_id', $roster->id)->count())->toBe(31);
+});
+
+it('plans multiple shifts of the same category, each with its own hours', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+
+    $early1 = createRosterGeneratorShiftTemplate($location, [
+        'code' => 'early',
+        'category' => 'early',
+        'name' => 'Früh 1',
+        'starts_at' => '06:00',
+        'ends_at' => '14:00',
+        'duration_minutes' => 480,
+    ]);
+    $early2 = createRosterGeneratorShiftTemplate($location, [
+        'code' => 'early2',
+        'category' => 'early',
+        'name' => 'Früh 2',
+        'starts_at' => '07:00',
+        'ends_at' => '13:00',
+        'duration_minutes' => 360,
+        'color' => '#10B981',
+    ]);
+    // Besetzung gilt pro Kategorie (Früh): min 2 → verteilt sich auf Früh 1 + Früh 2.
+    createRosterGeneratorStaffingRule($early1, ['required_total_staff' => 2, 'required_specialists' => 0]);
+
+    // Frühdienstfähige Mitarbeiter (Default can_work_early = true).
+    foreach (range(1, 8) as $ignored) {
+        createRosterGeneratorEmployee($location);
+    }
+
+    $roster = createRosterGeneratorRoster($location, $pdl);
+    app(RosterGeneratorService::class)->generate($roster);
+
+    $day = '2027-01-15';
+
+    // Beide Früh-Schichten werden besetzt – Kategorie-Fähigkeit greift für beide.
+    expect(Shift::query()->where('roster_id', $roster->id)
+        ->where('shift_template_id', $early1->id)->where('date', $day)->exists())->toBeTrue()
+        ->and(Shift::query()->where('roster_id', $roster->id)
+            ->where('shift_template_id', $early2->id)->where('date', $day)->exists())->toBeTrue();
+
+    // Die 6-h-Schicht zählt mit 360 Minuten in die geplanten Minuten.
+    $early2Shift = Shift::query()->where('shift_template_id', $early2->id)->first();
+    expect((int) $early2Shift->starts_at->diffInMinutes($early2Shift->ends_at, true))->toBe(360);
+});
+
+it('books overtime onto the employee balance when a roster is published and reverses on reopen', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $template = createRosterGeneratorShiftTemplate($location);
+    $employee = createRosterGeneratorEmployee($location, [
+        'weekly_hours' => 39,
+        'regular_work_days_per_week' => 5,
+    ]);
+
+    $roster = createRosterGeneratorRoster($location, $pdl);
+
+    // 25 Dienste à 480 min = 12000 min; Monats-Soll Januar 2027 = 10363 min.
+    foreach (range(1, 25) as $day) {
+        createRosterGeneratorShift($roster, $employee, $template, sprintf('2027-01-%02d', $day));
+    }
+
+    $service = app(App\Services\Rosters\OvertimeBookingService::class);
+
+    $service->bookForRoster($roster->refresh());
+    expect($employee->employeeProfile->refresh()->overtime_minutes_balance)->toBe(12000 - 10363);
+
+    // Idempotent: erneutes Buchen ändert nichts.
+    $service->bookForRoster($roster->refresh());
+    expect($employee->employeeProfile->refresh()->overtime_minutes_balance)->toBe(12000 - 10363);
+
+    // Wieder-Öffnen nimmt die Buchung zurück.
+    $service->reverseForRoster($roster->refresh());
+    expect($employee->employeeProfile->refresh()->overtime_minutes_balance)->toBe(0);
+});
+
+it('lowers the planned target for an employee carrying an overtime surplus', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $template = createRosterGeneratorShiftTemplate($location);
+    createRosterGeneratorStaffingRule($template, ['required_total_staff' => 1, 'target_total_staff' => 2]);
+
+    // Gleiches Profil, aber einer hat ein großes Überstunden-Guthaben.
+    $rested = createRosterGeneratorEmployee($location, [], ['name' => 'Ohne Guthaben']);
+    $surplus = createRosterGeneratorEmployee($location, [
+        'overtime_minutes_balance' => 6000,
+    ], ['name' => 'Mit Guthaben']);
+
+    foreach (range(1, 4) as $ignored) {
+        createRosterGeneratorEmployee($location);
+    }
+
+    $roster = createRosterGeneratorRoster($location, $pdl);
+    app(RosterGeneratorService::class)->generate($roster);
+
+    $restedShifts = Shift::query()->where('roster_id', $roster->id)->where('user_id', $rested->id)->count();
+    $surplusShifts = Shift::query()->where('roster_id', $roster->id)->where('user_id', $surplus->id)->count();
+
+    // Wer Überstunden mitbringt, wird weniger eingeplant (reduziertes Soll).
+    expect($surplusShifts)->toBeLessThan($restedShifts);
 });

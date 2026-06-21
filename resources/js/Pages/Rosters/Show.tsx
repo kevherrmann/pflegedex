@@ -36,6 +36,7 @@ type ShiftItem = {
     employeeName: string | null;
     shiftTemplateName: string | null;
     shiftTemplateCode: string | null;
+    shiftTemplateCategory: string | null;
     source: string;
     sourceLabel: string;
     note: string | null;
@@ -235,16 +236,16 @@ function ShiftSourceBadge({ shift }: { shift: ShiftItem }) {
     );
 }
 
-function shiftBadgeClass(code: string | null): string {
-    if (code === 'early') {
+function shiftBadgeClass(category: string | null): string {
+    if (category === 'early') {
         return 'border-amber-200 bg-amber-50 text-amber-900';
     }
 
-    if (code === 'late') {
+    if (category === 'late') {
         return 'border-blue-200 bg-blue-50 text-blue-900';
     }
 
-    if (code === 'night') {
+    if (category === 'night') {
         return 'border-indigo-200 bg-indigo-50 text-indigo-900';
     }
 
@@ -738,7 +739,7 @@ function MonthOverview({
                                                         : undefined
                                                 }
                                                 className={`rounded-md border px-2.5 py-2 text-xs ${shiftBadgeClass(
-                                                    shift.shiftTemplateCode,
+                                                    shift.shiftTemplateCategory,
                                                 )} ${
                                                     roster.isEditable
                                                         ? 'cursor-pointer transition hover:ring-2 hover:ring-[#9B1C3B]/30 focus:outline-none focus:ring-2 focus:ring-[#9B1C3B]/40'
@@ -1873,8 +1874,8 @@ export default function RosterShow({
         >
             <Head title="Dienstplan" />
 
-            <div className="py-12">
-                <div className="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
+            <div className="py-6 sm:py-8 lg:py-12">
+                <div className="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
                     <Link
                         href={route('rosters.index')}
                         className="inline-flex rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"

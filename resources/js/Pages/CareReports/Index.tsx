@@ -132,7 +132,7 @@ export default function Index({
         >
             <Head title="Pflegeberichte" />
 
-            <div className="bg-[#F8F8F8] py-8">
+            <div className="bg-[#F8F8F8] py-6 sm:py-8 lg:py-12">
                 <div className="mx-auto grid max-w-[1800px] gap-6 px-4 sm:px-6 lg:grid-cols-[340px_minmax(0,1fr)] lg:px-8">
                     {/* Bewohner-Leiste */}
                     <aside className="lg:sticky lg:top-6 lg:h-[calc(100vh-7rem)]">
@@ -256,7 +256,7 @@ export default function Index({
                                 <p className="text-sm font-bold uppercase tracking-[0.22em] text-[#9B1C3B]">
                                     Bewohnerakte
                                 </p>
-                                <h1 className="mt-2 text-3xl font-semibold text-[#333333]">
+                                <h1 className="mt-2 text-2xl font-semibold text-[#333333] sm:text-3xl">
                                     {selectedResident?.fullName ?? 'Kein Bewohner ausgewählt'}
                                 </h1>
                                 {selectedResident && (

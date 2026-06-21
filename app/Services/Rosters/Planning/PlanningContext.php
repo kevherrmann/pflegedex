@@ -9,6 +9,7 @@ use App\Models\AbsenceRequest;
 use App\Models\Roster;
 use App\Models\RosterBlackoutDay;
 use App\Models\Shift;
+use App\Models\ShiftCategoryStaffingRule;
 use App\Models\ShiftStaffingRule;
 use App\Models\ShiftTemplate;
 use App\Models\ShiftWish;
@@ -98,6 +99,18 @@ class PlanningContext
     /** @var array<string, int> "date|templateId" => Fachkräfte im aktuellen Dienstplan */
     private array $slotSpecialists = [];
 
+    /** @var array<string, int> "date|category" => Gesamtbesetzung der Kategorie an dem Tag */
+    private array $slotCategoryTotals = [];
+
+    /** @var array<string, int> "date|category" => Fachkräfte der Kategorie an dem Tag */
+    private array $slotCategorySpecialists = [];
+
+    /** @var array<string, array<int, ShiftCategoryStaffingRule>> category => Regeln (Wochentag-spezifisch + Standard) */
+    private array $categoryStaffingRules = [];
+
+    /** @var array<string, \Illuminate\Support\Collection<int, ShiftTemplate>> category => aktive Vorlagen */
+    private array $templatesByCategory = [];
+
     /** @var array<string, true> Urlaubssperren-Tage des Standorts im Monat */
     private array $blackoutDates = [];
 
@@ -143,6 +156,7 @@ class PlanningContext
 
         $this->buildDateLookups();
         $this->loadTemplates();
+        $this->loadCategoryStaffing();
         $this->loadEmployees();
         $this->loadShifts($ignoreAutoShifts);
         $this->loadAbsences();
@@ -259,6 +273,19 @@ class PlanningContext
         $this->representativeShiftMinutes = $shiftMinutes > 0
             ? $shiftMinutes
             : (int) config('rostering.default_shift_minutes');
+
+        $this->templatesByCategory = $this->shiftTemplates
+            ->groupBy(fn (ShiftTemplate $template): string => $template->category)
+            ->all();
+    }
+
+    private function loadCategoryStaffing(): void
+    {
+        $this->categoryStaffingRules = (new \App\Services\Rosters\CategoryStaffingResolver)
+            ->forLocation($this->roster->location_id)
+            ->groupBy('category')
+            ->map(fn ($rules): array => $rules->all())
+            ->all();
     }
 
     private function loadEmployees(): void
@@ -285,7 +312,7 @@ class PlanningContext
         // Alle Dienste dieses Dienstplans (auch von inzwischen nicht mehr
         // berechtigten Mitarbeitern), damit Besetzungszaehler vollstaendig sind.
         $rosterShifts = Shift::query()
-            ->with(['user.employeeProfile', 'shiftTemplate:id,code'])
+            ->with(['user.employeeProfile', 'shiftTemplate:id,code,category'])
             ->where('roster_id', $this->roster->id)
             ->when($ignoreAutoShifts, fn ($query) => $query->where('source', '!=', 'auto'))
             ->get();
@@ -294,19 +321,20 @@ class PlanningContext
             $this->indexShift(
                 $shift->user_id,
                 $shift->shift_template_id,
-                $this->rotationRankForCode($shift->shiftTemplate?->code),
+                $this->rotationRankForCode($shift->shiftTemplate?->category),
                 CarbonImmutable::parse($shift->date)->startOfDay(),
                 $shift->starts_at->toImmutable(),
                 $shift->ends_at->toImmutable(),
                 belongsToRoster: true,
                 isSpecialist: (bool) ($shift->user?->employeeProfile?->is_nursing_specialist ?? false),
+                category: $shift->shiftTemplate?->category,
             );
         }
 
         // Dienste derselben Mitarbeiter im Randfenster, inklusive anderer
         // Dienstplaene und Standorte (Ruhezeiten, Folgetage, Wochenstunden).
         $boundaryShifts = Shift::query()
-            ->with('shiftTemplate:id,code')
+            ->with('shiftTemplate:id,code,category')
             ->whereIn('user_id', $this->employees->pluck('id'))
             ->where('roster_id', '!=', $this->roster->id)
             ->whereDate('date', '>=', $windowStart->toDateString())
@@ -317,7 +345,7 @@ class PlanningContext
             $this->indexShift(
                 $shift->user_id,
                 $shift->shift_template_id,
-                $this->rotationRankForCode($shift->shiftTemplate?->code),
+                $this->rotationRankForCode($shift->shiftTemplate?->category),
                 CarbonImmutable::parse($shift->date)->startOfDay(),
                 $shift->starts_at->toImmutable(),
                 $shift->ends_at->toImmutable(),
@@ -386,12 +414,19 @@ class PlanningContext
         $calculator = new TargetMinutesCalculator;
 
         foreach ($this->employees as $employee) {
-            $this->targetMinutes[$employee->id] = $calculator->monthlyTargetMinutes(
+            $baseTarget = $calculator->monthlyTargetMinutes(
                 $employee->employeeProfile,
                 $this->roster->year,
                 $this->roster->month,
                 $this->representativeShiftMinutes,
             );
+
+            // Überstunden-Carryover: ein positiver Saldo (im Vormonat zu viel
+            // gearbeitet) senkt das Monats-Soll, ein negativer (zu wenig) erhöht
+            // es. Nie unter 0.
+            $overtimeBalance = (int) ($employee->employeeProfile?->overtime_minutes_balance ?? 0);
+
+            $this->targetMinutes[$employee->id] = max(0, $baseTarget - $overtimeBalance);
         }
     }
 
@@ -418,12 +453,13 @@ class PlanningContext
         $this->indexShift(
             $assignment->employee->id,
             $assignment->shiftTemplate->id,
-            $this->rotationRankForCode($assignment->shiftTemplate->code),
+            $this->rotationRankForCode($assignment->shiftTemplate->category),
             $assignment->date,
             $assignment->startsAt,
             $assignment->endsAt,
             belongsToRoster: true,
             isSpecialist: $this->isSpecialist($assignment->employee),
+            category: $assignment->shiftTemplate->category,
         );
     }
 
@@ -464,7 +500,7 @@ class PlanningContext
             }
         }
 
-        $rotationRank = $this->rotationRankForCode($assignment->shiftTemplate->code);
+        $rotationRank = $this->rotationRankForCode($assignment->shiftTemplate->category);
         if ($rotationRank !== null) {
             $this->rotationRanks[$userId][$dateKey][$rotationRank]--;
             if ($this->rotationRanks[$userId][$dateKey][$rotationRank] <= 0) {
@@ -472,7 +508,7 @@ class PlanningContext
             }
         }
 
-        if ($assignment->shiftTemplate->code === 'night') {
+        if ($assignment->shiftTemplate->category === 'night') {
             $this->nightShiftCounts[$userId]--;
         }
 
@@ -480,8 +516,17 @@ class PlanningContext
         $this->shiftCounts[$userId]--;
         $this->slotTotals[$occupancyKey]--;
 
+        $categoryKey = $dateKey.'|'.$assignment->shiftTemplate->category;
+        if (isset($this->slotCategoryTotals[$categoryKey])) {
+            $this->slotCategoryTotals[$categoryKey]--;
+        }
+
         if ($this->isSpecialist($assignment->employee)) {
             $this->slotSpecialists[$occupancyKey]--;
+
+            if (isset($this->slotCategorySpecialists[$categoryKey])) {
+                $this->slotCategorySpecialists[$categoryKey]--;
+            }
         }
     }
 
@@ -494,10 +539,12 @@ class PlanningContext
         CarbonImmutable $endsAt,
         bool $belongsToRoster,
         bool $isSpecialist,
+        ?string $category = null,
     ): void {
         $dateKey = $date->toDateString();
         $minutes = (int) $startsAt->diffInMinutes($endsAt, true);
         $occupancyKey = $dateKey.'|'.$shiftTemplateId;
+        $categoryKey = $category === null ? null : $dateKey.'|'.$category;
         $meta = $this->dateMetaFor($date);
 
         $this->workDates[$userId][$dateKey] = ($this->workDates[$userId][$dateKey] ?? 0) + 1;
@@ -521,12 +568,20 @@ class PlanningContext
             $this->shiftCounts[$userId] = ($this->shiftCounts[$userId] ?? 0) + 1;
             $this->slotTotals[$occupancyKey] = ($this->slotTotals[$occupancyKey] ?? 0) + 1;
 
+            if ($categoryKey !== null) {
+                $this->slotCategoryTotals[$categoryKey] = ($this->slotCategoryTotals[$categoryKey] ?? 0) + 1;
+            }
+
             if ($rotationRank === self::ROTATION_RANKS['night']) {
                 $this->nightShiftCounts[$userId] = ($this->nightShiftCounts[$userId] ?? 0) + 1;
             }
 
             if ($isSpecialist) {
                 $this->slotSpecialists[$occupancyKey] = ($this->slotSpecialists[$occupancyKey] ?? 0) + 1;
+
+                if ($categoryKey !== null) {
+                    $this->slotCategorySpecialists[$categoryKey] = ($this->slotCategorySpecialists[$categoryKey] ?? 0) + 1;
+                }
             }
         }
     }
@@ -546,6 +601,57 @@ class PlanningContext
             ->first(fn (ShiftStaffingRule $rule): bool => $rule->weekday === $weekday)
             ?? $shiftTemplate->staffingRules
                 ->first(fn (ShiftStaffingRule $rule): bool => $rule->weekday === null);
+    }
+
+    /**
+     * Besetzungsregel der Kategorie an dem Tag (Wochentag-spezifisch vor Standard).
+     * Feiertage zählen wie Sonntag (ISO 7).
+     */
+    public function categoryStaffingFor(string $category, CarbonImmutable $date): ?ShiftCategoryStaffingRule
+    {
+        $weekday = isset($this->holidays[$date->toDateString()]) ? 7 : $date->dayOfWeekIso;
+        $rules = $this->categoryStaffingRules[$category] ?? [];
+
+        $specific = null;
+        $default = null;
+
+        foreach ($rules as $rule) {
+            if ($rule->weekday === $weekday) {
+                $specific = $rule;
+            } elseif ($rule->weekday === null) {
+                $default = $rule;
+            }
+        }
+
+        return $specific ?? $default;
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, ShiftTemplate>
+     */
+    public function templatesForCategory(string $category): Collection
+    {
+        return $this->templatesByCategory[$category] ?? collect();
+    }
+
+    /**
+     * Kategorien, für die es aktive Vorlagen gibt (early/late/night).
+     *
+     * @return array<int, string>
+     */
+    public function categoriesWithTemplates(): array
+    {
+        return array_keys($this->templatesByCategory);
+    }
+
+    public function slotCategoryTotal(CarbonImmutable $date, string $category): int
+    {
+        return $this->slotCategoryTotals[$date->toDateString().'|'.$category] ?? 0;
+    }
+
+    public function slotCategorySpecialistCount(CarbonImmutable $date, string $category): int
+    {
+        return $this->slotCategorySpecialists[$date->toDateString().'|'.$category] ?? 0;
     }
 
     public function slotTotalStaff(CarbonImmutable $date, ShiftTemplate $shiftTemplate): int

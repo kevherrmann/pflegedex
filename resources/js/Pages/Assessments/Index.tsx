@@ -90,8 +90,8 @@ export default function Index({ resident, assessments, definitions }: Props) {
         >
             <Head title="Assessments" />
 
-            <div className="py-12">
-                <div className="mx-auto max-w-5xl space-y-6 sm:px-6 lg:px-8">
+            <div className="py-6 sm:py-8 lg:py-12">
+                <div className="mx-auto max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
                     <Link
                         href={route('residents.index')}
                         className="inline-flex rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
@@ -99,7 +99,7 @@ export default function Index({ resident, assessments, definitions }: Props) {
                         Zurück zur Bewohner-Übersicht
                     </Link>
 
-                    <div className="overflow-hidden bg-white p-6 shadow-sm sm:rounded-lg">
+                    <div className="overflow-hidden bg-white p-4 shadow-sm sm:rounded-lg sm:p-6">
                         <p className="text-sm text-gray-500">
                             {resident.locationName ?? 'Unbekannter Wohnbereich'}
                         </p>
@@ -110,7 +110,7 @@ export default function Index({ resident, assessments, definitions }: Props) {
 
                     <form
                         onSubmit={submit}
-                        className="overflow-hidden bg-white p-6 shadow-sm sm:rounded-lg"
+                        className="overflow-hidden bg-white p-4 shadow-sm sm:rounded-lg sm:p-6"
                     >
                         <h3 className="text-lg font-semibold text-gray-900">
                             Assessment durchführen
@@ -195,10 +195,10 @@ export default function Index({ resident, assessments, definitions }: Props) {
                     </form>
 
                     <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
-                        <div className="border-b border-gray-200 p-6">
+                        <div className="border-b border-gray-200 p-4 sm:p-6">
                             <h3 className="text-lg font-semibold text-gray-900">Verlauf</h3>
                         </div>
-                        <div className="space-y-4 p-6">
+                        <div className="space-y-4 p-4 sm:p-6">
                             {assessments.length === 0 ? (
                                 <p className="text-sm text-gray-600">
                                     Noch keine Assessments erfasst.

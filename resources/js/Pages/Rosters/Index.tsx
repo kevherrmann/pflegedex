@@ -115,10 +115,10 @@ export default function RostersIndex({ locations, rosters }: Props) {
         >
             <Head title="Dienstpläne" />
 
-            <div className="py-12">
-                <div className="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
+            <div className="py-6 sm:py-8 lg:py-12">
+                <div className="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
                     <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
-                        <div className="border-b border-gray-200 p-6">
+                        <div className="border-b border-gray-200 p-4 sm:p-6">
                             <h3 className="text-lg font-semibold text-gray-900">
                                 Monatsdienstplan anlegen
                             </h3>
@@ -129,7 +129,7 @@ export default function RostersIndex({ locations, rosters }: Props) {
 
                         <form
                             onSubmit={submit}
-                            className="grid gap-4 p-6 lg:grid-cols-4 lg:items-end"
+                            className="grid gap-4 p-4 sm:p-6 lg:grid-cols-4 lg:items-end"
                         >
                             <div>
                                 <InputLabel htmlFor="location_id" value="Wohnbereich" />
@@ -189,79 +189,136 @@ export default function RostersIndex({ locations, rosters }: Props) {
                     </div>
 
                     <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
-                        <div className="border-b border-gray-200 p-6">
+                        <div className="border-b border-gray-200 p-4 sm:p-6">
                             <h3 className="text-lg font-semibold text-gray-900">
                                 Vorhandene Dienstpläne
                             </h3>
                         </div>
 
-                        <div className="p-6">
+                        <div className="p-4 sm:p-6">
                             {rosters.length === 0 ? (
                                 <p className="text-sm text-gray-600">
                                     Es sind noch keine Monatsdienstpläne angelegt.
                                 </p>
                             ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="min-w-full divide-y divide-gray-200">
-                                        <thead>
-                                            <tr>
-                                                <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                                    Wohnbereich
-                                                </th>
-                                                <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                                    Monat/Jahr
-                                                </th>
-                                                <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                                    Status
-                                                </th>
-                                                <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                                    Dienste
-                                                </th>
-                                                <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                                    Erstellt von
-                                                </th>
-                                                <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                                    Veröffentlicht am
-                                                </th>
-                                                <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                                    Aktionen
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-200">
-                                            {rosters.map((roster) => (
-                                                <tr key={roster.id}>
-                                                    <td className="whitespace-nowrap px-3 py-4 text-sm font-medium text-gray-900">
+                                <>
+                                    <div className="hidden overflow-x-auto md:block">
+                                        <table className="min-w-full divide-y divide-gray-200">
+                                            <thead>
+                                                <tr>
+                                                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                                        Wohnbereich
+                                                    </th>
+                                                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                                        Monat/Jahr
+                                                    </th>
+                                                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                                        Status
+                                                    </th>
+                                                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                                        Dienste
+                                                    </th>
+                                                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                                        Erstellt von
+                                                    </th>
+                                                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                                        Veröffentlicht am
+                                                    </th>
+                                                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                                        Aktionen
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-200">
+                                                {rosters.map((roster) => (
+                                                    <tr key={roster.id}>
+                                                        <td className="whitespace-nowrap px-3 py-4 text-sm font-medium text-gray-900">
+                                                            {roster.locationName ??
+                                                                'Unbekannter Wohnbereich'}
+                                                        </td>
+                                                        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-700">
+                                                            {roster.month}/{roster.year}
+                                                        </td>
+                                                        <td className="whitespace-nowrap px-3 py-4 text-sm">
+                                                            <span
+                                                                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(roster.status)}`}
+                                                            >
+                                                                {roster.statusLabel}
+                                                            </span>
+                                                        </td>
+                                                        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-700">
+                                                            {roster.shiftsCount}
+                                                        </td>
+                                                        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-700">
+                                                            {roster.createdByName ?? '-'}
+                                                        </td>
+                                                        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-700">
+                                                            {formatDateTime(roster.publishedAt)}
+                                                        </td>
+                                                        <td className="whitespace-nowrap px-3 py-4 text-sm">
+                                                            <RosterActions roster={roster} />
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <ul className="divide-y divide-gray-200 md:hidden">
+                                        {rosters.map((roster) => (
+                                            <li key={roster.id} className="space-y-3 py-4">
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <p className="font-medium text-gray-900">
                                                         {roster.locationName ??
                                                             'Unbekannter Wohnbereich'}
-                                                    </td>
-                                                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-700">
-                                                        {roster.month}/{roster.year}
-                                                    </td>
-                                                    <td className="whitespace-nowrap px-3 py-4 text-sm">
-                                                        <span
-                                                            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(roster.status)}`}
-                                                        >
-                                                            {roster.statusLabel}
-                                                        </span>
-                                                    </td>
-                                                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-700">
-                                                        {roster.shiftsCount}
-                                                    </td>
-                                                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-700">
-                                                        {roster.createdByName ?? '-'}
-                                                    </td>
-                                                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-700">
-                                                        {formatDateTime(roster.publishedAt)}
-                                                    </td>
-                                                    <td className="whitespace-nowrap px-3 py-4 text-sm">
-                                                        <RosterActions roster={roster} />
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                                    </p>
+                                                    <span
+                                                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(roster.status)}`}
+                                                    >
+                                                        {roster.statusLabel}
+                                                    </span>
+                                                </div>
+                                                <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+                                                    <div>
+                                                        <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                                            Monat/Jahr
+                                                        </dt>
+                                                        <dd className="text-gray-700">
+                                                            {roster.month}/{roster.year}
+                                                        </dd>
+                                                    </div>
+                                                    <div>
+                                                        <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                                            Dienste
+                                                        </dt>
+                                                        <dd className="text-gray-700">
+                                                            {roster.shiftsCount}
+                                                        </dd>
+                                                    </div>
+                                                    <div>
+                                                        <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                                            Erstellt von
+                                                        </dt>
+                                                        <dd className="text-gray-700">
+                                                            {roster.createdByName ?? '-'}
+                                                        </dd>
+                                                    </div>
+                                                    <div>
+                                                        <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                                            Veröffentlicht am
+                                                        </dt>
+                                                        <dd className="text-gray-700">
+                                                            {formatDateTime(roster.publishedAt)}
+                                                        </dd>
+                                                    </div>
+                                                </dl>
+                                                <div className="flex flex-wrap gap-x-4 gap-y-2 pt-1">
+                                                    <RosterActions roster={roster} />
+                                                </div>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </>
                             )}
                         </div>
                     </div>

@@ -38,7 +38,7 @@ class HardConstraintChecker
 
         // Mutterschutz (MuSchG): kein Nacht- und kein Sonntagsdienst (Feiertage: s. isHoliday).
         if ($employee->employeeProfile?->maternity_protection) {
-            if ($shiftTemplate->code === 'night') {
+            if ($shiftTemplate->category === 'night') {
                 return 'maternity_night';
             }
 
@@ -82,7 +82,7 @@ class HardConstraintChecker
 
     public function employeeCanWorkShiftTemplate(User $employee, ShiftTemplate $shiftTemplate): bool
     {
-        return match ($shiftTemplate->code) {
+        return match ($shiftTemplate->category) {
             'early' => $employee->employeeProfile?->can_work_early ?? false,
             'late' => $employee->employeeProfile?->can_work_late ?? false,
             'night' => $employee->employeeProfile?->can_work_night ?? false,

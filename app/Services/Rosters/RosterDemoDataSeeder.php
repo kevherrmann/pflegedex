@@ -12,7 +12,7 @@ use App\Models\EmployeeProfile;
 use App\Models\Location;
 use App\Models\Resident;
 use App\Models\Roster;
-use App\Models\ShiftStaffingRule;
+use App\Models\ShiftCategoryStaffingRule;
 use App\Models\ShiftTemplate;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -468,6 +468,7 @@ class RosterDemoDataSeeder
             ],
             [
                 'name' => $template['name'],
+                'category' => $template['code'],
                 'starts_at' => $template['starts_at'],
                 'ends_at' => $template['ends_at'],
                 'duration_minutes' => 480,
@@ -482,33 +483,29 @@ class RosterDemoDataSeeder
      */
     private function createStaffingRules(Location $location, Collection $shiftTemplates): int
     {
+        // Besetzung PRO KATEGORIE: total = Mindestbesetzung (Boden), target =
+        // Idealbesetzung (Aufstockung bis Soll). Früh > Spät > Nacht steckt in den
+        // Idealzahlen. Mehrere Schichten je Kategorie teilen sich diese Zahlen.
         $requirements = [
-            'early' => ['total' => 2, 'specialists' => 1],
-            'late' => ['total' => 2, 'specialists' => 1],
-            // Nachtdienst: zwingend eine Fachkraft (PDL-Vorgabe).
-            'night' => ['total' => 1, 'specialists' => 1],
+            'early' => ['total' => 2, 'target' => 4, 'specialists' => 1],
+            'late' => ['total' => 2, 'target' => 3, 'specialists' => 1],
+            // Nachtdienst: zwingend eine Fachkraft (PDL-Vorgabe), keine Aufstockung.
+            'night' => ['total' => 1, 'target' => 1, 'specialists' => 1],
         ];
 
-        foreach ($shiftTemplates as $shiftTemplate) {
-            $requirement = $requirements[$shiftTemplate->code];
-            $rule = ShiftStaffingRule::query()
-                ->where('location_id', $location->id)
-                ->where('shift_template_id', $shiftTemplate->id)
-                ->whereNull('weekday')
-                ->first();
-
-            if ($rule === null) {
-                $rule = new ShiftStaffingRule([
-                    'shift_template_id' => $shiftTemplate->id,
+        foreach ($requirements as $category => $requirement) {
+            ShiftCategoryStaffingRule::query()->updateOrCreate(
+                [
+                    'location_id' => $location->id,
+                    'category' => $category,
                     'weekday' => null,
-                ]);
-            }
-
-            $rule->forceFill([
-                'location_id' => $location->id,
-                'required_total_staff' => $requirement['total'],
-                'required_specialists' => $requirement['specialists'],
-            ])->save();
+                ],
+                [
+                    'required_total_staff' => $requirement['total'],
+                    'target_total_staff' => $requirement['target'],
+                    'required_specialists' => $requirement['specialists'],
+                ],
+            );
         }
 
         return count($requirements);

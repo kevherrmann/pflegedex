@@ -259,6 +259,7 @@ class RosterController extends Controller
             'employeeName' => $shift->user?->name,
             'shiftTemplateName' => $shift->shiftTemplate?->name,
             'shiftTemplateCode' => $shift->shiftTemplate?->code,
+            'shiftTemplateCategory' => $shift->shiftTemplate?->category,
             'source' => $shift->source->value,
             'sourceLabel' => match ($shift->source->value) {
                 'auto' => 'Auto',
@@ -342,6 +343,7 @@ class RosterController extends Controller
                 'locationId' => $shiftTemplate->location_id,
                 'name' => $shiftTemplate->name,
                 'code' => $shiftTemplate->code,
+                'category' => $shiftTemplate->category,
                 'startsAt' => $shiftTemplate->starts_at,
                 'endsAt' => $shiftTemplate->ends_at,
             ])

@@ -93,10 +93,10 @@ export default function AbsenceRequestsIndex({
         >
             <Head title="Urlaub & Abwesenheiten" />
 
-            <div className="py-12">
-                <div className="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
+            <div className="py-6 sm:py-8 lg:py-12">
+                <div className="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
                     <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
-                        <div className="border-b border-gray-200 p-6">
+                        <div className="border-b border-gray-200 p-4 sm:p-6">
                             <h3 className="text-lg font-semibold text-gray-900">Urlaubskonto</h3>
                             <p className="mt-1 text-sm text-gray-600">
                                 Dein aktueller Überblick über genehmigten, beantragten und
@@ -104,7 +104,7 @@ export default function AbsenceRequestsIndex({
                             </p>
                         </div>
 
-                        <div className="grid gap-4 p-6 md:grid-cols-2 xl:grid-cols-4">
+                        <div className="grid gap-4 p-4 sm:p-6 md:grid-cols-2 xl:grid-cols-4">
                             <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
                                 <p className="text-sm text-gray-500">Jahresurlaub</p>
                                 <p className="mt-1 text-2xl font-semibold text-gray-900">
@@ -170,7 +170,7 @@ export default function AbsenceRequestsIndex({
                     </div>
                     {canRequestAbsence && (
                         <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
-                            <div className="border-b border-gray-200 p-6">
+                            <div className="border-b border-gray-200 p-4 sm:p-6">
                                 <h3 className="text-lg font-semibold text-gray-900">
                                     Neuen Antrag stellen
                                 </h3>
@@ -179,7 +179,7 @@ export default function AbsenceRequestsIndex({
                                 </p>
                             </div>
 
-                            <form onSubmit={submit} className="space-y-6 p-6">
+                            <form onSubmit={submit} className="space-y-6 p-4 sm:p-6">
                                 <div className="grid gap-4 md:grid-cols-2">
                                     <div>
                                         <InputLabel htmlFor="type" value="Art" />
@@ -282,7 +282,7 @@ export default function AbsenceRequestsIndex({
                     )}
 
                     <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
-                        <div className="border-b border-gray-200 p-6">
+                        <div className="border-b border-gray-200 p-4 sm:p-6">
                             <h3 className="text-lg font-semibold text-gray-900">Meine Anträge</h3>
                             <p className="mt-1 text-sm text-gray-600">
                                 Hier siehst du deine beantragten, genehmigten und abgelehnten
@@ -290,56 +290,125 @@ export default function AbsenceRequestsIndex({
                             </p>
                         </div>
 
-                        <div className="p-6">
+                        <div className="p-4 sm:p-6">
                             {absenceRequests.length === 0 ? (
                                 <p className="text-sm text-gray-600">
                                     Du hast noch keine Anträge gestellt.
                                 </p>
                             ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="min-w-full divide-y divide-gray-200 text-sm">
-                                        <thead>
-                                            <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                                <th className="py-3 pr-4">Art</th>
-                                                <th className="py-3 pr-4">Zeitraum</th>
-                                                <th className="py-3 pr-4">Tage</th>
-                                                <th className="py-3 pr-4">Status</th>
-                                                <th className="py-3 pr-4">Notiz</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-100">
-                                            {absenceRequests.map((request) => (
-                                                <tr key={request.id}>
-                                                    <td className="py-3 pr-4 font-medium text-gray-900">
+                                <>
+                                    <div className="hidden overflow-x-auto md:block">
+                                        <table className="min-w-full divide-y divide-gray-200 text-sm">
+                                            <thead>
+                                                <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                                    <th className="py-3 pr-4">Art</th>
+                                                    <th className="py-3 pr-4">Zeitraum</th>
+                                                    <th className="py-3 pr-4">Tage</th>
+                                                    <th className="py-3 pr-4">Status</th>
+                                                    <th className="py-3 pr-4">Notiz</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-100">
+                                                {absenceRequests.map((request) => (
+                                                    <tr key={request.id}>
+                                                        <td className="py-3 pr-4 font-medium text-gray-900">
+                                                            {request.typeLabel}
+                                                        </td>
+                                                        <td className="py-3 pr-4 text-gray-700">
+                                                            {request.startsOn} bis {request.endsOn}
+                                                        </td>
+                                                        <td className="py-3 pr-4 text-gray-700">
+                                                            {request.daysCount}
+                                                        </td>
+                                                        <td className="py-3 pr-4">
+                                                            <div className="flex flex-wrap items-center gap-1.5">
+                                                                <span
+                                                                    className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(
+                                                                        request.status,
+                                                                    )}`}
+                                                                >
+                                                                    {request.statusLabel}
+                                                                </span>
+                                                                {request.status === 'requested' &&
+                                                                    request.hitsBlackout && (
+                                                                        <span
+                                                                            className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-800"
+                                                                            title="Fällt in eine Urlaubssperre. Genehmigung nur als Ausnahme durch die PDL."
+                                                                        >
+                                                                            Urlaubssperre
+                                                                        </span>
+                                                                    )}
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-3 pr-4 text-gray-700">
+                                                            {request.rejectionReason ? (
+                                                                <span className="text-red-700">
+                                                                    {request.rejectionReason}
+                                                                </span>
+                                                            ) : request.overrideReason ? (
+                                                                <span className="text-amber-700">
+                                                                    Ausnahme:{' '}
+                                                                    {request.overrideReason}
+                                                                </span>
+                                                            ) : (
+                                                                (request.note ?? '—')
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <ul className="divide-y divide-gray-100 md:hidden">
+                                        {absenceRequests.map((request) => (
+                                            <li key={request.id} className="space-y-3 py-4">
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <p className="font-medium text-gray-900">
                                                         {request.typeLabel}
-                                                    </td>
-                                                    <td className="py-3 pr-4 text-gray-700">
-                                                        {request.startsOn} bis {request.endsOn}
-                                                    </td>
-                                                    <td className="py-3 pr-4 text-gray-700">
-                                                        {request.daysCount}
-                                                    </td>
-                                                    <td className="py-3 pr-4">
-                                                        <div className="flex flex-wrap items-center gap-1.5">
-                                                            <span
-                                                                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(
-                                                                    request.status,
-                                                                )}`}
-                                                            >
-                                                                {request.statusLabel}
-                                                            </span>
-                                                            {request.status === 'requested' &&
-                                                                request.hitsBlackout && (
-                                                                    <span
-                                                                        className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-800"
-                                                                        title="Fällt in eine Urlaubssperre. Genehmigung nur als Ausnahme durch die PDL."
-                                                                    >
-                                                                        Urlaubssperre
-                                                                    </span>
-                                                                )}
-                                                        </div>
-                                                    </td>
-                                                    <td className="py-3 pr-4 text-gray-700">
+                                                    </p>
+                                                    <div className="flex flex-wrap items-center justify-end gap-1.5">
+                                                        <span
+                                                            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(
+                                                                request.status,
+                                                            )}`}
+                                                        >
+                                                            {request.statusLabel}
+                                                        </span>
+                                                        {request.status === 'requested' &&
+                                                            request.hitsBlackout && (
+                                                                <span
+                                                                    className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-800"
+                                                                    title="Fällt in eine Urlaubssperre. Genehmigung nur als Ausnahme durch die PDL."
+                                                                >
+                                                                    Urlaubssperre
+                                                                </span>
+                                                            )}
+                                                    </div>
+                                                </div>
+                                                <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+                                                    <div>
+                                                        <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                                            Zeitraum
+                                                        </dt>
+                                                        <dd className="text-gray-700">
+                                                            {request.startsOn} bis {request.endsOn}
+                                                        </dd>
+                                                    </div>
+                                                    <div>
+                                                        <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                                            Tage
+                                                        </dt>
+                                                        <dd className="text-gray-700">
+                                                            {request.daysCount}
+                                                        </dd>
+                                                    </div>
+                                                </dl>
+                                                <div>
+                                                    <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                                        Notiz
+                                                    </dt>
+                                                    <dd className="text-sm text-gray-700">
                                                         {request.rejectionReason ? (
                                                             <span className="text-red-700">
                                                                 {request.rejectionReason}
@@ -351,12 +420,12 @@ export default function AbsenceRequestsIndex({
                                                         ) : (
                                                             (request.note ?? '—')
                                                         )}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                                    </dd>
+                                                </div>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </>
                             )}
                         </div>
                     </div>

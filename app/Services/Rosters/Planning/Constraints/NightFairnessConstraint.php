@@ -30,7 +30,7 @@ class NightFairnessConstraint implements SoftConstraint
         CarbonImmutable $startsAt,
         CarbonImmutable $endsAt,
     ): int {
-        if ($shiftTemplate->code !== 'night') {
+        if ($shiftTemplate->category !== 'night') {
             return 0;
         }
 

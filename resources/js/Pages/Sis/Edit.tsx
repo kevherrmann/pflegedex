@@ -113,10 +113,10 @@ export default function Edit({ resident, sis, topics, risks }: Props) {
             }
         >
             <Head title={`SIS bearbeiten - ${resident.fullName}`} />
-            <div className="bg-[#F8F8F8] py-12">
+            <div className="bg-[#F8F8F8] py-6 sm:py-8 lg:py-12">
                 <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
                     <form onSubmit={submit} className="space-y-6">
-                        <div className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-[#E5E7EB]">
+                        <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-[#E5E7EB] sm:p-6 lg:p-8">
                             <p className="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-[#9B1C3B]">
                                 {resident.pseudonym}
                             </p>
@@ -156,7 +156,7 @@ export default function Edit({ resident, sis, topics, risks }: Props) {
                         </div>
 
                         {/* Themenfelder */}
-                        <div className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-[#E5E7EB]">
+                        <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-[#E5E7EB] sm:p-6 lg:p-8">
                             <h3 className="text-base font-bold uppercase tracking-widest text-[#333333]">
                                 Themenfelder
                             </h3>
@@ -182,7 +182,7 @@ export default function Edit({ resident, sis, topics, risks }: Props) {
                         </div>
 
                         {/* Risikomatrix */}
-                        <div className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-[#E5E7EB]">
+                        <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-[#E5E7EB] sm:p-6 lg:p-8">
                             <h3 className="text-base font-bold uppercase tracking-widest text-[#333333]">
                                 Risikomatrix
                             </h3>
@@ -257,7 +257,7 @@ export default function Edit({ resident, sis, topics, risks }: Props) {
                                     </span>
                                 )}
                             </p>
-                            <div className="flex gap-3">
+                            <div className="flex flex-wrap gap-3">
                                 <button
                                     type="submit"
                                     disabled={processing}

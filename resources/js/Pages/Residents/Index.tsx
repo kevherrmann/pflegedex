@@ -20,6 +20,50 @@ type ResidentsIndexProps = {
     residents: Resident[];
 };
 
+function ResidentActions({
+    resident,
+    canManageResidents,
+}: {
+    resident: Resident;
+    canManageResidents: boolean;
+}) {
+    const linkClass = 'text-sm font-semibold text-[#9B1C3B] hover:underline';
+
+    return (
+        <>
+            <Link href={route('residents.sis.show', resident.id)} className={linkClass}>
+                SIS
+            </Link>
+            <Link href={route('residents.care-plan.show', resident.id)} className={linkClass}>
+                MP
+            </Link>
+            <Link href={route('residents.vitals.index', resident.id)} className={linkClass}>
+                Vitalwerte
+            </Link>
+            <Link href={route('residents.care-tasks.index', resident.id)} className={linkClass}>
+                Nachweis
+            </Link>
+            <Link href={route('residents.assessments.index', resident.id)} className={linkClass}>
+                Assessments
+            </Link>
+            <Link href={route('residents.medications.index', resident.id)} className={linkClass}>
+                Medikation
+            </Link>
+            <Link href={route('residents.wounds.index', resident.id)} className={linkClass}>
+                Wunden
+            </Link>
+            <Link href={route('residents.quality.index', resident.id)} className={linkClass}>
+                Qualität
+            </Link>
+            {canManageResidents && (
+                <Link href={route('residents.edit', resident.id)} className={linkClass}>
+                    Bearbeiten
+                </Link>
+            )}
+        </>
+    );
+}
+
 export default function Index({ location, locations, residents }: ResidentsIndexProps) {
     const canManageResidents = usePage().props.auth.permissions.manageResidents;
 
@@ -36,15 +80,15 @@ export default function Index({ location, locations, residents }: ResidentsIndex
         >
             <Head title="Bewohner" />
 
-            <div className="bg-[#F8F8F8] py-12">
+            <div className="bg-[#F8F8F8] py-6 sm:py-8 lg:py-12">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                    <section className="mb-8 rounded-2xl bg-white p-8 shadow-sm ring-1 ring-[#E5E7EB]">
+                    <section className="mb-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-[#E5E7EB] sm:mb-8 sm:p-6 lg:p-8">
                         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                             <div>
                                 <p className="text-sm font-bold uppercase tracking-[0.22em] text-[#9B1C3B]">
                                     {location?.name ?? 'Alle zugeordneten Wohnbereiche'}
                                 </p>
-                                <h1 className="mt-3 text-3xl font-semibold text-[#333333]">
+                                <h1 className="mt-3 text-2xl font-semibold text-[#333333] sm:text-3xl">
                                     Aktive Bewohner
                                 </h1>
                                 <p className="mt-4 max-w-3xl leading-7 text-[#54595F]">
@@ -69,7 +113,7 @@ export default function Index({ location, locations, residents }: ResidentsIndex
                     </section>
 
                     {locations.length > 1 && (
-                        <section className="mb-8 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-[#E5E7EB]">
+                        <section className="mb-6 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-[#E5E7EB] sm:mb-8 sm:p-6">
                             <p className="mb-3 text-sm font-semibold text-[#333333]">
                                 Wohnbereich filtern
                             </p>
@@ -112,145 +156,114 @@ export default function Index({ location, locations, residents }: ResidentsIndex
                         </div>
 
                         {residents.length > 0 ? (
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full divide-y divide-[#E5E7EB]">
-                                    <thead className="bg-[#F7E8ED]">
-                                        <tr>
-                                            <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-[#7F1730]">
-                                                Name
-                                            </th>
-                                            {locations.length > 1 && (
+                            <>
+                                <div className="hidden overflow-x-auto md:block">
+                                    <table className="min-w-full divide-y divide-[#E5E7EB]">
+                                        <thead className="bg-[#F7E8ED]">
+                                            <tr>
                                                 <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-[#7F1730]">
-                                                    Wohnbereich
+                                                    Name
                                                 </th>
-                                            )}
-                                            <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-[#7F1730]">
-                                                Zimmer
-                                            </th>
-                                            <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-[#7F1730]">
-                                                Pflegegrad
-                                            </th>
-                                            {canManageResidents && (
-                                                <th className="px-6 py-3 text-right text-xs font-bold uppercase tracking-wider text-[#7F1730]">
-                                                    Aktionen
-                                                </th>
-                                            )}
-                                            {!canManageResidents && (
-                                                <th className="px-6 py-3 text-right text-xs font-bold uppercase tracking-wider text-[#7F1730]">
-                                                    Dokumentation
-                                                </th>
-                                            )}
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-[#E5E7EB] bg-white">
-                                        {residents.map((resident) => (
-                                            <tr key={resident.id}>
-                                                <td className="whitespace-nowrap px-6 py-4 font-medium text-[#333333]">
-                                                    {resident.fullName}
-                                                </td>
                                                 {locations.length > 1 && (
-                                                    <td className="whitespace-nowrap px-6 py-4 text-[#54595F]">
-                                                        {resident.locationName ?? '—'}
-                                                    </td>
+                                                    <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-[#7F1730]">
+                                                        Wohnbereich
+                                                    </th>
                                                 )}
-                                                <td className="whitespace-nowrap px-6 py-4 text-[#54595F]">
-                                                    {resident.roomNumber ?? '—'}
-                                                </td>
-                                                <td className="whitespace-nowrap px-6 py-4 text-[#54595F]">
-                                                    {resident.careLevel ?? '—'}
-                                                </td>
-                                                <td className="whitespace-nowrap px-6 py-4 text-right">
-                                                    <div className="flex justify-end gap-4">
-                                                        <Link
-                                                            href={route(
-                                                                'residents.sis.show',
-                                                                resident.id,
-                                                            )}
-                                                            className="text-sm font-semibold text-[#9B1C3B] hover:underline"
-                                                        >
-                                                            SIS
-                                                        </Link>
-                                                        <Link
-                                                            href={route(
-                                                                'residents.care-plan.show',
-                                                                resident.id,
-                                                            )}
-                                                            className="text-sm font-semibold text-[#9B1C3B] hover:underline"
-                                                        >
-                                                            MP
-                                                        </Link>
-                                                        <Link
-                                                            href={route(
-                                                                'residents.vitals.index',
-                                                                resident.id,
-                                                            )}
-                                                            className="text-sm font-semibold text-[#9B1C3B] hover:underline"
-                                                        >
-                                                            Vitalwerte
-                                                        </Link>
-                                                        <Link
-                                                            href={route(
-                                                                'residents.care-tasks.index',
-                                                                resident.id,
-                                                            )}
-                                                            className="text-sm font-semibold text-[#9B1C3B] hover:underline"
-                                                        >
-                                                            Nachweis
-                                                        </Link>
-                                                        <Link
-                                                            href={route(
-                                                                'residents.assessments.index',
-                                                                resident.id,
-                                                            )}
-                                                            className="text-sm font-semibold text-[#9B1C3B] hover:underline"
-                                                        >
-                                                            Assessments
-                                                        </Link>
-                                                        <Link
-                                                            href={route(
-                                                                'residents.medications.index',
-                                                                resident.id,
-                                                            )}
-                                                            className="text-sm font-semibold text-[#9B1C3B] hover:underline"
-                                                        >
-                                                            Medikation
-                                                        </Link>
-                                                        <Link
-                                                            href={route(
-                                                                'residents.wounds.index',
-                                                                resident.id,
-                                                            )}
-                                                            className="text-sm font-semibold text-[#9B1C3B] hover:underline"
-                                                        >
-                                                            Wunden
-                                                        </Link>
-                                                        <Link
-                                                            href={route(
-                                                                'residents.quality.index',
-                                                                resident.id,
-                                                            )}
-                                                            className="text-sm font-semibold text-[#9B1C3B] hover:underline"
-                                                        >
-                                                            Qualität
-                                                        </Link>
-                                                        {canManageResidents && (
-                                                            <Link
-                                                                href={route(
-                                                                    'residents.edit',
-                                                                    resident.id,
-                                                                )}
-                                                                className="text-sm font-semibold text-[#9B1C3B] hover:underline"
-                                                            >
-                                                                Bearbeiten
-                                                            </Link>
-                                                        )}
-                                                    </div>
-                                                </td>
+                                                <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-[#7F1730]">
+                                                    Zimmer
+                                                </th>
+                                                <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-[#7F1730]">
+                                                    Pflegegrad
+                                                </th>
+                                                {canManageResidents && (
+                                                    <th className="px-6 py-3 text-right text-xs font-bold uppercase tracking-wider text-[#7F1730]">
+                                                        Aktionen
+                                                    </th>
+                                                )}
+                                                {!canManageResidents && (
+                                                    <th className="px-6 py-3 text-right text-xs font-bold uppercase tracking-wider text-[#7F1730]">
+                                                        Dokumentation
+                                                    </th>
+                                                )}
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
+                                        </thead>
+                                        <tbody className="divide-y divide-[#E5E7EB] bg-white">
+                                            {residents.map((resident) => (
+                                                <tr key={resident.id}>
+                                                    <td className="whitespace-nowrap px-6 py-4 font-medium text-[#333333]">
+                                                        {resident.fullName}
+                                                    </td>
+                                                    {locations.length > 1 && (
+                                                        <td className="whitespace-nowrap px-6 py-4 text-[#54595F]">
+                                                            {resident.locationName ?? '—'}
+                                                        </td>
+                                                    )}
+                                                    <td className="whitespace-nowrap px-6 py-4 text-[#54595F]">
+                                                        {resident.roomNumber ?? '—'}
+                                                    </td>
+                                                    <td className="whitespace-nowrap px-6 py-4 text-[#54595F]">
+                                                        {resident.careLevel ?? '—'}
+                                                    </td>
+                                                    <td className="whitespace-nowrap px-6 py-4 text-right">
+                                                        <div className="flex flex-wrap justify-end gap-x-4 gap-y-2">
+                                                            <ResidentActions
+                                                                resident={resident}
+                                                                canManageResidents={
+                                                                    canManageResidents
+                                                                }
+                                                            />
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <ul className="divide-y divide-[#E5E7EB] md:hidden">
+                                    {residents.map((resident) => (
+                                        <li key={resident.id} className="space-y-3 p-4">
+                                            <p className="font-medium text-[#333333]">
+                                                {resident.fullName}
+                                            </p>
+                                            <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+                                                {locations.length > 1 && (
+                                                    <div>
+                                                        <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                                            Wohnbereich
+                                                        </dt>
+                                                        <dd className="text-[#54595F]">
+                                                            {resident.locationName ?? '—'}
+                                                        </dd>
+                                                    </div>
+                                                )}
+                                                <div>
+                                                    <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                                        Zimmer
+                                                    </dt>
+                                                    <dd className="text-[#54595F]">
+                                                        {resident.roomNumber ?? '—'}
+                                                    </dd>
+                                                </div>
+                                                <div>
+                                                    <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                                        Pflegegrad
+                                                    </dt>
+                                                    <dd className="text-[#54595F]">
+                                                        {resident.careLevel ?? '—'}
+                                                    </dd>
+                                                </div>
+                                            </dl>
+                                            <div className="flex flex-wrap gap-x-4 gap-y-2 border-t border-[#E5E7EB] pt-3">
+                                                <ResidentActions
+                                                    resident={resident}
+                                                    canManageResidents={canManageResidents}
+                                                />
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </>
                         ) : (
                             <div className="px-6 py-12 text-center">
                                 <p className="text-lg font-semibold text-[#333333]">

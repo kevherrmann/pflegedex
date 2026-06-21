@@ -22,6 +22,7 @@ class ShiftTemplate extends Model
         'location_id',
         'name',
         'code',
+        'category',
         'starts_at',
         'ends_at',
         'duration_minutes',
@@ -69,6 +70,19 @@ class ShiftTemplate extends Model
     {
         return Attribute::make(
             get: fn (?string $value): ?string => $value === null ? null : substr($value, 0, 5),
+        );
+    }
+
+    /**
+     * Kategorie (early/late/night). Fällt auf den code zurück, wenn nicht gesetzt
+     * (Bestandsdaten/ältere Vorlagen, bei denen der code die Kategorie trug).
+     *
+     * @return Attribute<string, never>
+     */
+    protected function category(): Attribute
+    {
+        return Attribute::make(
+            get: fn (?string $value): string => $value ?? $this->code,
         );
     }
 }
