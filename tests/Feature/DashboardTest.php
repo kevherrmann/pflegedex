@@ -274,6 +274,41 @@ it('Dashboard listet fehlgeschlagene Generationen', function (): void {
             ->where('running.sisFailed.0.errorMessage', 'Ollama timeout nach 30s'));
 });
 
+it('Dashboard blendet fehlgeschlagene Generation aus, wenn ein neuerer Lauf erfolgreich war', function (): void {
+    [$location, $pdl] = dashLocationAndPdl();
+    $resident = Resident::factory()->for($location)->create();
+    $sis = Sis::factory()->create([
+        'resident_id' => $resident->id,
+        'location_id' => $location->id,
+    ]);
+
+    $this->travel(-10)->minutes();
+    SisGeneration::query()->create([
+        'sis_id' => $sis->id,
+        'triggered_by' => $pdl->id,
+        'status' => 'failed',
+        'progress' => 3,
+        'total_steps' => 7,
+        'error_message' => 'curl error 28',
+        'finished_at' => now(),
+    ]);
+    $this->travelBack();
+
+    // Neuerer, erfolgreicher Lauf für dieselbe SIS.
+    SisGeneration::query()->create([
+        'sis_id' => $sis->id,
+        'triggered_by' => $pdl->id,
+        'status' => 'completed',
+        'progress' => 7,
+        'total_steps' => 7,
+        'finished_at' => now(),
+    ]);
+
+    $this->actingAs($pdl)
+        ->get(route('dashboard'))
+        ->assertInertia(fn ($page) => $page->has('running.sisFailed', 0));
+});
+
 it('Dashboard recent-Block zeigt zuletzt aufgenommene Bewohner', function (): void {
     [$location, $pdl] = dashLocationAndPdl();
 

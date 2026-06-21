@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link } from '@inertiajs/react';
+import { ReactNode, useState } from 'react';
 
 type MyShift = {
     id: string;
@@ -76,45 +77,166 @@ function weekdayMondayFirst(date: string): number {
     return (new Date(`${date}T00:00:00`).getDay() + 6) % 7;
 }
 
-function ShiftChip({ shift, compact = false }: { shift: MyShift; compact?: boolean }) {
+function ShiftChip({ shift }: { shift: MyShift }) {
     return (
         <div
-            className={
-                'rounded-md border border-gray-200 bg-white ' + (compact ? 'px-1.5 py-1' : 'p-2.5')
-            }
+            className="rounded-md border border-gray-200 bg-white p-2.5"
             style={{ borderLeftWidth: '4px', borderLeftColor: shift.shiftTemplateColor ?? ACCENT }}
         >
-            <div className={'flex flex-wrap items-center gap-x-2 ' + (compact ? '' : 'gap-y-0.5')}>
-                <span
-                    className={'font-semibold text-gray-900 ' + (compact ? 'text-xs' : 'text-sm')}
-                >
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                <span className="text-sm font-semibold text-gray-900">
                     {shift.shiftTemplateName ?? 'Dienst'}
                 </span>
-                <span className={compact ? 'text-[11px] text-gray-600' : 'text-sm text-gray-700'}>
+                <span className="text-sm text-gray-700">
                     {shift.startsAt}–{shift.endsAt}
                 </span>
-                {!compact && (
-                    <span className="text-xs text-gray-500">
-                        ({formatMinutesAsHours(shift.minutes)})
-                    </span>
-                )}
-                {shift.isLocked && !compact && (
+                <span className="text-xs text-gray-500">
+                    ({formatMinutesAsHours(shift.minutes)})
+                </span>
+                {shift.isLocked && (
                     <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-600">
                         Gesperrt
                     </span>
                 )}
             </div>
-            {!compact && shift.locationName && (
+            {shift.locationName && (
                 <p className="mt-0.5 text-xs text-gray-500">{shift.locationName}</p>
             )}
-            {!compact && shift.note && (
-                <p className="mt-1 text-xs italic text-gray-600">{shift.note}</p>
-            )}
+            {shift.note && <p className="mt-1 text-xs italic text-gray-600">{shift.note}</p>}
         </div>
     );
 }
 
-function CalendarGrid({ days }: { days: MyDay[] }) {
+function SectionLabel({ children }: { children: ReactNode }) {
+    return (
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">{children}</p>
+    );
+}
+
+function DayDetailModal({ day, onClose }: { day: MyDay; onClose: () => void }) {
+    const hasOwnShift = day.shifts.length > 0;
+
+    return (
+        <div
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4"
+            onClick={onClose}
+        >
+            <div
+                onClick={(event) => event.stopPropagation()}
+                className="max-h-[85vh] w-full overflow-hidden rounded-t-2xl bg-white shadow-xl sm:max-w-lg sm:rounded-2xl"
+            >
+                {/* Kopf mit Akzent */}
+                <div className="flex items-center gap-4 border-b border-gray-100 bg-[#F7E8ED]/50 p-5 sm:p-6">
+                    <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-2xl bg-[#9B1C3B] text-white">
+                        <span className="text-xl font-bold leading-none">
+                            {dayOfMonth(day.date)}
+                        </span>
+                        <span className="text-[10px] font-medium uppercase">
+                            {day.weekdayLabel}
+                        </span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <h3 className="text-lg font-semibold text-gray-900">{day.dayLabel}</h3>
+                        {day.isToday && (
+                            <span className="mt-0.5 inline-flex rounded-full bg-[#9B1C3B]/10 px-2 py-0.5 text-[11px] font-semibold text-[#9B1C3B]">
+                                Heute
+                            </span>
+                        )}
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        aria-label="Schließen"
+                        className="rounded-full p-1.5 text-gray-500 transition hover:bg-white hover:text-gray-800"
+                    >
+                        <svg
+                            className="h-6 w-6"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            strokeWidth={1.8}
+                            stroke="currentColor"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M6 18L18 6M6 6l12 12"
+                            />
+                        </svg>
+                    </button>
+                </div>
+
+                <div className="max-h-[60vh] space-y-5 overflow-y-auto p-5 sm:p-6">
+                    {/* Eigener Status */}
+                    <section className="space-y-2">
+                        <SectionLabel>Mein Tag</SectionLabel>
+                        {day.absence && (
+                            <div className="flex items-center gap-2 rounded-lg bg-teal-50 px-3 py-2 text-sm font-semibold text-teal-800 ring-1 ring-teal-200">
+                                <span className="h-2 w-2 rounded-full bg-teal-500" />
+                                {day.absence.typeLabel}
+                            </div>
+                        )}
+                        {hasOwnShift
+                            ? day.shifts.map((shift) => <ShiftChip key={shift.id} shift={shift} />)
+                            : !day.absence && (
+                                  <p className="text-sm text-gray-500">
+                                      Du hast an diesem Tag keinen eigenen Dienst.
+                                  </p>
+                              )}
+                    </section>
+
+                    {/* Team */}
+                    {day.team.length > 0 && (
+                        <section className="space-y-2">
+                            <SectionLabel>
+                                {hasOwnShift
+                                    ? 'Mit wem arbeite ich zusammen?'
+                                    : 'Wer ist im Dienst?'}
+                            </SectionLabel>
+                            <div className="space-y-2">
+                                {day.team.map((group, index) => (
+                                    <div
+                                        key={`${group.shiftTemplateCode ?? 'x'}-${index}`}
+                                        className="rounded-lg border border-gray-200 bg-white p-3"
+                                        style={{
+                                            borderLeftWidth: '4px',
+                                            borderLeftColor: group.shiftTemplateColor ?? ACCENT,
+                                        }}
+                                    >
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <span className="text-sm font-semibold text-gray-900">
+                                                {group.shiftTemplateName ?? 'Dienst'}
+                                            </span>
+                                            <span className="text-sm text-gray-600">
+                                                {group.startsAt}–{group.endsAt} Uhr
+                                            </span>
+                                            {group.isOwnShift && (
+                                                <span className="rounded-full bg-[#9B1C3B]/10 px-2 py-0.5 text-[11px] font-semibold text-[#9B1C3B]">
+                                                    meine Schicht
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                            {group.colleagues.map((colleague) => (
+                                                <span
+                                                    key={colleague}
+                                                    className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-700"
+                                                >
+                                                    {colleague}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </section>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function CalendarGrid({ days, onSelect }: { days: MyDay[]; onSelect: (day: MyDay) => void }) {
     if (days.length === 0) {
         return null;
     }
@@ -133,7 +255,7 @@ function CalendarGrid({ days }: { days: MyDay[] }) {
                     <div
                         key={label}
                         className={
-                            'px-2 py-2 text-center text-xs font-semibold uppercase tracking-wide ' +
+                            'px-1 py-2 text-center text-[11px] font-semibold uppercase tracking-wide sm:text-xs ' +
                             (index >= 5 ? 'text-[#9B1C3B]' : 'text-gray-500')
                         }
                     >
@@ -148,42 +270,68 @@ function CalendarGrid({ days }: { days: MyDay[] }) {
                         return (
                             <div
                                 key={`blank-${index}`}
-                                className="min-h-[7.5rem] border-b border-r border-gray-100 bg-gray-50/40"
+                                className="min-h-[4.5rem] border-b border-r border-gray-100 bg-gray-50/40 sm:min-h-[7rem]"
                             />
                         );
                     }
 
-                    return (
-                        <div
-                            key={day.date}
+                    const hasOwnContent = day.shifts.length > 0 || day.absence !== null;
+                    const cellClass =
+                        'min-h-[4.5rem] border-b border-r border-gray-100 p-1 text-left align-top transition hover:bg-[#F7E8ED]/40 sm:min-h-[7rem] sm:p-1.5 ' +
+                        (day.isWeekend ? 'bg-gray-50/60 ' : 'bg-white ') +
+                        (day.isToday ? 'ring-2 ring-inset ring-[#9B1C3B] ' : '');
+
+                    const dayNumber = (
+                        <span
                             className={
-                                'min-h-[7.5rem] border-b border-r border-gray-100 p-1.5 ' +
-                                (day.isWeekend ? 'bg-gray-50/60 ' : 'bg-white ') +
-                                (day.isToday ? 'ring-2 ring-inset ring-[#9B1C3B]' : '')
+                                'inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-xs font-semibold ' +
+                                (day.isToday ? 'bg-[#9B1C3B] text-white' : 'text-gray-700')
                             }
                         >
-                            <div className="mb-1 flex items-center justify-between">
-                                <span
-                                    className={
-                                        'inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-xs font-semibold ' +
-                                        (day.isToday ? 'bg-[#9B1C3B] text-white' : 'text-gray-700')
-                                    }
-                                >
-                                    {dayOfMonth(day.date)}
-                                </span>
-                            </div>
+                            {dayOfMonth(day.date)}
+                        </span>
+                    );
 
-                            <div className="space-y-1">
+                    return (
+                        <button
+                            key={day.date}
+                            type="button"
+                            onClick={() => onSelect(day)}
+                            className={cellClass}
+                        >
+                            {dayNumber}
+                            <div className="mt-1 space-y-1">
                                 {day.absence && (
-                                    <span className="block truncate rounded bg-teal-100 px-1.5 py-0.5 text-[11px] font-semibold text-teal-800">
+                                    <span className="block truncate rounded bg-teal-100 px-1 py-0.5 text-[10px] font-semibold text-teal-800 sm:text-[11px]">
                                         {day.absence.typeLabel}
                                     </span>
                                 )}
                                 {day.shifts.map((shift) => (
-                                    <ShiftChip key={shift.id} shift={shift} compact />
+                                    <span
+                                        key={shift.id}
+                                        className="flex items-center gap-1 rounded border-l-2 bg-gray-50 px-1 py-0.5 text-[10px] sm:text-[11px]"
+                                        style={{
+                                            borderLeftColor: shift.shiftTemplateColor ?? ACCENT,
+                                        }}
+                                    >
+                                        <span className="truncate font-medium text-gray-800">
+                                            {shift.shiftTemplateName ?? 'Dienst'}
+                                        </span>
+                                        <span className="hidden text-gray-500 sm:inline">
+                                            {shift.startsAt}
+                                        </span>
+                                    </span>
                                 ))}
+                                {!hasOwnContent && (
+                                    <span className="block text-[10px] text-gray-400 sm:text-[11px]">
+                                        frei
+                                        {day.team.length > 0 && (
+                                            <span className="hidden sm:inline"> · Team</span>
+                                        )}
+                                    </span>
+                                )}
                             </div>
-                        </div>
+                        </button>
                     );
                 })}
             </div>
@@ -191,96 +339,9 @@ function CalendarGrid({ days }: { days: MyDay[] }) {
     );
 }
 
-function TeamBlock({ team, hasOwnShift }: { team: TeamGroup[]; hasOwnShift: boolean }) {
-    return (
-        <div className="rounded-lg bg-gray-50 px-3 py-2 ring-1 ring-gray-200">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-                {hasOwnShift ? 'Mit wem arbeite ich zusammen?' : 'Wer ist im Dienst?'}
-            </p>
-            <div className="mt-1.5 space-y-1">
-                {team.map((group, index) => (
-                    <div
-                        key={`${group.shiftTemplateCode ?? 'unbekannt'}-${index}`}
-                        className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs"
-                    >
-                        <span className="inline-flex items-center gap-1.5 font-semibold text-gray-700">
-                            <span
-                                className="h-2 w-2 shrink-0 rounded-full"
-                                style={{ backgroundColor: group.shiftTemplateColor ?? ACCENT }}
-                            />
-                            {group.shiftTemplateName ?? 'Dienst'}
-                            {group.isOwnShift && (
-                                <span className="rounded-full bg-[#9B1C3B]/10 px-1.5 py-0.5 text-[10px] font-semibold text-[#9B1C3B]">
-                                    meine Schicht
-                                </span>
-                            )}
-                        </span>
-                        <span className="text-gray-500">
-                            {group.startsAt}–{group.endsAt} Uhr
-                        </span>
-                        <span className="text-gray-700">{group.colleagues.join(', ')}</span>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-}
-
-function AgendaCard({ day }: { day: MyDay }) {
-    return (
-        <div
-            className={
-                'rounded-2xl bg-white p-4 shadow-sm ring-1 ' +
-                (day.isToday ? 'ring-2 ring-[#9B1C3B]' : 'ring-gray-200')
-            }
-        >
-            <div className="flex items-center gap-3">
-                <div
-                    className={
-                        'flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl ' +
-                        (day.isToday
-                            ? 'bg-[#9B1C3B] text-white'
-                            : day.isWeekend
-                              ? 'bg-[#F7E8ED] text-[#7F1730]'
-                              : 'bg-gray-100 text-gray-700')
-                    }
-                >
-                    <span className="text-base font-bold leading-none">{dayOfMonth(day.date)}</span>
-                    <span className="text-[10px] font-medium uppercase">{day.weekdayLabel}</span>
-                </div>
-                <div className="min-w-0">
-                    <p className="text-sm font-semibold text-gray-900">{day.dayLabel}</p>
-                    {day.isToday && (
-                        <p className="text-[11px] font-semibold uppercase tracking-wide text-[#9B1C3B]">
-                            Heute
-                        </p>
-                    )}
-                </div>
-                {day.absence && (
-                    <span className="ml-auto inline-flex rounded-full bg-teal-100 px-2.5 py-1 text-xs font-semibold text-teal-800">
-                        {day.absence.typeLabel}
-                    </span>
-                )}
-            </div>
-
-            {day.shifts.length > 0 && (
-                <div className="mt-3 space-y-2">
-                    {day.shifts.map((shift) => (
-                        <ShiftChip key={shift.id} shift={shift} />
-                    ))}
-                </div>
-            )}
-
-            {day.team.length > 0 && (
-                <div className="mt-3">
-                    <TeamBlock team={day.team} hasOwnShift={day.shifts.length > 0} />
-                </div>
-            )}
-        </div>
-    );
-}
-
 export default function MyRosterShow({ month, days, summary, hasUnpublishedRoster }: Props) {
+    const [selectedDay, setSelectedDay] = useState<MyDay | null>(null);
+
     const stats: Array<{ label: string; value: string; hint: string | null }> = [
         { label: 'Dienste', value: String(summary.shiftCount), hint: 'im Monat' },
         {
@@ -298,9 +359,6 @@ export default function MyRosterShow({ month, days, summary, hasUnpublishedRoste
 
     const todayIso = new Date().toISOString().slice(0, 10);
     const nextShiftDay = days.find((day) => day.shifts.length > 0 && day.date >= todayIso) ?? null;
-
-    // Agenda: nur Tage mit Diensten oder Abwesenheit – das hält die Liste übersichtlich.
-    const agendaDays = days.filter((day) => day.shifts.length > 0 || day.absence !== null);
 
     return (
         <AuthenticatedLayout
@@ -380,31 +438,17 @@ export default function MyRosterShow({ month, days, summary, hasUnpublishedRoste
                         ))}
                     </div>
 
-                    {/* Kalender (ab Desktop) */}
-                    <div className="hidden lg:block">
-                        <CalendarGrid days={days} />
-                    </div>
-
-                    {/* Agenda (alle Größen; auf Mobile die Hauptansicht) */}
-                    <div>
-                        <h3 className="mb-3 text-lg font-semibold text-gray-900">
-                            Dienste im {month.label}
-                        </h3>
-                        {agendaDays.length === 0 ? (
-                            <div className="rounded-2xl bg-white p-6 text-sm text-gray-600 shadow-sm ring-1 ring-gray-200">
-                                In diesem Monat sind für dich keine Dienste aus veröffentlichten
-                                Dienstplänen und keine genehmigten Abwesenheiten hinterlegt.
-                            </div>
-                        ) : (
-                            <div className="space-y-3">
-                                {agendaDays.map((day) => (
-                                    <AgendaCard key={day.date} day={day} />
-                                ))}
-                            </div>
-                        )}
-                    </div>
+                    {/* Kalender (responsive, Tag antippen für Details) */}
+                    <CalendarGrid days={days} onSelect={setSelectedDay} />
+                    <p className="text-center text-xs text-gray-500">
+                        Tippe auf einen Tag mit Dienst, um Details und das Team zu sehen.
+                    </p>
                 </div>
             </div>
+
+            {selectedDay && (
+                <DayDetailModal day={selectedDay} onClose={() => setSelectedDay(null)} />
+            )}
         </AuthenticatedLayout>
     );
 }

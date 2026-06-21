@@ -3,6 +3,7 @@
 namespace App\Services\Rosters;
 
 use App\Enums\ShiftSource;
+use App\Models\AbsenceRequest;
 use App\Models\Roster;
 use App\Models\Shift;
 use App\Models\ShiftStaffingRule;
@@ -53,6 +54,11 @@ class RosterGeneratorService
 
             $result->addDeletedAutoShifts($deletedAutoShifts);
 
+            // Selbstheilung: Dienste entfernen, die mit einer genehmigten
+            // Abwesenheit kollidieren (auch manuelle) – niemand kann im Urlaub
+            // arbeiten. So lösen sich auch Alt-Konflikte beim Neugenerieren.
+            $this->removeApprovedAbsenceConflicts($roster);
+
             $context = new PlanningContext($roster);
             $assignments = $this->plan($roster, $context, $result);
 
@@ -72,6 +78,32 @@ class RosterGeneratorService
 
             return $result;
         });
+    }
+
+    /**
+     * Entfernt Dienste, die mit einer genehmigten Abwesenheit kollidieren
+     * (jede Quelle). So kann niemand im Urlaub eingeplant sein und Alt-Konflikte
+     * lösen sich beim Neugenerieren von selbst.
+     */
+    private function removeApprovedAbsenceConflicts(Roster $roster): void
+    {
+        $monthStart = CarbonImmutable::create($roster->year, $roster->month, 1)->startOfDay();
+        $monthEnd = $monthStart->endOfMonth();
+
+        $absences = AbsenceRequest::query()
+            ->where('status', 'approved')
+            ->whereDate('starts_on', '<=', $monthEnd->toDateString())
+            ->whereDate('ends_on', '>=', $monthStart->toDateString())
+            ->get(['user_id', 'starts_on', 'ends_on']);
+
+        foreach ($absences as $absence) {
+            Shift::query()
+                ->where('roster_id', $roster->id)
+                ->where('user_id', $absence->user_id)
+                ->whereDate('date', '>=', $absence->starts_on->toDateString())
+                ->whereDate('date', '<=', $absence->ends_on->toDateString())
+                ->delete();
+        }
     }
 
     /**

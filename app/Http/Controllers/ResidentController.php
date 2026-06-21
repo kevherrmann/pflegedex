@@ -52,6 +52,30 @@ class ResidentController extends Controller
         ]);
     }
 
+    public function show(Request $request, Resident $resident): Response
+    {
+        $this->authorizeResidentViewing($request);
+
+        $locations = $this->residentViewLocations($request);
+        abort_unless($locations->contains('id', $resident->location_id), 403);
+
+        $resident->loadMissing('location');
+
+        return Inertia::render('Residents/Show', [
+            'resident' => [
+                'id' => $resident->id,
+                'fullName' => $resident->full_name,
+                'formalName' => $resident->formal_name,
+                'roomNumber' => $resident->room_number,
+                'careLevel' => $resident->care_level,
+                'locationName' => $resident->location?->name,
+                'status' => ($resident->status ?? ResidentStatus::Present)->value,
+                'admittedOn' => $resident->admitted_on?->toDateString(),
+                'birthDate' => $resident->birth_date?->toDateString(),
+            ],
+        ]);
+    }
+
     public function create(Request $request): Response
     {
         $this->authorizeResidentManagement($request);

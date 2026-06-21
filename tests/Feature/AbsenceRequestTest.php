@@ -5,10 +5,15 @@ use App\Enums\AbsenceRequestType;
 use App\Enums\BlackoutScope;
 use App\Enums\EmploymentArea;
 use App\Enums\QualificationLevel;
+use App\Enums\RosterStatus;
+use App\Enums\ShiftSource;
 use App\Models\AbsenceRequest;
 use App\Models\EmployeeProfile;
 use App\Models\Location;
+use App\Models\Roster;
 use App\Models\RosterBlackoutDay;
+use App\Models\Shift;
+use App\Models\ShiftTemplate;
 use App\Models\User;
 use App\Services\Absences\AbsenceRequestService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -399,4 +404,63 @@ it('does not require a reason to approve a request outside any blackout', functi
 
     expect($approved->status)->toBe(AbsenceRequestStatus::Approved)
         ->and($approved->override_reason)->toBeNull();
+});
+
+it('removes conflicting roster shifts when an absence is approved', function (): void {
+    $employee = createEmployeeWithProfile(EmploymentArea::Nursing);
+    $location = $employee->location;
+    $pdl = User::factory()->for($location)->create();
+    $pdl->refresh();
+
+    $roster = Roster::query()->create([
+        'location_id' => $location->id,
+        'year' => 2027,
+        'month' => 1,
+        'status' => RosterStatus::Draft,
+        'created_by' => $pdl->id,
+    ]);
+
+    $template = ShiftTemplate::query()->create([
+        'location_id' => $location->id,
+        'name' => 'Frühdienst',
+        'code' => 'early',
+        'category' => 'early',
+        'starts_at' => '06:00',
+        'ends_at' => '14:00',
+        'duration_minutes' => 480,
+        'color' => '#F59E0B',
+        'active' => true,
+    ]);
+
+    Shift::query()->create([
+        'roster_id' => $roster->id,
+        'location_id' => $location->id,
+        'user_id' => $employee->id,
+        'shift_template_id' => $template->id,
+        'date' => '2027-01-03',
+        'starts_at' => '2027-01-03 06:00:00',
+        'ends_at' => '2027-01-03 14:00:00',
+        'source' => ShiftSource::Manual,
+    ]);
+
+    $absence = AbsenceRequest::query()->create([
+        'user_id' => $employee->id,
+        'location_id' => $location->id,
+        'type' => AbsenceRequestType::Vacation,
+        'starts_on' => '2027-01-01',
+        'ends_on' => '2027-01-05',
+        'days_count' => 5,
+        'status' => AbsenceRequestStatus::Requested,
+        'requested_by' => $employee->id,
+    ]);
+
+    app(AbsenceRequestService::class)->approve($absence, $pdl);
+
+    $remaining = Shift::query()
+        ->where('user_id', $employee->id)
+        ->whereDate('date', '>=', '2027-01-01')
+        ->whereDate('date', '<=', '2027-01-05')
+        ->count();
+
+    expect($remaining)->toBe(0);
 });

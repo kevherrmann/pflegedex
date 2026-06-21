@@ -73,6 +73,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/residents/create', [ResidentController::class, 'create'])->name('residents.create');
     Route::post('/residents', [ResidentController::class, 'store'])->name('residents.store');
     Route::get('/residents/{resident}/edit', [ResidentController::class, 'edit'])->name('residents.edit');
+    Route::get('/residents/{resident}', [ResidentController::class, 'show'])->name('residents.show');
     Route::patch('/residents/{resident}', [ResidentController::class, 'update'])->name('residents.update');
 
     Route::get('/residents/{resident}/sis', [SisController::class, 'show'])->name('residents.sis.show');

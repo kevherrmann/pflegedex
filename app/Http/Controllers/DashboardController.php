@@ -288,14 +288,27 @@ class DashboardController extends Controller
             ->values()
             ->all();
 
-        // Failed-Liste: nur die juengste failed-Generation pro Bewohner
-        $sisFailed = SisGeneration::query()
+        // Failed-Liste: einen Fehler nur zeigen, wenn er die JÜNGSTE Generierung
+        // dieser SIS ist. Ein späterer (z. B. erfolgreicher) Lauf macht den alten
+        // Fehler gegenstandslos und blendet ihn damit aus.
+        $sisFailedGens = SisGeneration::query()
             ->where('status', 'failed')
             ->whereHas('sis', fn ($q) => $q->whereIn('location_id', $locationIds))
             ->with(['sis.resident:id,pseudonym,first_name,last_name,salutation'])
             ->orderByDesc('finished_at')
+            ->take(30)
+            ->get();
+
+        $latestSisGenId = SisGeneration::query()
+            ->whereIn('sis_id', $sisFailedGens->pluck('sis_id')->unique())
+            ->orderByDesc('created_at')
+            ->get(['id', 'sis_id'])
+            ->groupBy('sis_id')
+            ->map(fn ($group) => $group->first()->id);
+
+        $sisFailed = $sisFailedGens
+            ->filter(fn (SisGeneration $g): bool => ($latestSisGenId[$g->sis_id] ?? null) === $g->id)
             ->take(10)
-            ->get()
             ->map(fn (SisGeneration $g): array => [
                 'generationId' => $g->id,
                 'kind' => 'sis',
@@ -308,13 +321,24 @@ class DashboardController extends Controller
             ->values()
             ->all();
 
-        $mpFailed = CarePlanGeneration::query()
+        $mpFailedGens = CarePlanGeneration::query()
             ->where('status', 'failed')
             ->whereHas('carePlan', fn ($q) => $q->whereIn('location_id', $locationIds))
             ->with(['carePlan.resident:id,pseudonym,first_name,last_name,salutation'])
             ->orderByDesc('finished_at')
+            ->take(30)
+            ->get();
+
+        $latestMpGenId = CarePlanGeneration::query()
+            ->whereIn('care_plan_id', $mpFailedGens->pluck('care_plan_id')->unique())
+            ->orderByDesc('created_at')
+            ->get(['id', 'care_plan_id'])
+            ->groupBy('care_plan_id')
+            ->map(fn ($group) => $group->first()->id);
+
+        $mpFailed = $mpFailedGens
+            ->filter(fn (CarePlanGeneration $g): bool => ($latestMpGenId[$g->care_plan_id] ?? null) === $g->id)
             ->take(10)
-            ->get()
             ->map(fn (CarePlanGeneration $g): array => [
                 'generationId' => $g->id,
                 'kind' => 'mp',

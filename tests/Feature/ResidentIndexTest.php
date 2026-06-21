@@ -77,3 +77,36 @@ it('shows an empty residents list if the user has no location yet', function () 
             ->has('residents', 0)
         );
 });
+
+it('shows the resident overview hub to an authorized viewer', function () {
+    $north = Location::factory()->create();
+    $user = User::factory()->for($north)->create();
+    $user->assignRole('PDL');
+
+    $resident = Resident::factory()->for($north)->create([
+        'first_name' => 'Erika',
+        'last_name' => 'Musterfrau',
+        'active' => true,
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('residents.show', $resident))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Residents/Show')
+            ->where('resident.id', $resident->id)
+            ->where('resident.fullName', 'Erika Musterfrau'));
+});
+
+it('forbids the resident overview for a resident of another Wohnbereich', function () {
+    $north = Location::factory()->create();
+    $south = Location::factory()->create();
+    $user = User::factory()->for($north)->create();
+    $user->assignRole('PDL');
+
+    $other = Resident::factory()->for($south)->create(['active' => true]);
+
+    $this->actingAs($user)
+        ->get(route('residents.show', $other))
+        ->assertForbidden();
+});

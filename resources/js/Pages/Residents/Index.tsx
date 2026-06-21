@@ -1,5 +1,7 @@
+import SearchField from '@/Components/SearchField';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, usePage } from '@inertiajs/react';
+import { useMemo, useState } from 'react';
 
 type Location = {
     id: string;
@@ -20,52 +22,83 @@ type ResidentsIndexProps = {
     residents: Resident[];
 };
 
-function ResidentActions({
-    resident,
-    canManageResidents,
-}: {
-    resident: Resident;
-    canManageResidents: boolean;
-}) {
-    const linkClass = 'text-sm font-semibold text-[#9B1C3B] hover:underline';
+function initials(name: string): string {
+    return name
+        .split(' ')
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part.charAt(0).toUpperCase())
+        .join('');
+}
+
+function ResidentCard({ resident, showLocation }: { resident: Resident; showLocation: boolean }) {
+    const details = [
+        `Zimmer ${resident.roomNumber ?? '—'}`,
+        `Pflegegrad ${resident.careLevel ?? '—'}`,
+        showLocation && resident.locationName ? resident.locationName : null,
+    ].filter(Boolean);
 
     return (
-        <>
-            <Link href={route('residents.sis.show', resident.id)} className={linkClass}>
-                SIS
-            </Link>
-            <Link href={route('residents.care-plan.show', resident.id)} className={linkClass}>
-                MP
-            </Link>
-            <Link href={route('residents.vitals.index', resident.id)} className={linkClass}>
-                Vitalwerte
-            </Link>
-            <Link href={route('residents.care-tasks.index', resident.id)} className={linkClass}>
-                Nachweis
-            </Link>
-            <Link href={route('residents.assessments.index', resident.id)} className={linkClass}>
-                Assessments
-            </Link>
-            <Link href={route('residents.medications.index', resident.id)} className={linkClass}>
-                Medikation
-            </Link>
-            <Link href={route('residents.wounds.index', resident.id)} className={linkClass}>
-                Wunden
-            </Link>
-            <Link href={route('residents.quality.index', resident.id)} className={linkClass}>
-                Qualität
-            </Link>
-            {canManageResidents && (
-                <Link href={route('residents.edit', resident.id)} className={linkClass}>
-                    Bearbeiten
-                </Link>
-            )}
-        </>
+        <Link
+            href={route('residents.show', resident.id)}
+            className="group flex items-center gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-[#E5E7EB] transition hover:shadow-md hover:ring-[#9B1C3B]/40"
+        >
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#F7E8ED] text-sm font-bold text-[#7F1730]">
+                {initials(resident.fullName)}
+            </span>
+            <div className="min-w-0 flex-1">
+                <p className="truncate font-semibold text-[#333333]">{resident.fullName}</p>
+                <p className="mt-0.5 truncate text-sm text-[#54595F]">{details.join(' · ')}</p>
+            </div>
+            <svg
+                className="h-5 w-5 shrink-0 text-gray-300 transition group-hover:text-[#9B1C3B]"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+                stroke="currentColor"
+            >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+            </svg>
+        </Link>
     );
 }
 
 export default function Index({ location, locations, residents }: ResidentsIndexProps) {
     const canManageResidents = usePage().props.auth.permissions.manageResidents;
+
+    const [query, setQuery] = useState('');
+    const [careLevelFilter, setCareLevelFilter] = useState<number | null>(null);
+
+    // Vorhandene Pflegegrade als Filter-Optionen (aufsteigend).
+    const careLevels = useMemo(
+        () =>
+            Array.from(
+                new Set(
+                    residents
+                        .map((resident) => resident.careLevel)
+                        .filter((level): level is number => level !== null),
+                ),
+            ).sort((a, b) => a - b),
+        [residents],
+    );
+
+    const filtered = useMemo(() => {
+        const needle = query.trim().toLowerCase();
+
+        return residents.filter((resident) => {
+            const matchesQuery =
+                needle === '' ||
+                resident.fullName.toLowerCase().includes(needle) ||
+                (resident.roomNumber ?? '').toLowerCase().includes(needle) ||
+                String(resident.careLevel ?? '').includes(needle) ||
+                (resident.locationName ?? '').toLowerCase().includes(needle);
+
+            const matchesCareLevel =
+                careLevelFilter === null || resident.careLevel === careLevelFilter;
+
+            return matchesQuery && matchesCareLevel;
+        });
+    }, [residents, query, careLevelFilter]);
 
     return (
         <AuthenticatedLayout
@@ -92,9 +125,8 @@ export default function Index({ location, locations, residents }: ResidentsIndex
                                     Aktive Bewohner
                                 </h1>
                                 <p className="mt-4 max-w-3xl leading-7 text-[#54595F]">
-                                    Diese Liste zeigt aktuell nur aktive Bewohner aus deinem
-                                    zugeordneten Wohnbereich. Archivierte Bewohner und andere
-                                    Wohnbereiche bleiben ausgeblendet.
+                                    Tippe auf einen Bewohner, um zu SIS, Maßnahmenplan, Vitalwerten
+                                    und der weiteren Dokumentation zu gelangen.
                                 </p>
                             </div>
 
@@ -131,9 +163,7 @@ export default function Index({ location, locations, residents }: ResidentsIndex
                                 {locations.map((item) => (
                                     <Link
                                         key={item.id}
-                                        href={route('residents.index', {
-                                            location_id: item.id,
-                                        })}
+                                        href={route('residents.index', { location_id: item.id })}
                                         className={`rounded-full px-4 py-2 text-sm font-semibold ${
                                             location?.id === item.id
                                                 ? 'bg-[#9B1C3B] text-white'
@@ -147,135 +177,82 @@ export default function Index({ location, locations, residents }: ResidentsIndex
                         </section>
                     )}
 
-                    <section className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-[#E5E7EB]">
-                        <div className="border-b border-[#E5E7EB] px-6 py-5">
-                            <h3 className="text-lg font-semibold text-[#333333]">Bewohnerliste</h3>
-                            <p className="mt-1 text-sm text-[#54595F]">
-                                {residents.length} aktive Einträge
+                    {residents.length > 0 && (
+                        <section className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-[#E5E7EB] sm:p-5">
+                            <SearchField
+                                value={query}
+                                onChange={setQuery}
+                                placeholder="Suche nach Name, Zimmer oder Pflegegrad …"
+                            />
+                            {careLevels.length > 0 && (
+                                <div className="mt-3 flex flex-wrap items-center gap-2">
+                                    <span className="text-sm font-medium text-[#54595F]">
+                                        Pflegegrad:
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setCareLevelFilter(null)}
+                                        className={`rounded-full px-3 py-1 text-sm font-semibold ${
+                                            careLevelFilter === null
+                                                ? 'bg-[#9B1C3B] text-white'
+                                                : 'bg-[#F7E8ED] text-[#7F1730]'
+                                        }`}
+                                    >
+                                        Alle
+                                    </button>
+                                    {careLevels.map((level) => (
+                                        <button
+                                            key={level}
+                                            type="button"
+                                            onClick={() => setCareLevelFilter(level)}
+                                            className={`rounded-full px-3 py-1 text-sm font-semibold ${
+                                                careLevelFilter === level
+                                                    ? 'bg-[#9B1C3B] text-white'
+                                                    : 'bg-[#F7E8ED] text-[#7F1730]'
+                                            }`}
+                                        >
+                                            {level}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </section>
+                    )}
+
+                    <div className="mb-3 flex items-baseline justify-between">
+                        <h3 className="text-lg font-semibold text-[#333333]">Bewohnerliste</h3>
+                        <p className="text-sm text-[#54595F]">
+                            {filtered.length} von {residents.length}
+                        </p>
+                    </div>
+
+                    {residents.length === 0 ? (
+                        <div className="rounded-2xl bg-white px-6 py-12 text-center shadow-sm ring-1 ring-[#E5E7EB]">
+                            <p className="text-lg font-semibold text-[#333333]">
+                                Noch keine aktiven Bewohner vorhanden
+                            </p>
+                            <p className="mt-2 text-[#54595F]">
+                                Lege über „Bewohner anlegen" den ersten Bewohner an.
                             </p>
                         </div>
-
-                        {residents.length > 0 ? (
-                            <>
-                                <div className="hidden overflow-x-auto md:block">
-                                    <table className="min-w-full divide-y divide-[#E5E7EB]">
-                                        <thead className="bg-[#F7E8ED]">
-                                            <tr>
-                                                <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-[#7F1730]">
-                                                    Name
-                                                </th>
-                                                {locations.length > 1 && (
-                                                    <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-[#7F1730]">
-                                                        Wohnbereich
-                                                    </th>
-                                                )}
-                                                <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-[#7F1730]">
-                                                    Zimmer
-                                                </th>
-                                                <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-[#7F1730]">
-                                                    Pflegegrad
-                                                </th>
-                                                {canManageResidents && (
-                                                    <th className="px-6 py-3 text-right text-xs font-bold uppercase tracking-wider text-[#7F1730]">
-                                                        Aktionen
-                                                    </th>
-                                                )}
-                                                {!canManageResidents && (
-                                                    <th className="px-6 py-3 text-right text-xs font-bold uppercase tracking-wider text-[#7F1730]">
-                                                        Dokumentation
-                                                    </th>
-                                                )}
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-[#E5E7EB] bg-white">
-                                            {residents.map((resident) => (
-                                                <tr key={resident.id}>
-                                                    <td className="whitespace-nowrap px-6 py-4 font-medium text-[#333333]">
-                                                        {resident.fullName}
-                                                    </td>
-                                                    {locations.length > 1 && (
-                                                        <td className="whitespace-nowrap px-6 py-4 text-[#54595F]">
-                                                            {resident.locationName ?? '—'}
-                                                        </td>
-                                                    )}
-                                                    <td className="whitespace-nowrap px-6 py-4 text-[#54595F]">
-                                                        {resident.roomNumber ?? '—'}
-                                                    </td>
-                                                    <td className="whitespace-nowrap px-6 py-4 text-[#54595F]">
-                                                        {resident.careLevel ?? '—'}
-                                                    </td>
-                                                    <td className="whitespace-nowrap px-6 py-4 text-right">
-                                                        <div className="flex flex-wrap justify-end gap-x-4 gap-y-2">
-                                                            <ResidentActions
-                                                                resident={resident}
-                                                                canManageResidents={
-                                                                    canManageResidents
-                                                                }
-                                                            />
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-
-                                <ul className="divide-y divide-[#E5E7EB] md:hidden">
-                                    {residents.map((resident) => (
-                                        <li key={resident.id} className="space-y-3 p-4">
-                                            <p className="font-medium text-[#333333]">
-                                                {resident.fullName}
-                                            </p>
-                                            <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
-                                                {locations.length > 1 && (
-                                                    <div>
-                                                        <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-                                                            Wohnbereich
-                                                        </dt>
-                                                        <dd className="text-[#54595F]">
-                                                            {resident.locationName ?? '—'}
-                                                        </dd>
-                                                    </div>
-                                                )}
-                                                <div>
-                                                    <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-                                                        Zimmer
-                                                    </dt>
-                                                    <dd className="text-[#54595F]">
-                                                        {resident.roomNumber ?? '—'}
-                                                    </dd>
-                                                </div>
-                                                <div>
-                                                    <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-                                                        Pflegegrad
-                                                    </dt>
-                                                    <dd className="text-[#54595F]">
-                                                        {resident.careLevel ?? '—'}
-                                                    </dd>
-                                                </div>
-                                            </dl>
-                                            <div className="flex flex-wrap gap-x-4 gap-y-2 border-t border-[#E5E7EB] pt-3">
-                                                <ResidentActions
-                                                    resident={resident}
-                                                    canManageResidents={canManageResidents}
-                                                />
-                                            </div>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </>
-                        ) : (
-                            <div className="px-6 py-12 text-center">
-                                <p className="text-lg font-semibold text-[#333333]">
-                                    Noch keine aktiven Bewohner vorhanden
-                                </p>
-                                <p className="mt-2 text-[#54595F]">
-                                    Im nächsten Schritt ergänzen wir das Formular zum Anlegen neuer
-                                    Bewohner.
-                                </p>
-                            </div>
-                        )}
-                    </section>
+                    ) : filtered.length === 0 ? (
+                        <div className="rounded-2xl bg-white px-6 py-12 text-center shadow-sm ring-1 ring-[#E5E7EB]">
+                            <p className="text-lg font-semibold text-[#333333]">Keine Treffer</p>
+                            <p className="mt-2 text-[#54595F]">
+                                Für diese Suche/Filter gibt es keinen Bewohner.
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                            {filtered.map((resident) => (
+                                <ResidentCard
+                                    key={resident.id}
+                                    resident={resident}
+                                    showLocation={locations.length > 1}
+                                />
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
         </AuthenticatedLayout>

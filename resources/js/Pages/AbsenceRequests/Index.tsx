@@ -4,7 +4,13 @@ import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, useForm } from '@inertiajs/react';
-import { FormEventHandler } from 'react';
+import { FormEventHandler, useState } from 'react';
+
+const WEEKDAY_HEADERS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+
+function pad2(value: number): string {
+    return value.toString().padStart(2, '0');
+}
 
 type AbsenceRequestItem = {
     id: string;
@@ -60,6 +66,144 @@ function statusClass(status: string): string {
     return 'bg-amber-100 text-amber-800';
 }
 
+function dayTint(status: string): string {
+    if (status === 'approved') {
+        return 'bg-emerald-500 text-white';
+    }
+    if (status === 'requested') {
+        return 'bg-amber-100 text-amber-900 ring-1 ring-dashed ring-amber-400';
+    }
+    return 'bg-gray-100 text-gray-500';
+}
+
+function AbsenceCalendar({ requests }: { requests: AbsenceRequestItem[] }) {
+    const now = new Date();
+    const [offset, setOffset] = useState(0);
+
+    const viewDate = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    const year = viewDate.getFullYear();
+    const month = viewDate.getMonth();
+    const monthLabel = new Intl.DateTimeFormat('de-DE', {
+        month: 'long',
+        year: 'numeric',
+    }).format(viewDate);
+    const todayIso = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
+
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const leadingBlanks = (new Date(year, month, 1).getDay() + 6) % 7;
+
+    const cells: (string | null)[] = [...Array(leadingBlanks).fill(null)];
+    for (let day = 1; day <= daysInMonth; day++) {
+        cells.push(`${year}-${pad2(month + 1)}-${pad2(day)}`);
+    }
+    while (cells.length % 7 !== 0) {
+        cells.push(null);
+    }
+
+    const coverFor = (iso: string): AbsenceRequestItem | null => {
+        const covering = requests.filter((r) => iso >= r.startsOn && iso <= r.endsOn);
+        return (
+            covering.find((r) => r.status === 'approved') ??
+            covering.find((r) => r.status === 'requested') ??
+            covering[0] ??
+            null
+        );
+    };
+
+    return (
+        <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200">
+            <div className="flex items-center justify-between gap-2 border-b border-gray-200 p-3 sm:p-4">
+                <button
+                    type="button"
+                    onClick={() => setOffset((value) => value - 1)}
+                    className="rounded-lg px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-900"
+                >
+                    ← <span className="hidden sm:inline">Vormonat</span>
+                </button>
+                <span className="text-base font-semibold text-gray-900 sm:text-lg">
+                    {monthLabel}
+                </span>
+                <button
+                    type="button"
+                    onClick={() => setOffset((value) => value + 1)}
+                    className="rounded-lg px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-900"
+                >
+                    <span className="hidden sm:inline">Folgemonat</span> →
+                </button>
+            </div>
+
+            <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50">
+                {WEEKDAY_HEADERS.map((label, index) => (
+                    <div
+                        key={label}
+                        className={
+                            'px-1 py-2 text-center text-[11px] font-semibold uppercase tracking-wide sm:text-xs ' +
+                            (index >= 5 ? 'text-[#9B1C3B]' : 'text-gray-500')
+                        }
+                    >
+                        {label}
+                    </div>
+                ))}
+            </div>
+
+            <div className="grid grid-cols-7">
+                {cells.map((iso, index) => {
+                    if (iso === null) {
+                        return (
+                            <div
+                                key={`blank-${index}`}
+                                className="min-h-[3.5rem] border-b border-r border-gray-100 bg-gray-50/40 sm:min-h-[5.5rem]"
+                            />
+                        );
+                    }
+
+                    const cover = coverFor(iso);
+                    const isToday = iso === todayIso;
+
+                    return (
+                        <div
+                            key={iso}
+                            className={
+                                'min-h-[3.5rem] border-b border-r border-gray-100 p-1 sm:min-h-[5.5rem] sm:p-1.5 ' +
+                                (isToday ? 'ring-2 ring-inset ring-[#9B1C3B]' : '')
+                            }
+                        >
+                            <span
+                                className={
+                                    'inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-xs font-semibold ' +
+                                    (isToday ? 'bg-[#9B1C3B] text-white' : 'text-gray-700')
+                                }
+                            >
+                                {Number(iso.slice(8, 10))}
+                            </span>
+                            {cover && (
+                                <span
+                                    className={`mt-1 block truncate rounded px-1 py-0.5 text-[10px] font-semibold sm:text-[11px] ${dayTint(
+                                        cover.status,
+                                    )}`}
+                                    title={`${cover.typeLabel} – ${cover.statusLabel}`}
+                                >
+                                    {cover.typeLabel}
+                                </span>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 p-3 text-xs text-gray-600 sm:p-4">
+                <span className="flex items-center gap-2">
+                    <span className="inline-block h-3 w-5 rounded bg-emerald-500" /> Genehmigt
+                </span>
+                <span className="flex items-center gap-2">
+                    <span className="inline-block h-3 w-5 rounded bg-amber-100 ring-1 ring-dashed ring-amber-400" />{' '}
+                    Beantragt
+                </span>
+            </div>
+        </div>
+    );
+}
+
 export default function AbsenceRequestsIndex({
     absenceRequests,
     canRequestAbsence,
@@ -93,8 +237,10 @@ export default function AbsenceRequestsIndex({
         >
             <Head title="Urlaub & Abwesenheiten" />
 
-            <div className="py-6 sm:py-8 lg:py-12">
+            <div className="bg-[#F8F8F8] py-6 sm:py-8 lg:py-12">
                 <div className="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
+                    <AbsenceCalendar requests={absenceRequests} />
+
                     <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
                         <div className="border-b border-gray-200 p-4 sm:p-6">
                             <h3 className="text-lg font-semibold text-gray-900">Urlaubskonto</h3>

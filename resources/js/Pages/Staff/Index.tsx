@@ -4,8 +4,9 @@ import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { FormEventHandler } from 'react';
+import { FormEventHandler, useMemo, useState } from 'react';
 import EmployeeProfileFields from '@/Components/Staff/EmployeeProfileFields';
+import SearchField from '@/Components/SearchField';
 
 type LocationOption = { id: string; name: string };
 type StaffUser = {
@@ -24,6 +25,23 @@ type StaffIndexProps = {
 };
 
 export default function Index({ staffUsers, locations, roles }: StaffIndexProps) {
+    const [query, setQuery] = useState('');
+
+    const filteredStaff = useMemo(() => {
+        const needle = query.trim().toLowerCase();
+        if (needle === '') {
+            return staffUsers;
+        }
+
+        return staffUsers.filter(
+            (user) =>
+                user.name.toLowerCase().includes(needle) ||
+                user.email.toLowerCase().includes(needle) ||
+                user.role.toLowerCase().includes(needle) ||
+                user.locations.some((location) => location.name.toLowerCase().includes(needle)),
+        );
+    }, [staffUsers, query]);
+
     const { data, setData, post, processing, errors, reset } = useForm<{
         name: string;
         email: string;
@@ -121,11 +139,41 @@ export default function Index({ staffUsers, locations, roles }: StaffIndexProps)
                                 PDLs legen hier Pflegekräfte, Putzkräfte und Hausmeister an und
                                 ordnen sie Wohnbereichen zu.
                             </p>
+                            {staffUsers.length > 0 && (
+                                <div className="mt-4">
+                                    <SearchField
+                                        value={query}
+                                        onChange={setQuery}
+                                        placeholder="Suche nach Name, Rolle oder Wohnbereich …"
+                                    />
+                                    <p className="mt-2 text-sm text-[#54595F]">
+                                        {filteredStaff.length} von {staffUsers.length}
+                                    </p>
+                                </div>
+                            )}
                         </div>
 
-                        {staffUsers.length > 0 ? (
+                        {staffUsers.length === 0 ? (
+                            <div className="px-6 py-12 text-center">
+                                <p className="text-lg font-semibold text-[#333333]">
+                                    Noch keine Mitarbeiter vorhanden
+                                </p>
+                                <p className="mt-2 text-[#54595F]">
+                                    Lege rechts das erste Mitarbeiterkonto an.
+                                </p>
+                            </div>
+                        ) : filteredStaff.length === 0 ? (
+                            <div className="px-6 py-12 text-center">
+                                <p className="text-lg font-semibold text-[#333333]">
+                                    Keine Treffer
+                                </p>
+                                <p className="mt-2 text-[#54595F]">
+                                    Für diese Suche gibt es keinen Mitarbeiter.
+                                </p>
+                            </div>
+                        ) : (
                             <div className="divide-y divide-[#E5E7EB]">
-                                {staffUsers.map((user) => (
+                                {filteredStaff.map((user) => (
                                     <article
                                         key={user.id}
                                         className="flex flex-col gap-3 px-6 py-5 sm:flex-row sm:items-center sm:justify-between"
@@ -151,15 +199,6 @@ export default function Index({ staffUsers, locations, roles }: StaffIndexProps)
                                         </Link>
                                     </article>
                                 ))}
-                            </div>
-                        ) : (
-                            <div className="px-6 py-12 text-center">
-                                <p className="text-lg font-semibold text-[#333333]">
-                                    Noch keine Mitarbeiter vorhanden
-                                </p>
-                                <p className="mt-2 text-[#54595F]">
-                                    Lege rechts das erste Mitarbeiterkonto an.
-                                </p>
                             </div>
                         )}
                     </section>

@@ -5,8 +5,11 @@ namespace App\Services\Absences;
 use App\Enums\AbsenceRequestStatus;
 use App\Enums\AbsenceRequestType;
 use App\Models\AbsenceRequest;
+use App\Models\Roster;
 use App\Models\RosterBlackoutDay;
+use App\Models\Shift;
 use App\Models\User;
+use App\Services\Rosters\RosterGeneratorService;
 use Carbon\CarbonImmutable;
 use Illuminate\Validation\ValidationException;
 
@@ -160,7 +163,52 @@ class AbsenceRequestService
             'override_reason' => $hitsBlackout ? $overrideReason : null,
         ])->save();
 
+        $this->resolveRosterConflicts($absenceRequest);
+
         return $absenceRequest->refresh();
+    }
+
+    /**
+     * Nach der Genehmigung darf es keine Doppelbuchung (Abwesenheit + Dienst)
+     * geben: In editierbaren Dienstplänen werden die Dienste des Mitarbeiters im
+     * Abwesenheitszeitraum entfernt und der Plan neu generiert, damit die frei
+     * gewordenen Slots nachbesetzt werden (die genehmigte Abwesenheit ist jetzt
+     * eine harte Regel). Veröffentlichte/gesperrte Pläne bleiben unangetastet.
+     */
+    private function resolveRosterConflicts(AbsenceRequest $absenceRequest): void
+    {
+        $start = $absenceRequest->starts_on->toDateString();
+        $end = $absenceRequest->ends_on->toDateString();
+
+        $rosterIds = Shift::query()
+            ->where('user_id', $absenceRequest->user_id)
+            ->whereDate('date', '>=', $start)
+            ->whereDate('date', '<=', $end)
+            ->distinct()
+            ->pluck('roster_id');
+
+        if ($rosterIds->isEmpty()) {
+            return;
+        }
+
+        $generator = app(RosterGeneratorService::class);
+
+        foreach (Roster::query()->whereIn('id', $rosterIds)->get() as $roster) {
+            if (! $roster->isEditable()) {
+                continue;
+            }
+
+            // Konfliktdienste des Mitarbeiters entfernen (auch manuelle).
+            Shift::query()
+                ->where('roster_id', $roster->id)
+                ->where('user_id', $absenceRequest->user_id)
+                ->whereDate('date', '>=', $start)
+                ->whereDate('date', '<=', $end)
+                ->delete();
+
+            // Neu generieren – berücksichtigt die Abwesenheit als harte Regel.
+            $generator->generate($roster);
+        }
     }
 
     public function reject(AbsenceRequest $absenceRequest, User $decidedBy, string $reason): AbsenceRequest
