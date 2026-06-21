@@ -1,3 +1,4 @@
+import Markdown from '@/Components/Markdown';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
@@ -323,9 +324,7 @@ export default function Show({
                                         <p className="text-xs font-bold uppercase tracking-widest text-[#9B1C3B]">
                                             Was bewegt Sie?
                                         </p>
-                                        <p className="mt-1 whitespace-pre-line text-sm text-gray-800">
-                                            {sis.openingQuestion}
-                                        </p>
+                                        <Markdown className="mt-1" content={sis.openingQuestion} />
                                     </div>
                                 )}
                             </div>
@@ -346,13 +345,16 @@ export default function Show({
                                                 <p className="text-sm font-semibold text-gray-800">
                                                     {t.number}. {t.label}
                                                 </p>
-                                                <p className="mt-1 whitespace-pre-line text-sm text-gray-700">
-                                                    {entry?.content || (
-                                                        <span className="italic text-gray-400">
-                                                            Keine Angabe.
-                                                        </span>
-                                                    )}
-                                                </p>
+                                                {entry?.content ? (
+                                                    <Markdown
+                                                        className="mt-1"
+                                                        content={entry.content}
+                                                    />
+                                                ) : (
+                                                    <p className="mt-1 text-sm italic text-gray-400">
+                                                        Keine Angabe.
+                                                    </p>
+                                                )}
                                             </li>
                                         );
                                     })}

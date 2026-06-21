@@ -21,6 +21,7 @@ use App\Http\Controllers\RosterController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\ShiftTemplateController;
 use App\Http\Controllers\ShiftWishController;
+use App\Http\Controllers\ShoppingListController;
 use App\Http\Controllers\SisController;
 use App\Http\Controllers\SisGenerationController;
 use App\Http\Controllers\SisPdfController;
@@ -53,6 +54,11 @@ Route::middleware('auth')->group(function () {
     Route::post('/care-reports', [CareReportController::class, 'store'])->name('care-reports.store');
     Route::patch('/care-reports/{careReport}', [CareReportController::class, 'update'])->name('care-reports.update');
     Route::post('/care-reports/{careReport}/sign', [CareReportController::class, 'sign'])->name('care-reports.sign');
+
+    // Gemeinsame Einkaufsliste (PDL + Pflegekräfte/Hilfskräfte).
+    Route::get('/shopping-list', [ShoppingListController::class, 'index'])->name('shopping-list.index');
+    Route::post('/shopping-list', [ShoppingListController::class, 'store'])->name('shopping-list.store');
+    Route::delete('/shopping-list/{shoppingItem}', [ShoppingListController::class, 'destroy'])->name('shopping-list.destroy');
 
     Route::get('/staff', [StaffController::class, 'index'])->name('staff.index');
     Route::post('/staff', [StaffController::class, 'store'])->name('staff.store');

@@ -162,6 +162,12 @@ class StaffController extends Controller
             'can_work_early' => ['sometimes', 'boolean'],
             'can_work_late' => ['sometimes', 'boolean'],
             'can_work_night' => ['sometimes', 'boolean'],
+            'avoids_weekends' => ['sometimes', 'boolean'],
+            'week_rotation' => ['sometimes', 'nullable', Rule::in(['even', 'odd'])],
+            'fixed_free_weekdays' => ['sometimes', 'nullable', 'array'],
+            'fixed_free_weekdays.*' => ['integer', 'between:1,7'],
+            'max_consecutive_days_override' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:14'],
+            'scheduling_note' => ['sometimes', 'nullable', 'string', 'max:1000'],
             'active' => ['sometimes', 'boolean'],
         ]);
 
@@ -240,6 +246,11 @@ class StaffController extends Controller
                 'canWorkEarly' => $user->employeeProfile->can_work_early,
                 'canWorkLate' => $user->employeeProfile->can_work_late,
                 'canWorkNight' => $user->employeeProfile->can_work_night,
+                'avoidsWeekends' => $user->employeeProfile->avoids_weekends,
+                'weekRotation' => $user->employeeProfile->week_rotation,
+                'fixedFreeWeekdays' => $user->employeeProfile->fixed_free_weekdays ?? [],
+                'maxConsecutiveDaysOverride' => $user->employeeProfile->max_consecutive_days_override,
+                'schedulingNote' => $user->employeeProfile->scheduling_note,
                 'active' => $user->employeeProfile->active,
             ] : null,
         ];
@@ -289,6 +300,11 @@ class StaffController extends Controller
             'can_work_early' => $validated['can_work_early'] ?? true,
             'can_work_late' => $validated['can_work_late'] ?? true,
             'can_work_night' => $validated['can_work_night'] ?? false,
+            'avoids_weekends' => $validated['avoids_weekends'] ?? false,
+            'week_rotation' => $validated['week_rotation'] ?? null,
+            'fixed_free_weekdays' => array_values($validated['fixed_free_weekdays'] ?? []),
+            'max_consecutive_days_override' => $validated['max_consecutive_days_override'] ?? null,
+            'scheduling_note' => $validated['scheduling_note'] ?? null,
             'active' => $validated['active'] ?? true,
         ];
     }

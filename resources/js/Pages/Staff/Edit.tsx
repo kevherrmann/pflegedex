@@ -22,6 +22,11 @@ type EmployeeProfile = {
     canWorkEarly: boolean;
     canWorkLate: boolean;
     canWorkNight: boolean;
+    avoidsWeekends: boolean;
+    weekRotation: string | null;
+    fixedFreeWeekdays: number[];
+    maxConsecutiveDaysOverride: number | null;
+    schedulingNote: string | null;
     active: boolean;
 };
 type StaffUser = {
@@ -57,6 +62,11 @@ export default function Edit({ staffUser, locations, roles }: StaffEditProps) {
         can_work_early: boolean;
         can_work_late: boolean;
         can_work_night: boolean;
+        avoids_weekends: boolean;
+        week_rotation: string;
+        fixed_free_weekdays: number[];
+        max_consecutive_days_override: string;
+        scheduling_note: string;
         active: boolean;
     }>({
         name: staffUser.name,
@@ -79,6 +89,12 @@ export default function Edit({ staffUser, locations, roles }: StaffEditProps) {
         can_work_early: staffUser.employeeProfile?.canWorkEarly ?? true,
         can_work_late: staffUser.employeeProfile?.canWorkLate ?? true,
         can_work_night: staffUser.employeeProfile?.canWorkNight ?? false,
+        avoids_weekends: staffUser.employeeProfile?.avoidsWeekends ?? false,
+        week_rotation: staffUser.employeeProfile?.weekRotation ?? '',
+        fixed_free_weekdays: staffUser.employeeProfile?.fixedFreeWeekdays ?? [],
+        max_consecutive_days_override:
+            staffUser.employeeProfile?.maxConsecutiveDaysOverride?.toString() ?? '',
+        scheduling_note: staffUser.employeeProfile?.schedulingNote ?? '',
         active: staffUser.employeeProfile?.active ?? true,
     });
 

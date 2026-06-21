@@ -47,6 +47,22 @@ class HardConstraintChecker
             }
         }
 
+        // Persönliche Sonderregelungen (mit der PDL vereinbart).
+        $profile = $employee->employeeProfile;
+        if ($profile !== null) {
+            if ($profile->avoids_weekends && in_array($date->dayOfWeekIso, [6, 7], true)) {
+                return 'employee_no_weekend';
+            }
+
+            if ($this->isRotationWeekOff($profile->week_rotation, $date)) {
+                return 'employee_week_off';
+            }
+
+            if (in_array($date->dayOfWeekIso, $profile->fixed_free_weekdays ?? [], true)) {
+                return 'employee_fixed_free';
+            }
+        }
+
         if ($context->isAlreadyAssigned($employee, $shiftTemplate, $date)) {
             return 'already_assigned';
         }
@@ -78,6 +94,22 @@ class HardConstraintChecker
         }
 
         return null;
+    }
+
+    /**
+     * Wochenweiser Wechsel (1 Woche Dienst / 1 Woche frei) über die
+     * Kalenderwoche: 'even' = arbeitet nur in geraden KW, 'odd' = nur in
+     * ungeraden KW. In der jeweils anderen Woche ist der Tag dienstfrei.
+     */
+    private function isRotationWeekOff(?string $rotation, CarbonImmutable $date): bool
+    {
+        if ($rotation !== 'even' && $rotation !== 'odd') {
+            return false;
+        }
+
+        $isEvenWeek = $date->isoWeek() % 2 === 0;
+
+        return $rotation === 'even' ? ! $isEvenWeek : $isEvenWeek;
     }
 
     public function employeeCanWorkShiftTemplate(User $employee, ShiftTemplate $shiftTemplate): bool

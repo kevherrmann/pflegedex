@@ -1,3 +1,4 @@
+import Markdown from '@/Components/Markdown';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
@@ -327,9 +328,10 @@ export default function Show({
                                         <p className="text-xs font-bold uppercase tracking-widest text-[#9B1C3B]">
                                             Grundbotschaft
                                         </p>
-                                        <p className="mt-1 whitespace-pre-line text-sm text-gray-800">
-                                            {carePlan.grundbotschaft}
-                                        </p>
+                                        <Markdown
+                                            className="mt-1"
+                                            content={carePlan.grundbotschaft}
+                                        />
                                     </div>
                                 )}
                             </div>
@@ -351,9 +353,7 @@ export default function Show({
                                                     {t.topicNumber}.{' '}
                                                     {labelByNumber.get(t.topicNumber) ?? '—'}
                                                 </p>
-                                                <p className="mt-1 whitespace-pre-line text-sm text-gray-700">
-                                                    {t.content}
-                                                </p>
+                                                <Markdown className="mt-1" content={t.content} />
                                             </div>
                                         ))}
                                     </div>

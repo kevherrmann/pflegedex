@@ -52,6 +52,29 @@ it('stores a care report for an assigned resident as Pflegekraft', function () {
         ->and($report->body)->toBe('Bewohnerin wurde bei der Morgenpflege unterstützt.');
 });
 
+it('signs the care report immediately when the sign flag is set', function () {
+    $location = Location::factory()->create();
+    $resident = Resident::factory()->for($location)->create();
+    $nurse = User::factory()->for($location)->create();
+    $nurse->assignRole('Pflegekraft');
+    $nurse->locations()->attach($location->id);
+
+    $this->actingAs($nurse)
+        ->post('/care-reports', [
+            'resident_id' => $resident->id,
+            'occurred_at' => '2026-05-01 10:15',
+            'category' => 'Grundpflege',
+            'body' => 'Bewohnerin wurde bei der Morgenpflege unterstützt.',
+            'sign' => true,
+        ])
+        ->assertRedirect();
+
+    $report = CareReport::query()->first();
+
+    expect($report)->not->toBeNull()
+        ->and($report->isSigned())->toBeTrue();
+});
+
 it('lists care reports only from accessible residents', function () {
     $own = Location::factory()->create(['name' => 'Wohnbereich A']);
     $foreign = Location::factory()->create(['name' => 'Wohnbereich B']);

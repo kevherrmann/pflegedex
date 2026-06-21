@@ -58,6 +58,11 @@ export default function Index({ staffUsers, locations, roles }: StaffIndexProps)
         can_work_early: boolean;
         can_work_late: boolean;
         can_work_night: boolean;
+        avoids_weekends: boolean;
+        week_rotation: string;
+        fixed_free_weekdays: number[];
+        max_consecutive_days_override: string;
+        scheduling_note: string;
         active: boolean;
     }>({
         name: '',
@@ -75,6 +80,11 @@ export default function Index({ staffUsers, locations, roles }: StaffIndexProps)
         can_work_early: true,
         can_work_late: true,
         can_work_night: false,
+        avoids_weekends: false,
+        week_rotation: '',
+        fixed_free_weekdays: [],
+        max_consecutive_days_override: '',
+        scheduling_note: '',
         active: true,
     });
 

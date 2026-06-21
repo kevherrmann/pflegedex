@@ -90,6 +90,7 @@ class CareReportController extends Controller
             'occurred_at' => ['required', 'date', 'before_or_equal:now'],
             'category' => ['required', 'string', Rule::in(CareReportCategory::values())],
             'body' => ['required', 'string', 'min:5', 'max:5000'],
+            'sign' => ['sometimes', 'boolean'],
         ]);
 
         $resident = Resident::query()
@@ -112,6 +113,11 @@ class CareReportController extends Controller
         ]);
 
         $report->appendVersion('created', $request->user());
+
+        // Optional direkt mit-signieren (ein Schritt statt extra Klick).
+        if ($request->boolean('sign')) {
+            $report->sign($request->user());
+        }
 
         return to_route('care-reports.index', [
             'resident_id' => $resident->id,

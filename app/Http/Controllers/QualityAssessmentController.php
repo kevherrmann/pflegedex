@@ -83,7 +83,9 @@ class QualityAssessmentController extends Controller
     public function evaluation(Request $request): Response
     {
         $user = $request->user();
-        abort_unless($user?->hasRole('PDL'), HttpResponse::HTTP_FORBIDDEN);
+        // Lesender Zugriff: PDL und Pflegekräfte (Auswertung ist nur eine
+        // standortbezogene, schreibgeschützte Übersicht der erfassten Daten).
+        abort_unless($user?->hasAnyRole(['PDL', 'Pflegekraft']), HttpResponse::HTTP_FORBIDDEN);
 
         $locations = $user->accessibleLocations();
         $locationIds = $locations->pluck('id')->all();

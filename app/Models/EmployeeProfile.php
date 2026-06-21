@@ -31,6 +31,11 @@ class EmployeeProfile extends Model
         'can_work_early',
         'can_work_late',
         'can_work_night',
+        'avoids_weekends',
+        'week_rotation',
+        'fixed_free_weekdays',
+        'max_consecutive_days_override',
+        'scheduling_note',
         'maternity_protection',
         'active',
     ];
@@ -45,6 +50,7 @@ class EmployeeProfile extends Model
         'can_work_early' => true,
         'can_work_late' => true,
         'can_work_night' => false,
+        'avoids_weekends' => false,
         'active' => true,
     ];
 
@@ -62,6 +68,9 @@ class EmployeeProfile extends Model
             'can_work_early' => 'boolean',
             'can_work_late' => 'boolean',
             'can_work_night' => 'boolean',
+            'avoids_weekends' => 'boolean',
+            'fixed_free_weekdays' => 'array',
+            'max_consecutive_days_override' => 'integer',
             'maternity_protection' => 'boolean',
             'active' => 'boolean',
         ];

@@ -410,3 +410,42 @@ it('derives is_nursing_specialist from the qualification level for assistants an
     expect($staff->employeeProfile->qualification_level->value)->toBe($level)
         ->and($staff->employeeProfile->is_nursing_specialist)->toBeFalse();
 })->with(['assistant', 'aide']);
+
+it('persists special scheduling rules for nursing staff', function () {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $pdl->assignRole('PDL');
+    $pdl->locations()->attach([$location->id]);
+
+    $staff = User::factory()->for($location)->create(['email' => 'fk@pflegedex.local']);
+    $staff->assignRole('Pflegekraft');
+    $staff->locations()->attach([$location->id]);
+
+    $this->actingAs($pdl)
+        ->patch('/staff/'.$staff->id, [
+            'name' => 'Fachkraft Test',
+            'email' => 'fk@pflegedex.local',
+            'role' => 'Pflegekraft',
+            'location_ids' => [$location->id],
+            'qualification_level' => 'aide',
+            'weekly_hours' => 39,
+            'avoids_weekends' => true,
+            'week_rotation' => 'even',
+            'fixed_free_weekdays' => [1, 3],
+            'max_consecutive_days_override' => 4,
+            'scheduling_note' => 'Bevorzugt Frühdienste.',
+            'can_work_early' => true,
+            'can_work_late' => true,
+            'can_work_night' => false,
+            'active' => true,
+        ])
+        ->assertRedirect('/staff');
+
+    $staff->refresh()->load('employeeProfile');
+
+    expect($staff->employeeProfile->avoids_weekends)->toBeTrue()
+        ->and($staff->employeeProfile->week_rotation)->toBe('even')
+        ->and($staff->employeeProfile->fixed_free_weekdays)->toEqualCanonicalizing([1, 3])
+        ->and($staff->employeeProfile->max_consecutive_days_override)->toBe(4)
+        ->and($staff->employeeProfile->scheduling_note)->toBe('Bevorzugt Frühdienste.');
+});

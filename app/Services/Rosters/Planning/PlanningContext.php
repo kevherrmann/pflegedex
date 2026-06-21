@@ -726,7 +726,15 @@ class PlanningContext
             $runLength++;
         }
 
-        return $runLength > $this->maxConsecutiveWorkDays;
+        $maxConsecutive = $this->maxConsecutiveWorkDays;
+
+        // Individuelles, strengeres Limit aus den Sonderregelungen des Mitarbeiters.
+        $override = $employee->employeeProfile?->max_consecutive_days_override;
+        if ($override !== null && $override > 0 && $override < $maxConsecutive) {
+            $maxConsecutive = $override;
+        }
+
+        return $runLength > $maxConsecutive;
     }
 
     public function wouldExceedWeekendLoad(User $employee, CarbonImmutable $date): bool

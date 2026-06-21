@@ -24,8 +24,24 @@ export type EmployeeProfileFormData = {
     can_work_early: boolean;
     can_work_late: boolean;
     can_work_night: boolean;
+    avoids_weekends: boolean;
+    week_rotation: string;
+    fixed_free_weekdays: number[];
+    max_consecutive_days_override: string | number | null;
+    scheduling_note: string;
     active: boolean;
 };
+
+// ISO-Wochentage (1=Mo … 7=So) für die "feste freie Tage"-Auswahl.
+const WEEKDAYS: { iso: number; label: string }[] = [
+    { iso: 1, label: 'Mo' },
+    { iso: 2, label: 'Di' },
+    { iso: 3, label: 'Mi' },
+    { iso: 4, label: 'Do' },
+    { iso: 5, label: 'Fr' },
+    { iso: 6, label: 'Sa' },
+    { iso: 7, label: 'So' },
+];
 
 type EmployeeProfileFieldErrors = Partial<Record<keyof EmployeeProfileFormData, string>>;
 
@@ -276,6 +292,147 @@ export default function EmployeeProfileFields<TForm extends EmployeeProfileFormD
                     />
                 </div>
             </div>
+
+            {/* Sonderregelungen */}
+            {isNursingRole && (
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                    <p className="text-sm font-semibold text-gray-900">
+                        Sonderregelungen (mit der PDL vereinbart)
+                    </p>
+                    <p className="mt-0.5 text-xs text-gray-500">
+                        Diese Vorgaben berücksichtigt der Dienstplan-Generator automatisch.
+                    </p>
+
+                    {/* Keine Wochenenddienste */}
+                    <label className="mt-4 flex cursor-pointer items-center justify-between gap-4 rounded-lg border border-gray-200 bg-white p-3">
+                        <span>
+                            <span className="block text-sm font-medium text-gray-900">
+                                Keine Wochenenddienste
+                            </span>
+                            <span className="block text-xs text-gray-500">
+                                Wird nie an Samstag oder Sonntag eingeplant.
+                            </span>
+                        </span>
+                        <input
+                            type="checkbox"
+                            checked={data.avoids_weekends}
+                            onChange={(event) =>
+                                setData(
+                                    'avoids_weekends',
+                                    event.target.checked as TForm['avoids_weekends'],
+                                )
+                            }
+                            className="h-5 w-5 rounded border-gray-300 text-[#9B1C3B] focus:ring-[#9B1C3B]"
+                        />
+                    </label>
+
+                    {/* Wochen-Rhythmus */}
+                    <div className="mt-4">
+                        <InputLabel
+                            htmlFor="week_rotation"
+                            value="Wochen-Rhythmus (1 Woche Dienst / 1 Woche frei)"
+                        />
+                        <select
+                            id="week_rotation"
+                            value={data.week_rotation}
+                            onChange={(event) =>
+                                setData(
+                                    'week_rotation',
+                                    event.target.value as TForm['week_rotation'],
+                                )
+                            }
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]"
+                        >
+                            <option value="">Kein Rhythmus</option>
+                            <option value="even">Arbeitet nur in geraden Kalenderwochen</option>
+                            <option value="odd">Arbeitet nur in ungeraden Kalenderwochen</option>
+                        </select>
+                        <InputError message={errors.week_rotation} className="mt-2" />
+                    </div>
+
+                    {/* Feste freie Wochentage */}
+                    <div className="mt-4">
+                        <p className="text-sm font-medium text-gray-700">Feste freie Wochentage</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                            {WEEKDAYS.map((day) => {
+                                const checked = data.fixed_free_weekdays.includes(day.iso);
+
+                                return (
+                                    <ShiftChip
+                                        key={day.iso}
+                                        label={day.label}
+                                        checked={checked}
+                                        onToggle={() =>
+                                            setData(
+                                                'fixed_free_weekdays',
+                                                (checked
+                                                    ? data.fixed_free_weekdays.filter(
+                                                          (iso) => iso !== day.iso,
+                                                      )
+                                                    : [...data.fixed_free_weekdays, day.iso].sort(
+                                                          (a, b) => a - b,
+                                                      )) as TForm['fixed_free_weekdays'],
+                                            )
+                                        }
+                                    />
+                                );
+                            })}
+                        </div>
+                        <InputError message={errors.fixed_free_weekdays} className="mt-2" />
+                    </div>
+
+                    {/* Max. Arbeitstage am Stück */}
+                    <div className="mt-4">
+                        <InputLabel
+                            htmlFor="max_consecutive_days_override"
+                            value="Max. Arbeitstage am Stück (optional)"
+                        />
+                        <TextInput
+                            id="max_consecutive_days_override"
+                            type="number"
+                            min="1"
+                            max="14"
+                            value={data.max_consecutive_days_override ?? ''}
+                            onChange={(event) =>
+                                setData(
+                                    'max_consecutive_days_override',
+                                    event.target.value as TForm['max_consecutive_days_override'],
+                                )
+                            }
+                            className="mt-1 block w-full sm:max-w-[12rem]"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">
+                            Leer lassen für die allgemeine Obergrenze.
+                        </p>
+                        <InputError
+                            message={errors.max_consecutive_days_override}
+                            className="mt-2"
+                        />
+                    </div>
+
+                    {/* Notiz */}
+                    <div className="mt-4">
+                        <InputLabel
+                            htmlFor="scheduling_note"
+                            value="Weitere Absprache (Notiz, nur informativ)"
+                        />
+                        <textarea
+                            id="scheduling_note"
+                            value={data.scheduling_note}
+                            onChange={(event) =>
+                                setData(
+                                    'scheduling_note',
+                                    event.target.value as TForm['scheduling_note'],
+                                )
+                            }
+                            rows={2}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]"
+                            placeholder="z. B. Bevorzugt Frühdienste; donnerstags später Beginn …"
+                        />
+                        <InputError message={errors.scheduling_note} className="mt-2" />
+                    </div>
+                </div>
+            )}
 
             {/* Aktiv-Status */}
             <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-gray-200 p-4">

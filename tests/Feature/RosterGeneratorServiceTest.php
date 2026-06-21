@@ -51,6 +51,10 @@ function createRosterGeneratorEmployee(Location $location, array $profileAttribu
         'can_work_early' => $profileAttributes['can_work_early'] ?? true,
         'can_work_late' => $profileAttributes['can_work_late'] ?? true,
         'can_work_night' => $profileAttributes['can_work_night'] ?? false,
+        'avoids_weekends' => $profileAttributes['avoids_weekends'] ?? false,
+        'week_rotation' => $profileAttributes['week_rotation'] ?? null,
+        'fixed_free_weekdays' => $profileAttributes['fixed_free_weekdays'] ?? [],
+        'max_consecutive_days_override' => $profileAttributes['max_consecutive_days_override'] ?? null,
         'maternity_protection' => $profileAttributes['maternity_protection'] ?? false,
         'active' => $profileAttributes['active'] ?? true,
     ]);
@@ -1554,4 +1558,91 @@ it('lowers the planned target for an employee carrying an overtime surplus', fun
 
     // Wer Überstunden mitbringt, wird weniger eingeplant (reduziertes Soll).
     expect($surplusShifts)->toBeLessThan($restedShifts);
+});
+
+it('respects the no-weekend special rule', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $employee = createRosterGeneratorEmployee($location, ['avoids_weekends' => true]);
+    $roster = createRosterGeneratorRoster($location, $pdl);
+    $template = createRosterGeneratorShiftTemplate($location);
+    createRosterGeneratorStaffingRule($template);
+
+    app(RosterGeneratorService::class)->generate($roster);
+
+    $shifts = Shift::query()->where('user_id', $employee->id)->get();
+
+    expect($shifts)->not->toBeEmpty()
+        ->and($shifts->every(
+            fn (Shift $s): bool => ! in_array(CarbonImmutable::parse($s->date)->dayOfWeekIso, [6, 7], true)
+        ))->toBeTrue();
+});
+
+it('respects fixed free weekdays', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $employee = createRosterGeneratorEmployee($location, ['fixed_free_weekdays' => [1]]); // immer montags frei
+    $roster = createRosterGeneratorRoster($location, $pdl);
+    $template = createRosterGeneratorShiftTemplate($location);
+    createRosterGeneratorStaffingRule($template);
+
+    app(RosterGeneratorService::class)->generate($roster);
+
+    $shifts = Shift::query()->where('user_id', $employee->id)->get();
+
+    expect($shifts)->not->toBeEmpty()
+        ->and($shifts->every(
+            fn (Shift $s): bool => CarbonImmutable::parse($s->date)->dayOfWeekIso !== 1
+        ))->toBeTrue();
+});
+
+it('respects the alternating week rotation', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $employee = createRosterGeneratorEmployee($location, ['week_rotation' => 'even']);
+    $roster = createRosterGeneratorRoster($location, $pdl);
+    $template = createRosterGeneratorShiftTemplate($location);
+    createRosterGeneratorStaffingRule($template);
+
+    app(RosterGeneratorService::class)->generate($roster);
+
+    $shifts = Shift::query()->where('user_id', $employee->id)->get();
+
+    expect($shifts)->not->toBeEmpty()
+        ->and($shifts->every(
+            fn (Shift $s): bool => CarbonImmutable::parse($s->date)->isoWeek() % 2 === 0
+        ))->toBeTrue();
+});
+
+it('respects an individual max consecutive days override', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $employee = createRosterGeneratorEmployee($location, ['max_consecutive_days_override' => 2]);
+    $roster = createRosterGeneratorRoster($location, $pdl);
+    $template = createRosterGeneratorShiftTemplate($location);
+    createRosterGeneratorStaffingRule($template);
+
+    app(RosterGeneratorService::class)->generate($roster);
+
+    $workDates = Shift::query()
+        ->where('user_id', $employee->id)
+        ->pluck('date')
+        ->map(fn ($date): string => CarbonImmutable::parse($date)->toDateString())
+        ->unique()
+        ->sort()
+        ->values();
+
+    $longestRun = $workDates->count() > 0 ? 1 : 0;
+    $currentRun = $longestRun;
+
+    for ($index = 1; $index < $workDates->count(); $index++) {
+        $currentRun = CarbonImmutable::parse($workDates[$index])
+            ->equalTo(CarbonImmutable::parse($workDates[$index - 1])->addDay())
+            ? $currentRun + 1
+            : 1;
+        $longestRun = max($longestRun, $currentRun);
+    }
+
+    expect($workDates)->not->toBeEmpty()
+        ->and($longestRun)->toBeLessThanOrEqual(2);
 });

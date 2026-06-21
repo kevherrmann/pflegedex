@@ -11,6 +11,7 @@ export type PageProps<T extends Record<string, unknown> = Record<string, unknown
         permissions: {
             viewResidents: boolean;
             manageCareReports: boolean;
+            manageShoppingList: boolean;
             manageLocations: boolean;
             manageResidents: boolean;
             manageStaff: boolean;

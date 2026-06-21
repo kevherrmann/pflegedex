@@ -1,10 +1,11 @@
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
+import Markdown from '@/Components/Markdown';
 import PrimaryButton from '@/Components/PrimaryButton';
 import SecondaryButton from '@/Components/SecondaryButton';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { FormEventHandler, useMemo, useState } from 'react';
+import { SyntheticEvent, useMemo, useState } from 'react';
 
 type LocationOption = { id: string; name: string };
 
@@ -64,7 +65,7 @@ export default function Index({
     const [showComposer, setShowComposer] = useState(false);
     const defaultOccurredAt = `${selectedDate}T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
-    const { data, setData, post, processing, errors, reset } = useForm({
+    const { data, setData, post, processing, errors, reset, transform } = useForm({
         resident_id: selectedResident ? String(selectedResident.id) : '',
         occurred_at: defaultOccurredAt,
         category: categories[0] ?? 'Beobachtung',
@@ -88,8 +89,9 @@ export default function Index({
         [residents],
     );
 
-    const submit: FormEventHandler = (event) => {
+    const submit = (sign: boolean) => (event: SyntheticEvent) => {
         event.preventDefault();
+        transform((current) => ({ ...current, sign }));
         post(route('care-reports.store'), {
             onSuccess: () => {
                 reset('body');
@@ -326,7 +328,7 @@ export default function Index({
                                             </button>
                                         </div>
 
-                                        <form onSubmit={submit} className="mt-4 space-y-4">
+                                        <form onSubmit={submit(true)} className="mt-4 space-y-4">
                                             <div className="grid gap-4 sm:grid-cols-2">
                                                 <div>
                                                     <InputLabel
@@ -396,17 +398,30 @@ export default function Index({
                                                 />
                                             </div>
 
-                                            <div className="flex justify-end gap-2">
+                                            <div className="flex flex-wrap justify-end gap-2">
                                                 <SecondaryButton
                                                     type="button"
                                                     onClick={() => setShowComposer(false)}
                                                 >
                                                     Abbrechen
                                                 </SecondaryButton>
+                                                <SecondaryButton
+                                                    type="button"
+                                                    disabled={processing}
+                                                    onClick={submit(false)}
+                                                >
+                                                    Als Entwurf speichern
+                                                </SecondaryButton>
                                                 <PrimaryButton disabled={processing}>
-                                                    Bericht speichern
+                                                    Speichern & signieren
                                                 </PrimaryButton>
                                             </div>
+                                            <p className="text-xs text-[#54595F]">
+                                                Mit „Speichern &amp; signieren" wird der Eintrag
+                                                sofort rechtsverbindlich freigegeben und gegen
+                                                Änderungen gesperrt. Ein Entwurf kann später noch
+                                                bearbeitet und dann signiert werden.
+                                            </p>
                                         </form>
                                     </div>
                                 )}
@@ -440,24 +455,15 @@ export default function Index({
                                                 id={`category-${tab.name}`}
                                                 className="scroll-mt-20 px-6 py-6"
                                             >
-                                                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                                                    <div>
-                                                        <h2 className="text-xl font-semibold text-[#333333]">
-                                                            {tab.name}
-                                                        </h2>
-                                                        <p className="mt-1 text-sm text-[#54595F]">
-                                                            {reports.length > 0
-                                                                ? `${reports.length} Eintrag/Einträge`
-                                                                : 'Noch kein Eintrag in dieser Kategorie'}
-                                                        </p>
-                                                    </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => openComposer(tab.name)}
-                                                        className="self-start rounded-md bg-[#F7E8ED] px-3 py-2 text-sm font-semibold text-[#7F1730] hover:bg-[#efd3dc]"
-                                                    >
-                                                        + Eintrag in {tab.name}
-                                                    </button>
+                                                <div>
+                                                    <h2 className="text-xl font-semibold text-[#333333]">
+                                                        {tab.name}
+                                                    </h2>
+                                                    <p className="mt-1 text-sm text-[#54595F]">
+                                                        {reports.length > 0
+                                                            ? `${reports.length} Eintrag/Einträge`
+                                                            : 'Noch kein Eintrag in dieser Kategorie'}
+                                                    </p>
                                                 </div>
 
                                                 {reports.length > 0 ? (
@@ -490,9 +496,10 @@ export default function Index({
                                                                     )}
                                                                 </div>
 
-                                                                <p className="mt-2 whitespace-pre-line text-sm text-gray-700">
-                                                                    {report.body}
-                                                                </p>
+                                                                <Markdown
+                                                                    className="mt-2"
+                                                                    content={report.body}
+                                                                />
 
                                                                 <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-3 text-xs text-gray-500">
                                                                     <span>

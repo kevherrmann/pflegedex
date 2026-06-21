@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 100" width="340" height="100" role="img" aria-label="Pflegedex – Pflegedokumentation">
+  <defs>
+    <linearGradient id="pdxBgH" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9B1C3B"/>
+      <stop offset="1" stop-color="#7F1730"/>
+    </linearGradient>
+  </defs>
+  <!-- Marke -->
+  <g transform="translate(8,14)">
+    <rect width="72" height="72" rx="17" fill="url(#pdxBgH)"/>
+    <g transform="translate(16.6,17.3) scale(1.217)">
+      <path fill="#ffffff" d="M23.6 0c-3.4 0-6.4 1.7-7.6 4.3C14.8 1.7 11.8 0 8.4 0 3.8 0 0 3.8 0 8.4c0 9.4 16 20.6 16 20.6s16-11.2 16-20.6C32 3.8 28.2 0 23.6 0z"/>
+    </g>
+    <path d="M19.5 35.3 H29 l2.9 -7.2 l4.3 13.7 l2.9 -6.5 H52.5" fill="none" stroke="#9B1C3B" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <!-- Schriftzug -->
+  <text x="98" y="56" font-family="'Segoe UI', 'Inter', system-ui, Arial, sans-serif" font-size="44" font-weight="700" letter-spacing="-1">
+    <tspan fill="#333333">Pflege</tspan><tspan fill="#9B1C3B">dex</tspan>
+  </text>
+  <text x="100" y="79" font-family="'Segoe UI', 'Inter', system-ui, Arial, sans-serif" font-size="14.5" font-weight="600" letter-spacing="3" fill="#9B1C3B">PFLEGEDOKUMENTATION</text>
+</svg>

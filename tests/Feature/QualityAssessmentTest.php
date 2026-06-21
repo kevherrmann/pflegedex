@@ -93,11 +93,20 @@ it('wertet die Indikatoren je Halbjahr aggregiert aus', function (): void {
             ->where('results.0.percentGood', 50));
 });
 
-it('verwehrt die Auswertung für Nicht-PDL', function (): void {
+it('erlaubt Pflegekräften die lesende Auswertung', function (): void {
     $location = Location::factory()->create();
     $nurse = qualityUser('Pflegekraft', $location);
 
-    $this->actingAs($nurse)->get(route('quality.evaluation'))->assertForbidden();
+    $this->actingAs($nurse)
+        ->get(route('quality.evaluation', ['period' => '2026-H1']))
+        ->assertOk();
+});
+
+it('verwehrt die Auswertung für pflegefremde Rollen', function (): void {
+    $location = Location::factory()->create();
+    $cleaner = qualityUser('Putzkraft', $location);
+
+    $this->actingAs($cleaner)->get(route('quality.evaluation'))->assertForbidden();
 });
 
 it('verwehrt die QI-Erhebung für fremde Wohnbereiche', function (): void {
