@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\Location;
 use App\Models\Resident;
+use App\Models\Sis;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Role;
@@ -56,7 +57,7 @@ it('verbietet Pflegekraft das Anlegen', function (): void {
 it('laesst Pflegekraft eine SIS lesen', function (): void {
     $location = Location::factory()->create();
     $resident = Resident::factory()->for($location)->create();
-    \App\Models\Sis::factory()->withTopicsAndRisks()->create([
+    Sis::factory()->withTopicsAndRisks()->create([
         'resident_id' => $resident->id,
         'location_id' => $location->id,
     ]);
@@ -73,7 +74,7 @@ it('laesst Pflegekraft eine SIS lesen', function (): void {
 it('verbietet Pflegekraft das Edit-Formular zu oeffnen', function (): void {
     $location = Location::factory()->create();
     $resident = Resident::factory()->for($location)->create();
-    \App\Models\Sis::factory()->create([
+    Sis::factory()->create([
         'resident_id' => $resident->id,
         'location_id' => $location->id,
     ]);

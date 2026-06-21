@@ -58,6 +58,6 @@ enum CarePlanTopic: int
      */
     public static function numbers(): array
     {
-        return array_map(fn(self $t): int => $t->value, self::cases());
+        return array_map(fn (self $t): int => $t->value, self::cases());
     }
 }

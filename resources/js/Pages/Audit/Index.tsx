@@ -1,5 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { FormEventHandler, useState } from 'react';
 
 type AuditEntry = {
@@ -120,16 +120,24 @@ export default function Index({ audits, pagination, filters, filterOptions }: Pr
 
     return (
         <AuthenticatedLayout
-            header={<h2 className="text-xl font-semibold leading-tight text-[#333333]">Audit-Log</h2>}
+            header={
+                <h2 className="text-xl font-semibold leading-tight text-[#333333]">Audit-Log</h2>
+            }
         >
             <Head title="Audit-Log" />
             <div className="bg-[#F8F8F8] py-12">
                 <div className="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
                     {/* Filter-Karte */}
-                    <form onSubmit={submit} className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-[#E5E7EB]">
+                    <form
+                        onSubmit={submit}
+                        className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-[#E5E7EB]"
+                    >
                         <div className="grid gap-4 md:grid-cols-5">
                             <div>
-                                <label className="block text-xs font-bold uppercase tracking-widest text-[#7F1730]" htmlFor="filter-user">
+                                <label
+                                    className="block text-xs font-bold uppercase tracking-widest text-[#7F1730]"
+                                    htmlFor="filter-user"
+                                >
                                     Benutzer
                                 </label>
                                 <select
@@ -147,7 +155,10 @@ export default function Index({ audits, pagination, filters, filterOptions }: Pr
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-xs font-bold uppercase tracking-widest text-[#7F1730]" htmlFor="filter-model">
+                                <label
+                                    className="block text-xs font-bold uppercase tracking-widest text-[#7F1730]"
+                                    htmlFor="filter-model"
+                                >
                                     Modell-Typ
                                 </label>
                                 <select
@@ -165,7 +176,10 @@ export default function Index({ audits, pagination, filters, filterOptions }: Pr
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-xs font-bold uppercase tracking-widest text-[#7F1730]" htmlFor="filter-event">
+                                <label
+                                    className="block text-xs font-bold uppercase tracking-widest text-[#7F1730]"
+                                    htmlFor="filter-event"
+                                >
                                     Ereignis
                                 </label>
                                 <select
@@ -183,7 +197,10 @@ export default function Index({ audits, pagination, filters, filterOptions }: Pr
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-xs font-bold uppercase tracking-widest text-[#7F1730]" htmlFor="filter-from">
+                                <label
+                                    className="block text-xs font-bold uppercase tracking-widest text-[#7F1730]"
+                                    htmlFor="filter-from"
+                                >
                                     Von
                                 </label>
                                 <input
@@ -195,7 +212,10 @@ export default function Index({ audits, pagination, filters, filterOptions }: Pr
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-bold uppercase tracking-widest text-[#7F1730]" htmlFor="filter-to">
+                                <label
+                                    className="block text-xs font-bold uppercase tracking-widest text-[#7F1730]"
+                                    htmlFor="filter-to"
+                                >
                                     Bis
                                 </label>
                                 <input
@@ -227,10 +247,13 @@ export default function Index({ audits, pagination, filters, filterOptions }: Pr
                     {/* Liste */}
                     <div className="rounded-2xl bg-white shadow-sm ring-1 ring-[#E5E7EB]">
                         <div className="border-b border-gray-200 p-4 text-sm text-gray-600">
-                            {pagination.total} Einträge gesamt — Seite {pagination.currentPage} von {pagination.lastPage}
+                            {pagination.total} Einträge gesamt — Seite {pagination.currentPage} von{' '}
+                            {pagination.lastPage}
                         </div>
                         {audits.length === 0 ? (
-                            <div className="p-8 text-center text-gray-500">Keine Einträge für diese Filter.</div>
+                            <div className="p-8 text-center text-gray-500">
+                                Keine Einträge für diese Filter.
+                            </div>
                         ) : (
                             <ul className="divide-y divide-gray-100">
                                 {audits.map((a) => {
@@ -239,15 +262,25 @@ export default function Index({ audits, pagination, filters, filterOptions }: Pr
                                         <li key={a.id} className="p-4">
                                             <div className="flex flex-wrap items-start justify-between gap-3">
                                                 <div className="flex flex-wrap items-center gap-3">
-                                                    <span className={`rounded-full px-2 py-1 text-xs font-semibold ${eventColor(a.event)}`}>
+                                                    <span
+                                                        className={`rounded-full px-2 py-1 text-xs font-semibold ${eventColor(a.event)}`}
+                                                    >
                                                         {eventLabel(a.event)}
                                                     </span>
-                                                    <span className="font-medium text-gray-800">{a.modelLabel}</span>
-                                                    <span className="text-xs text-gray-500">{a.auditableId.slice(0, 8)}…</span>
+                                                    <span className="font-medium text-gray-800">
+                                                        {a.modelLabel}
+                                                    </span>
+                                                    <span className="text-xs text-gray-500">
+                                                        {a.auditableId.slice(0, 8)}…
+                                                    </span>
                                                 </div>
                                                 <div className="text-right text-xs text-gray-500">
                                                     <div>{a.createdAt}</div>
-                                                    <div>{a.userName ?? <span className="italic">System</span>}</div>
+                                                    <div>
+                                                        {a.userName ?? (
+                                                            <span className="italic">System</span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                             {a.changedFields.length > 0 && (
@@ -257,26 +290,45 @@ export default function Index({ audits, pagination, filters, filterOptions }: Pr
                                                         onClick={() => toggle(a.id)}
                                                         className="text-xs font-semibold text-[#9B1C3B] hover:underline"
                                                     >
-                                                        {isOpen ? 'Details ausblenden' : `${a.changedFields.length} Felder anzeigen`}
+                                                        {isOpen
+                                                            ? 'Details ausblenden'
+                                                            : `${a.changedFields.length} Felder anzeigen`}
                                                     </button>
                                                     {isOpen && (
                                                         <table className="mt-2 w-full text-xs">
                                                             <thead className="text-left text-gray-500">
                                                                 <tr>
-                                                                    <th className="py-1 pr-3">Feld</th>
-                                                                    <th className="py-1 pr-3">Alt</th>
+                                                                    <th className="py-1 pr-3">
+                                                                        Feld
+                                                                    </th>
+                                                                    <th className="py-1 pr-3">
+                                                                        Alt
+                                                                    </th>
                                                                     <th className="py-1">Neu</th>
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
                                                                 {a.changedFields.map((c) => (
-                                                                    <tr key={c.field} className="border-t border-gray-100 align-top">
-                                                                        <td className="py-1 pr-3 font-medium text-gray-700">{c.field}</td>
+                                                                    <tr
+                                                                        key={c.field}
+                                                                        className="border-t border-gray-100 align-top"
+                                                                    >
+                                                                        <td className="py-1 pr-3 font-medium text-gray-700">
+                                                                            {c.field}
+                                                                        </td>
                                                                         <td className="py-1 pr-3 text-red-700">
-                                                                            {c.old ?? <span className="italic text-gray-400">—</span>}
+                                                                            {c.old ?? (
+                                                                                <span className="italic text-gray-400">
+                                                                                    —
+                                                                                </span>
+                                                                            )}
                                                                         </td>
                                                                         <td className="py-1 text-green-700">
-                                                                            {c.new ?? <span className="italic text-gray-400">—</span>}
+                                                                            {c.new ?? (
+                                                                                <span className="italic text-gray-400">
+                                                                                    —
+                                                                                </span>
+                                                                            )}
                                                                         </td>
                                                                     </tr>
                                                                 ))}

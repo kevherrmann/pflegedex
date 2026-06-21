@@ -18,7 +18,7 @@ beforeEach(function (): void {
     // Globalen Test-Bind aus TestCase aushebeln, damit hier die echte
     // Implementation getestet wird.
     app()->forgetInstance(AiHealthService::class);
-    app()->bind(AiHealthService::class, fn() => new AiHealthService(app(HttpFactory::class)));
+    app()->bind(AiHealthService::class, fn () => new AiHealthService(app(HttpFactory::class)));
 });
 
 it('meldet available+modelPresent wenn Ollama das Modell hat', function (): void {

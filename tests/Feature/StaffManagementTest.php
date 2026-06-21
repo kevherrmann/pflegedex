@@ -54,7 +54,7 @@ it('lets PDL users create operational staff for accessible Wohnbereiche only', f
         ->post('/staff', [
             'name' => 'Neue Pflegekraft',
             'email' => 'pflege@pflegedex.local',
-            'password' => 'sicheres-passwort',
+            'password' => 'Sicheres-Passwort1',
             'role' => 'Pflegekraft',
             'location_ids' => [$first->id, $second->id],
             'is_nursing_specialist' => true,
@@ -77,7 +77,7 @@ it('lets PDL users create operational staff for accessible Wohnbereiche only', f
         ->and($staff->hasRole('Pflegekraft'))->toBeTrue()
         ->and($staff->location_id)->toBe($first->id)
         ->and($staff->locations()->pluck('locations.id')->all())->toEqualCanonicalizing([$first->id, $second->id])
-        ->and(Hash::check('sicheres-passwort', $staff->password))->toBeTrue()
+        ->and(Hash::check('Sicheres-Passwort1', $staff->password))->toBeTrue()
         ->and($staff->employeeProfile)->not->toBeNull()
         ->and($staff->employeeProfile->employment_area)->toBe(EmploymentArea::Nursing)
         ->and($staff->employeeProfile->is_nursing_specialist)->toBeTrue()
@@ -94,7 +94,7 @@ it('lets PDL users create operational staff for accessible Wohnbereiche only', f
         ->post('/staff', [
             'name' => 'Fremde Pflegekraft',
             'email' => 'fremd@pflegedex.local',
-            'password' => 'sicheres-passwort',
+            'password' => 'Sicheres-Passwort1',
             'role' => 'Pflegekraft',
             'location_ids' => [$foreign->id],
         ])
@@ -113,7 +113,7 @@ it('prevents PDL users from creating admin or PDL accounts through staff managem
             ->post('/staff', [
                 'name' => 'Verboten '.$role,
                 'email' => strtolower($role).'@pflegedex.local',
-                'password' => 'sicheres-passwort',
+                'password' => 'Sicheres-Passwort1',
                 'role' => $role,
                 'location_ids' => [$location->id],
             ])
@@ -146,7 +146,7 @@ it('lets PDL users edit staff in their Wohnbereiche', function () {
         ->patch('/staff/'.$staff->id, [
             'name' => 'Neuer Name',
             'email' => 'neu@pflegedex.local',
-            'password' => 'neues-passwort',
+            'password' => 'Neues-Passwort1',
             'role' => 'Hausmeister',
             'location_ids' => [$second->id],
             'is_nursing_specialist' => false,
@@ -169,7 +169,7 @@ it('lets PDL users edit staff in their Wohnbereiche', function () {
         ->and($staff->hasRole('Hausmeister'))->toBeTrue()
         ->and($staff->location_id)->toBe($second->id)
         ->and($staff->locations()->pluck('locations.id')->all())->toEqualCanonicalizing([$second->id])
-        ->and(Hash::check('neues-passwort', $staff->password))->toBeTrue()->and($staff->employeeProfile)->not->toBeNull()
+        ->and(Hash::check('Neues-Passwort1', $staff->password))->toBeTrue()->and($staff->employeeProfile)->not->toBeNull()
         ->and($staff->employeeProfile->employment_area)->toBe(EmploymentArea::Caretaker)
         ->and($staff->employeeProfile->is_nursing_specialist)->toBeFalse()
         ->and($staff->employeeProfile->weekly_hours)->toBe('20.00')
@@ -214,7 +214,7 @@ it('maps cleaning staff to cleaning employee profiles', function (): void {
         ->post('/staff', [
             'name' => 'Putz Eins',
             'email' => 'putz@pflegedex.local',
-            'password' => 'sicheres-passwort',
+            'password' => 'Sicheres-Passwort1',
             'role' => 'Putzkraft',
             'location_ids' => [$location->id],
             'weekly_hours' => 25,
@@ -250,7 +250,7 @@ it('maps caretakers to caretaker employee profiles and excludes absence requests
         ->post('/staff', [
             'name' => 'Hausmeister Eins',
             'email' => 'hausmeister@pflegedex.local',
-            'password' => 'sicheres-passwort',
+            'password' => 'Sicheres-Passwort1',
             'role' => 'Hausmeister',
             'location_ids' => [$location->id],
             'weekly_hours' => 39,
@@ -331,7 +331,7 @@ it('creates a WBL as nursing specialist with a specialist qualification level', 
         ->post('/staff', [
             'name' => 'Wohnbereichsleitung Eins',
             'email' => 'wbl@pflegedex.local',
-            'password' => 'sicheres-passwort',
+            'password' => 'Sicheres-Passwort1',
             'role' => 'WBL',
             'location_ids' => [$location->id],
             'qualification_level' => 'specialist',
@@ -363,7 +363,7 @@ it('forces a WBL to be a specialist even if another qualification is submitted',
         ->post('/staff', [
             'name' => 'Wohnbereichsleitung Zwei',
             'email' => 'wbl2@pflegedex.local',
-            'password' => 'sicheres-passwort',
+            'password' => 'Sicheres-Passwort1',
             'role' => 'WBL',
             'location_ids' => [$location->id],
             // Bewusst widerspruechlich: eine WBL ist immer Fachkraft.
@@ -392,7 +392,7 @@ it('derives is_nursing_specialist from the qualification level for assistants an
         ->post('/staff', [
             'name' => 'Pflege '.$level,
             'email' => $level.'@pflegedex.local',
-            'password' => 'sicheres-passwort',
+            'password' => 'Sicheres-Passwort1',
             'role' => 'Pflegekraft',
             'location_ids' => [$location->id],
             'qualification_level' => $level,

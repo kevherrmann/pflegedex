@@ -160,7 +160,12 @@ function SidebarContent({
                     </div>
                 )}
                 <NavRow
-                    item={{ label: 'Profil', href: route('profile.edit'), active: 'profile.edit', icon: 'profile' }}
+                    item={{
+                        label: 'Profil',
+                        href: route('profile.edit'),
+                        active: 'profile.edit',
+                        icon: 'profile',
+                    }}
                     collapsed={collapsed}
                     onNavigate={onNavigate}
                 />
@@ -192,8 +197,7 @@ export default function Authenticated({
     const user = auth.user;
 
     const canUseAbsenceRequests =
-        auth.permissions.canViewAbsenceRequests ||
-        auth.permissions.canManageAbsenceRequests;
+        auth.permissions.canViewAbsenceRequests || auth.permissions.canManageAbsenceRequests;
     const absenceRequestsRoute = auth.permissions.canManageAbsenceRequests
         ? 'absence-requests.manage'
         : 'absence-requests.index';
@@ -220,40 +224,100 @@ export default function Authenticated({
 
     const dienstplan: NavItem[] = [];
     if (auth.permissions.canViewOwnRoster) {
-        dienstplan.push({ label: 'Mein Dienstplan', href: route('my-roster.show'), active: 'my-roster.*', icon: 'calendarDays' });
+        dienstplan.push({
+            label: 'Mein Dienstplan',
+            href: route('my-roster.show'),
+            active: 'my-roster.*',
+            icon: 'calendarDays',
+        });
     }
     if (auth.permissions.canManageAbsenceRequests) {
         dienstplan.push(
-            { label: 'Dienstpläne', href: route('rosters.index'), active: 'rosters.*', icon: 'calendar' },
-            { label: 'Schichten', href: route('shift-templates.index'), active: 'shift-templates.*', icon: 'clock' },
-            { label: 'Urlaubssperren', href: route('roster-blackout-days.index'), active: 'roster-blackout-days.*', icon: 'lock' },
-            { label: 'Wunschdienste', href: route('shift-wishes.index'), active: 'shift-wishes.*', icon: 'star' },
+            {
+                label: 'Dienstpläne',
+                href: route('rosters.index'),
+                active: 'rosters.*',
+                icon: 'calendar',
+            },
+            {
+                label: 'Schichten',
+                href: route('shift-templates.index'),
+                active: 'shift-templates.*',
+                icon: 'clock',
+            },
+            {
+                label: 'Urlaubssperren',
+                href: route('roster-blackout-days.index'),
+                active: 'roster-blackout-days.*',
+                icon: 'lock',
+            },
+            {
+                label: 'Wunschdienste',
+                href: route('shift-wishes.index'),
+                active: 'shift-wishes.*',
+                icon: 'star',
+            },
         );
     }
     if (canUseAbsenceRequests) {
-        dienstplan.push({ label: 'Urlaub', href: route(absenceRequestsRoute), active: 'absence-requests.*', icon: 'sun' });
+        dienstplan.push({
+            label: 'Urlaub',
+            href: route(absenceRequestsRoute),
+            active: 'absence-requests.*',
+            icon: 'sun',
+        });
     }
     if (auth.permissions.manageStaff) {
-        dienstplan.push({ label: 'Mitarbeiter', href: route('staff.index'), active: 'staff.index', icon: 'users' });
+        dienstplan.push({
+            label: 'Mitarbeiter',
+            href: route('staff.index'),
+            active: 'staff.index',
+            icon: 'users',
+        });
     }
 
     const pflege: NavItem[] = [];
     if (auth.permissions.viewResidents) {
-        pflege.push({ label: 'Bewohner', href: route('residents.index'), active: 'residents.index', icon: 'residents' });
+        pflege.push({
+            label: 'Bewohner',
+            href: route('residents.index'),
+            active: 'residents.index',
+            icon: 'residents',
+        });
     }
     if (auth.permissions.manageCareReports) {
-        pflege.push({ label: 'Pflegeberichte', href: route('care-reports.index'), active: 'care-reports.index', icon: 'document' });
+        pflege.push({
+            label: 'Pflegeberichte',
+            href: route('care-reports.index'),
+            active: 'care-reports.index',
+            icon: 'document',
+        });
     }
 
     const verwaltung: NavItem[] = [];
     if (auth.permissions.manageLocations) {
-        verwaltung.push({ label: 'Wohnbereiche', href: route('locations.index'), active: 'locations.index', icon: 'building' });
+        verwaltung.push({
+            label: 'Wohnbereiche',
+            href: route('locations.index'),
+            active: 'locations.index',
+            icon: 'building',
+        });
     }
     if (auth.permissions.managePdlAccounts) {
-        verwaltung.push({ label: 'PDL-Konten', href: route('users.index'), active: 'users.index', icon: 'key' });
+        verwaltung.push({
+            label: 'PDL-Konten',
+            href: route('users.index'),
+            active: 'users.index',
+            icon: 'key',
+        });
     }
     if (auth.permissions.viewAuditLog) {
-        verwaltung.push({ label: 'Audit-Log', href: route('audit.index'), active: 'audit.index', icon: 'audit' });
+        verwaltung.push({
+            label: 'Audit-Log',
+            href: route('audit.index'),
+            active: 'audit.index',
+            icon: 'audit',
+        });
     }
 
     const navGroups: NavGroup[] = [
@@ -288,11 +352,7 @@ export default function Authenticated({
             {/* Mobiles Off-Canvas-Menü */}
             {mobileOpen && (
                 <div className="fixed inset-0 z-50 lg:hidden">
-                    <div
-                        className="fixed inset-0 bg-black/40"
-                        onClick={closeMobile}
-                        aria-hidden
-                    />
+                    <div className="fixed inset-0 bg-black/40" onClick={closeMobile} aria-hidden />
                     <aside className="fixed inset-y-0 left-0 w-64 bg-white shadow-xl">
                         <SidebarContent
                             collapsed={false}
@@ -311,8 +371,7 @@ export default function Authenticated({
             {/* Inhaltsspalte */}
             <div
                 className={
-                    'transition-[padding] duration-200 ' +
-                    (collapsed ? 'lg:pl-16' : 'lg:pl-64')
+                    'transition-[padding] duration-200 ' + (collapsed ? 'lg:pl-16' : 'lg:pl-64')
                 }
             >
                 {/* Mobile Topbar */}
@@ -333,9 +392,7 @@ export default function Authenticated({
 
                 {header && (
                     <header className="bg-white shadow">
-                        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-                            {header}
-                        </div>
+                        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">{header}</div>
                     </header>
                 )}
 

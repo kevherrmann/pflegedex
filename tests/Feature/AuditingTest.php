@@ -8,6 +8,7 @@ use App\Models\Resident;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Crypt;
 use OwenIt\Auditing\Models\Audit;
 use Spatie\Permission\Models\Role;
 
@@ -75,7 +76,9 @@ it('schreibt audit-Eintraege beim Anlegen eines CareReports ueber den Controller
     expect($audit)->not->toBeNull()
         ->and($audit->user_id)->toBe($user->id)
         ->and($audit->user_type)->toBe(User::class)
-        ->and($audit->new_values['body'])->toBe('Demo-Bericht fuer Audit-Test.');
+        // K1: Der Pflegebericht-Inhalt liegt im Audit verschluesselt vor (kein Klartext at-rest);
+        // entschluesselt entspricht er dem Original.
+        ->and(Crypt::decryptString($audit->new_values['body']))->toBe('Demo-Bericht fuer Audit-Test.');
 });
 
 it('schliesst sensible Felder vom User-Audit aus', function (): void {
@@ -85,7 +88,7 @@ it('schliesst sensible Felder vom User-Audit aus', function (): void {
 
     $user->update([
         'name' => 'Neuer Name',
-        'password' => bcrypt('neues-passwort'),
+        'password' => bcrypt('Neues-Passwort1'),
     ]);
 
     $audit = Audit::query()
@@ -101,9 +104,10 @@ it('schliesst sensible Felder vom User-Audit aus', function (): void {
 });
 
 it('schreibt KEINE audit-Eintraege beim Seeder-Lauf', function (): void {
-    Audit::query()->delete();
+    // Audits sind append-only (nicht loeschbar) -> Ausgangsstand zaehlen statt leeren.
+    $before = Audit::query()->count();
 
     $this->seed();
 
-    expect(Audit::query()->count())->toBe(0);
+    expect(Audit::query()->count())->toBe($before);
 });

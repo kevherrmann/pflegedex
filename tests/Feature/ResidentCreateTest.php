@@ -39,16 +39,16 @@ it('stores a resident in the authenticated users location', function (): void {
     $user->locations()->syncWithoutDetaching([$location->id]);
 
     $this->actingAs($user)
-    ->post('/residents', [
-        'salutation' => 'frau',
-        'first_name' => 'Erika',
-        'last_name' => 'Mustermann',
-        'birth_date' => '1940-01-01',
-        'room_number' => '12A',
-        'care_level' => 3,
-        'location_id' => $location->id,
-    ])
-    ->assertRedirect('/residents?location_id='.$location->id);
+        ->post('/residents', [
+            'salutation' => 'frau',
+            'first_name' => 'Erika',
+            'last_name' => 'Mustermann',
+            'birth_date' => '1940-01-01',
+            'room_number' => '12A',
+            'care_level' => 3,
+            'location_id' => $location->id,
+        ])
+        ->assertRedirect('/residents?location_id='.$location->id);
 
     $this->assertDatabaseHas('residents', [
         'location_id' => $location->id,

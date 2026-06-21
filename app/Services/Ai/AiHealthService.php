@@ -24,8 +24,7 @@ class AiHealthService
 
     public function __construct(
         private readonly HttpFactory $http,
-    ) {
-    }
+    ) {}
 
     /**
      * @return array{available: bool, modelPresent: bool, model: string, reason: string|null}
@@ -38,7 +37,7 @@ class AiHealthService
             return $this->probe();
         }
 
-        return Cache::remember(self::CACHE_KEY, $ttl, fn(): array => $this->probe());
+        return Cache::remember(self::CACHE_KEY, $ttl, fn (): array => $this->probe());
     }
 
     public function isAvailable(): bool
@@ -73,6 +72,7 @@ class AiHealthService
 
         if ($url === '' || $model === '') {
             $result['reason'] = 'Ollama ist nicht konfiguriert (OLLAMA_URL/AI_MODEL).';
+
             return $result;
         }
 
@@ -85,6 +85,7 @@ class AiHealthService
 
             if ($response->failed()) {
                 $result['reason'] = 'Ollama antwortet mit Status '.$response->status().'.';
+
                 return $result;
             }
 
@@ -95,6 +96,7 @@ class AiHealthService
                 $name = is_array($entry) ? (string) ($entry['name'] ?? '') : '';
                 if ($this->matchesModel($name, $model)) {
                     $result['modelPresent'] = true;
+
                     return $result;
                 }
             }
@@ -103,9 +105,11 @@ class AiHealthService
                 'Ollama laeuft, aber das Modell "%s" ist nicht installiert.',
                 $model,
             );
+
             return $result;
         } catch (Throwable $e) {
             $result['reason'] = 'Ollama nicht erreichbar: '.$e->getMessage();
+
             return $result;
         }
     }

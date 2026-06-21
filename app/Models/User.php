@@ -10,18 +10,19 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use OwenIt\Auditing\Auditable as AuditableTrait;
 use OwenIt\Auditing\Contracts\Auditable;
 use Spatie\Permission\Traits\HasRoles;
-use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class User extends Authenticatable implements Auditable
 {
     /** @use HasFactory<UserFactory> */
     use AuditableTrait;
+
     use HasFactory;
     use HasRoles;
     use HasUuidV7;
@@ -109,7 +110,7 @@ class User extends Authenticatable implements Auditable
     {
         $locations = $this->locations()->orderBy('name')->get();
 
-        if ($this->location && !$locations->contains('id', $this->location->id)) {
+        if ($this->location && ! $locations->contains('id', $this->location->id)) {
             $locations->push($this->location);
         }
 

@@ -34,7 +34,7 @@ it('lets admins edit existing PDL accounts', function () {
         ->patch('/users/'.$pdl->id, [
             'name' => 'Neue PDL',
             'email' => 'neu@pflegedex.local',
-            'password' => 'neues-passwort',
+            'password' => 'Neues-Passwort1',
         ])
         ->assertRedirect('/users');
 
@@ -43,7 +43,7 @@ it('lets admins edit existing PDL accounts', function () {
     expect($pdl->name)->toBe('Neue PDL')
         ->and($pdl->email)->toBe('neu@pflegedex.local')
         ->and($pdl->hasRole('PDL'))->toBeTrue()
-        ->and(Hash::check('neues-passwort', $pdl->password))->toBeTrue();
+        ->and(Hash::check('Neues-Passwort1', $pdl->password))->toBeTrue();
 });
 
 it('lets PDL users edit Wohnbereiche', function () {

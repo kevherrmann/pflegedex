@@ -92,9 +92,7 @@ function ShiftRow({ shift }: { shift: MyShift }) {
             {shift.locationName && (
                 <p className="mt-0.5 text-xs text-gray-500">{shift.locationName}</p>
             )}
-            {shift.note && (
-                <p className="mt-1 text-xs italic text-gray-600">{shift.note}</p>
-            )}
+            {shift.note && <p className="mt-1 text-xs italic text-gray-600">{shift.note}</p>}
         </div>
     );
 }
@@ -138,34 +136,21 @@ function DayRow({ day }: { day: MyDay }) {
                     <ShiftRow key={shift.id} shift={shift} />
                 ))}
 
-                {!hasContent && (
-                    <p className="pt-1 text-sm text-gray-400">frei</p>
-                )}
+                {!hasContent && <p className="pt-1 text-sm text-gray-400">frei</p>}
 
                 {day.team.length > 0 && (
-                    <TeamBlock
-                        team={day.team}
-                        hasOwnShift={day.shifts.length > 0}
-                    />
+                    <TeamBlock team={day.team} hasOwnShift={day.shifts.length > 0} />
                 )}
             </div>
         </div>
     );
 }
 
-function TeamBlock({
-    team,
-    hasOwnShift,
-}: {
-    team: TeamGroup[];
-    hasOwnShift: boolean;
-}) {
+function TeamBlock({ team, hasOwnShift }: { team: TeamGroup[]; hasOwnShift: boolean }) {
     return (
         <div className="rounded-lg bg-gray-50 px-3 py-2 ring-1 ring-gray-200">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-                {hasOwnShift
-                    ? 'Mit wem arbeite ich zusammen?'
-                    : 'Wer ist im Dienst?'}
+                {hasOwnShift ? 'Mit wem arbeite ich zusammen?' : 'Wer ist im Dienst?'}
             </p>
             <div className="mt-1.5 space-y-1">
                 {team.map((group, index) => (
@@ -177,8 +162,7 @@ function TeamBlock({
                             <span
                                 className="h-2 w-2 shrink-0 rounded-full"
                                 style={{
-                                    backgroundColor:
-                                        group.shiftTemplateColor ?? '#9B1C3B',
+                                    backgroundColor: group.shiftTemplateColor ?? '#9B1C3B',
                                 }}
                             />
                             {group.shiftTemplateName ?? 'Dienst'}
@@ -191,9 +175,7 @@ function TeamBlock({
                         <span className="text-gray-500">
                             {group.startsAt}–{group.endsAt} Uhr
                         </span>
-                        <span className="text-gray-700">
-                            {group.colleagues.join(', ')}
-                        </span>
+                        <span className="text-gray-700">{group.colleagues.join(', ')}</span>
                     </div>
                 ))}
             </div>
@@ -201,12 +183,7 @@ function TeamBlock({
     );
 }
 
-export default function MyRosterShow({
-    month,
-    days,
-    summary,
-    hasUnpublishedRoster,
-}: Props) {
+export default function MyRosterShow({ month, days, summary, hasUnpublishedRoster }: Props) {
     const stats: Array<{ label: string; value: string; hint: string | null }> = [
         {
             label: 'Dienste',
@@ -218,9 +195,7 @@ export default function MyRosterShow({
             value: (summary.plannedMinutes / 60).toFixed(1).replace('.', ','),
             hint:
                 summary.targetMinutes > 0
-                    ? `von ${(summary.targetMinutes / 60)
-                          .toFixed(1)
-                          .replace('.', ',')} Soll-Std.`
+                    ? `von ${(summary.targetMinutes / 60).toFixed(1).replace('.', ',')} Soll-Std.`
                     : null,
         },
         {
@@ -260,9 +235,7 @@ export default function MyRosterShow({
                         >
                             ← Vormonat
                         </Link>
-                        <span className="text-base font-semibold text-gray-900">
-                            {month.label}
-                        </span>
+                        <span className="text-base font-semibold text-gray-900">{month.label}</span>
                         <Link
                             href={route('my-roster.show', { month: month.next })}
                             className="rounded-md px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-900"
@@ -274,8 +247,8 @@ export default function MyRosterShow({
 
                     {hasUnpublishedRoster && (
                         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                            Der Dienstplan für diesen Monat ist noch in Bearbeitung
-                            und noch nicht veröffentlicht.
+                            Der Dienstplan für diesen Monat ist noch in Bearbeitung und noch nicht
+                            veröffentlicht.
                         </div>
                     )}
 
@@ -290,9 +263,7 @@ export default function MyRosterShow({
                                     {stat.value}
                                 </p>
                                 {stat.hint && (
-                                    <p className="mt-1 text-xs text-gray-500">
-                                        {stat.hint}
-                                    </p>
+                                    <p className="mt-1 text-xs text-gray-500">{stat.hint}</p>
                                 )}
                             </div>
                         ))}
@@ -304,8 +275,8 @@ export default function MyRosterShow({
                                 Dienste im {month.label}
                             </h3>
                             <p className="mt-1 text-sm text-gray-600">
-                                Deine Dienste aus veröffentlichten Dienstplänen sowie
-                                genehmigte Abwesenheiten.
+                                Deine Dienste aus veröffentlichten Dienstplänen sowie genehmigte
+                                Abwesenheiten.
                             </p>
                         </div>
 

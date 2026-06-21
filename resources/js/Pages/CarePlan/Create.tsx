@@ -40,16 +40,23 @@ export default function Create({ resident, topics }: Props) {
 
     return (
         <AuthenticatedLayout
-            header={<h2 className="text-xl font-semibold leading-tight text-[#333333]">Maßnahmenplan anlegen · {resident.formalName}</h2>}
+            header={
+                <h2 className="text-xl font-semibold leading-tight text-[#333333]">
+                    Maßnahmenplan anlegen · {resident.formalName}
+                </h2>
+            }
         >
             <Head title={`Maßnahmenplan anlegen – ${resident.fullName}`} />
 
             <div className="py-12">
                 <form onSubmit={submit} className="mx-auto max-w-5xl space-y-6 sm:px-6 lg:px-8">
                     <div className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-[#E5E7EB]">
-                        <h3 className="text-base font-bold uppercase tracking-widest text-[#333333]">Grundbotschaft</h3>
+                        <h3 className="text-base font-bold uppercase tracking-widest text-[#333333]">
+                            Grundbotschaft
+                        </h3>
                         <p className="mt-1 text-xs text-gray-500">
-                            Kurze, immer geltende Hinweise zum Bewohner (z.B. „Ansprache mit Vorname und Du", „Pflege nur zu zweit"). Optional.
+                            Kurze, immer geltende Hinweise zum Bewohner (z.B. „Ansprache mit Vorname
+                            und Du", „Pflege nur zu zweit"). Optional.
                         </p>
                         <textarea
                             id="grundbotschaft"
@@ -58,18 +65,26 @@ export default function Create({ resident, topics }: Props) {
                             onChange={(e) => setData('grundbotschaft', e.target.value)}
                             className="mt-3 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]"
                         />
-                        {errors.grundbotschaft && <p className="mt-1 text-xs text-red-600">{errors.grundbotschaft}</p>}
+                        {errors.grundbotschaft && (
+                            <p className="mt-1 text-xs text-red-600">{errors.grundbotschaft}</p>
+                        )}
                     </div>
 
                     <div className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-[#E5E7EB]">
-                        <h3 className="text-base font-bold uppercase tracking-widest text-[#333333]">Themenblöcke</h3>
+                        <h3 className="text-base font-bold uppercase tracking-widest text-[#333333]">
+                            Themenblöcke
+                        </h3>
                         <p className="mt-1 text-xs text-gray-500">
-                            Nur die Themen befüllen, die für diesen Bewohner relevant sind. Leere Felder werden nicht gespeichert.
+                            Nur die Themen befüllen, die für diesen Bewohner relevant sind. Leere
+                            Felder werden nicht gespeichert.
                         </p>
                         <div className="mt-4 space-y-5">
                             {topics.map((t, idx) => (
                                 <div key={t.number}>
-                                    <label className="block text-sm font-semibold text-gray-800" htmlFor={`topic-${t.number}`}>
+                                    <label
+                                        className="block text-sm font-semibold text-gray-800"
+                                        htmlFor={`topic-${t.number}`}
+                                    >
                                         {t.number}. {t.label}
                                     </label>
                                     <textarea

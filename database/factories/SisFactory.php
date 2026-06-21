@@ -65,7 +65,7 @@ class SisFactory extends Factory
 
     public function completed(): static
     {
-        return $this->state(fn(array $attributes): array => [
+        return $this->state(fn (array $attributes): array => [
             'completed_at' => today()->subDays(2),
             'next_evaluation_due' => today()->addWeeks(8),
         ]);
@@ -73,7 +73,7 @@ class SisFactory extends Factory
 
     public function overdue(): static
     {
-        return $this->state(fn(array $attributes): array => [
+        return $this->state(fn (array $attributes): array => [
             'completed_at' => today()->subWeeks(12),
             'evaluated_at' => today()->subWeeks(10),
             'next_evaluation_due' => today()->subWeeks(2),

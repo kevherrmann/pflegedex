@@ -185,3 +185,64 @@ it('forbids shift wish management for non-pdl users', function (): void {
         ])
         ->assertForbidden();
 });
+
+it('hides shift wishes and staff from other locations in the overview', function (): void {
+    $ownLocation = Location::factory()->create();
+    $otherLocation = Location::factory()->create();
+    $pdl = shiftWishHttpUser('PDL', $ownLocation);
+    $otherEmployee = shiftWishHttpEmployee($otherLocation, ['name' => 'Fremd Mitarbeiter']);
+
+    ShiftWish::query()->create([
+        'user_id' => $otherEmployee->id,
+        'location_id' => $otherLocation->id,
+        'date' => '2027-01-05',
+        'kind' => ShiftWishKind::WishFree,
+        'created_by' => $pdl->id,
+    ]);
+
+    $this->actingAs($pdl)
+        ->get(route('shift-wishes.index'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('ShiftWishes/Index')
+            ->has('shiftWishes', 0)
+            ->has('staff', 0));
+});
+
+it('forbids creating a wish for an employee of another location', function (): void {
+    $ownLocation = Location::factory()->create();
+    $otherLocation = Location::factory()->create();
+    $pdl = shiftWishHttpUser('PDL', $ownLocation);
+    $otherEmployee = shiftWishHttpEmployee($otherLocation);
+
+    $this->actingAs($pdl)
+        ->post(route('shift-wishes.store'), [
+            'user_id' => $otherEmployee->id,
+            'date' => '2027-01-05',
+            'kind' => ShiftWishKind::WishFree->value,
+        ])
+        ->assertForbidden();
+
+    expect(ShiftWish::query()->count())->toBe(0);
+});
+
+it('forbids deleting a wish from another location', function (): void {
+    $ownLocation = Location::factory()->create();
+    $otherLocation = Location::factory()->create();
+    $pdl = shiftWishHttpUser('PDL', $ownLocation);
+    $otherEmployee = shiftWishHttpEmployee($otherLocation);
+
+    $wish = ShiftWish::query()->create([
+        'user_id' => $otherEmployee->id,
+        'location_id' => $otherLocation->id,
+        'date' => '2027-01-05',
+        'kind' => ShiftWishKind::WishFree,
+        'created_by' => $pdl->id,
+    ]);
+
+    $this->actingAs($pdl)
+        ->delete(route('shift-wishes.destroy', $wish))
+        ->assertForbidden();
+
+    expect(ShiftWish::query()->count())->toBe(1);
+});

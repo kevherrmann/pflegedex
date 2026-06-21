@@ -112,7 +112,7 @@ it('Show-Seite zeigt completedAt nach Fertigstellung im Inertia-Payload', functi
 
     $this->actingAs($pdl)
         ->get(route('residents.sis.show', $resident))
-        ->assertInertia(fn($page) => $page
+        ->assertInertia(fn ($page) => $page
             ->component('Sis/Show')
             ->where('sis.completedAt', '2026-05-05'));
 });

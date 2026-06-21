@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ResidentStatus;
 use App\Enums\Salutation;
 use App\Support\Concerns\HasUuidV7;
 use Database\Factories\ResidentFactory;
@@ -19,6 +20,7 @@ class Resident extends Model implements Auditable
 {
     /** @use HasFactory<ResidentFactory> */
     use AuditableTrait;
+
     use HasFactory;
     use HasUuidV7;
 
@@ -35,6 +37,19 @@ class Resident extends Model implements Auditable
         'birth_date',
         'room_number',
         'care_level',
+        'status',
+        'admitted_on',
+        'discharged_on',
+        'health_insurance',
+        'insurance_number',
+        'family_doctor',
+        'family_doctor_phone',
+        'guardian_name',
+        'guardian_phone',
+        'has_living_will',
+        'has_healthcare_proxy',
+        'allergies',
+        'diagnoses',
         'active',
     ];
 
@@ -47,6 +62,15 @@ class Resident extends Model implements Auditable
             'salutation' => Salutation::class,
             'birth_date' => 'date',
             'care_level' => 'integer',
+            'status' => ResidentStatus::class,
+            'admitted_on' => 'date',
+            'discharged_on' => 'date',
+            'has_living_will' => 'boolean',
+            'has_healthcare_proxy' => 'boolean',
+            // Personenbezogene/Gesundheitsdaten verschlüsselt at-rest (K1).
+            'insurance_number' => 'encrypted',
+            'allergies' => 'encrypted',
+            'diagnoses' => 'encrypted',
             'active' => 'boolean',
         ];
     }

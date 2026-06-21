@@ -135,7 +135,7 @@ it('Show zeigt MP-Daten korrekt im Inertia-Payload', function (): void {
 
     $this->actingAs($pdl)
         ->get(route('residents.care-plan.show', $resident))
-        ->assertInertia(fn($page) => $page
+        ->assertInertia(fn ($page) => $page
             ->component('CarePlan/Show')
             ->where('carePlan.grundbotschaft', $cp->grundbotschaft)
             ->where('sisStatus.completed', true)
@@ -158,7 +158,7 @@ it('Show ohne MP zeigt Anlege-Hinweis', function (): void {
 
     $this->actingAs($pdl)
         ->get(route('residents.care-plan.show', $resident))
-        ->assertInertia(fn($page) => $page
+        ->assertInertia(fn ($page) => $page
             ->component('CarePlan/Show')
             ->where('carePlan', null)
             ->where('sisStatus.exists', true)

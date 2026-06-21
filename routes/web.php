@@ -1,15 +1,19 @@
 <?php
 
 use App\Http\Controllers\AbsenceRequestController;
+use App\Http\Controllers\AssessmentController;
 use App\Http\Controllers\AuditController;
 use App\Http\Controllers\CarePlanController;
 use App\Http\Controllers\CarePlanGenerationController;
 use App\Http\Controllers\CarePlanPdfController;
 use App\Http\Controllers\CareReportController;
+use App\Http\Controllers\CareTaskController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LocationController;
+use App\Http\Controllers\MedicationController;
 use App\Http\Controllers\MyRosterController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\QualityAssessmentController;
 use App\Http\Controllers\ResidentController;
 use App\Http\Controllers\RosterBlackoutDayController;
 use App\Http\Controllers\RosterController;
@@ -21,6 +25,8 @@ use App\Http\Controllers\SisGenerationController;
 use App\Http\Controllers\SisPdfController;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\VitalSignController;
+use App\Http\Controllers\WoundController;
 use App\Models\Resident;
 use App\Support\BrandPalette;
 use Illuminate\Foundation\Application;
@@ -92,6 +98,43 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/residents/{resident}/sis/generate', [SisGenerationController::class, 'start'])->name('residents.sis.generate.start');
     Route::get('/residents/{resident}/sis/generate/{generation}', [SisGenerationController::class, 'show'])->name('residents.sis.generate.show');
+
+    // Vitalwerte (RR, Puls, Temp, BZ, Gewicht, SpO2 ...) je Bewohner
+    Route::get('/residents/{resident}/vitals', [VitalSignController::class, 'index'])->name('residents.vitals.index');
+    Route::post('/residents/{resident}/vitals', [VitalSignController::class, 'store'])->name('residents.vitals.store');
+    Route::delete('/residents/{resident}/vitals/{vitalSign}', [VitalSignController::class, 'destroy'])->name('residents.vitals.destroy');
+
+    // Durchfuehrungsnachweis: geplante Massnahmen + taegliche Quittierung (geplant != geleistet)
+    Route::get('/residents/{resident}/care-tasks', [CareTaskController::class, 'index'])->name('residents.care-tasks.index');
+    Route::post('/residents/{resident}/care-tasks', [CareTaskController::class, 'store'])->name('residents.care-tasks.store');
+    Route::delete('/residents/{resident}/care-tasks/{careTask}', [CareTaskController::class, 'destroy'])->name('residents.care-tasks.destroy');
+    Route::post('/residents/{resident}/care-tasks/{careTask}/complete', [CareTaskController::class, 'complete'])->name('residents.care-tasks.complete');
+    Route::delete('/residents/{resident}/care-task-completions/{completion}', [CareTaskController::class, 'destroyCompletion'])->name('residents.care-tasks.completions.destroy');
+
+    // Validierte Assessments (Braden, Schmerz/NRS, erweiterbar) je Bewohner
+    Route::get('/residents/{resident}/assessments', [AssessmentController::class, 'index'])->name('residents.assessments.index');
+    Route::post('/residents/{resident}/assessments', [AssessmentController::class, 'store'])->name('residents.assessments.store');
+    Route::delete('/residents/{resident}/assessments/{assessment}', [AssessmentController::class, 'destroy'])->name('residents.assessments.destroy');
+
+    // Wunddokumentation: Wunden + Verlaufseinträge
+    Route::get('/residents/{resident}/wounds', [WoundController::class, 'index'])->name('residents.wounds.index');
+    Route::post('/residents/{resident}/wounds', [WoundController::class, 'store'])->name('residents.wounds.store');
+    Route::patch('/residents/{resident}/wounds/{wound}/status', [WoundController::class, 'updateStatus'])->name('residents.wounds.status');
+    Route::delete('/residents/{resident}/wounds/{wound}', [WoundController::class, 'destroy'])->name('residents.wounds.destroy');
+    Route::post('/residents/{resident}/wounds/{wound}/assessments', [WoundController::class, 'addAssessment'])->name('residents.wounds.assessments.store');
+    Route::delete('/residents/{resident}/wound-assessments/{woundAssessment}', [WoundController::class, 'destroyAssessment'])->name('residents.wounds.assessments.destroy');
+
+    // Qualitätsindikatoren § 113b: Erhebung je Bewohner + Halbjahres-Auswertung
+    Route::get('/residents/{resident}/quality', [QualityAssessmentController::class, 'resident'])->name('residents.quality.index');
+    Route::post('/residents/{resident}/quality', [QualityAssessmentController::class, 'store'])->name('residents.quality.store');
+    Route::get('/quality-indicators', [QualityAssessmentController::class, 'evaluation'])->name('quality.evaluation');
+
+    // Medikamentenmanagement (Medikationsplan + Verabreichungsnachweis/MAR, inkl. BTM)
+    Route::get('/residents/{resident}/medications', [MedicationController::class, 'index'])->name('residents.medications.index');
+    Route::post('/residents/{resident}/medications', [MedicationController::class, 'store'])->name('residents.medications.store');
+    Route::delete('/residents/{resident}/medications/{medication}', [MedicationController::class, 'destroy'])->name('residents.medications.destroy');
+    Route::post('/residents/{resident}/medications/{medication}/administer', [MedicationController::class, 'administer'])->name('residents.medications.administer');
+    Route::delete('/residents/{resident}/medication-administrations/{administration}', [MedicationController::class, 'destroyAdministration'])->name('residents.medications.administrations.destroy');
 
     Route::get('/audit', [AuditController::class, 'index'])->name('audit.index');
 

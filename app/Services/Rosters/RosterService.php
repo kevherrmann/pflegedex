@@ -10,9 +10,7 @@ use Illuminate\Validation\ValidationException;
 
 class RosterService
 {
-    public function __construct(private readonly RosterValidator $rosterValidator)
-    {
-    }
+    public function __construct(private readonly RosterValidator $rosterValidator) {}
 
     public function createOrGetDraft(Location $location, User $createdBy, int $year, int $month): Roster
     {

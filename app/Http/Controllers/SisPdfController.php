@@ -10,7 +10,6 @@ use App\Models\Resident;
 use App\Models\Sis;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 /**

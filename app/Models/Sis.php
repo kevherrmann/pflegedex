@@ -53,6 +53,7 @@ class Sis extends Model implements Auditable
     protected function casts(): array
     {
         return [
+            'opening_question' => 'encrypted',
             'started_at' => 'date',
             'completed_at' => 'date',
             'evaluated_at' => 'date',
@@ -122,11 +123,11 @@ class Sis extends Model implements Auditable
             'completed_at' => $this->completed_at?->toDateString(),
             'evaluated_at' => $this->evaluated_at?->toDateString(),
             'next_evaluation_due' => $this->next_evaluation_due?->toDateString(),
-            'topics' => $this->topicEntries->map(fn(SisTopicEntry $t): array => [
+            'topics' => $this->topicEntries->map(fn (SisTopicEntry $t): array => [
                 'topic_number' => $t->topic_number,
                 'content' => $t->content,
             ])->all(),
-            'risks' => $this->risks->map(fn(SisRisk $r): array => [
+            'risks' => $this->risks->map(fn (SisRisk $r): array => [
                 'risk_kind' => $r->risk_kind,
                 'is_at_risk' => $r->is_at_risk,
                 'needs_further_assessment' => $r->needs_further_assessment,

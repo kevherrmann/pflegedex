@@ -128,13 +128,11 @@ export default function ShiftWishesIndex({
                 <div className="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
                     <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
                         <div className="border-b border-gray-200 p-6">
-                            <h3 className="text-lg font-semibold text-gray-900">
-                                Neuer Wunsch
-                            </h3>
+                            <h3 className="text-lg font-semibold text-gray-900">Neuer Wunsch</h3>
                             <p className="mt-1 text-sm text-gray-600">
-                                Wunschfrei und Wunschdienste sind weiche Planungsziele.
-                                Die automatische Planung berücksichtigt sie, wenn die
-                                Besetzung es zulässt.
+                                Wunschfrei und Wunschdienste sind weiche Planungsziele. Die
+                                automatische Planung berücksichtigt sie, wenn die Besetzung es
+                                zulässt.
                             </p>
                         </div>
 
@@ -278,9 +276,7 @@ export default function ShiftWishesIndex({
                             </div>
 
                             <div className="flex justify-end">
-                                <PrimaryButton disabled={processing}>
-                                    Wunsch anlegen
-                                </PrimaryButton>
+                                <PrimaryButton disabled={processing}>Wunsch anlegen</PrimaryButton>
                             </div>
                         </form>
                     </div>

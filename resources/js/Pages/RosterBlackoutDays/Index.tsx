@@ -120,9 +120,9 @@ export default function RosterBlackoutDaysIndex({
                                 Neue Urlaubssperre
                             </h3>
                             <p className="mt-1 text-sm text-gray-600">
-                                Sperrt einzelne Tage je Wohnbereich für Urlaubs- und Überstundenfrei-Anträge.
-                                Eine Sperre kann den ganzen Wohnbereich, nur bestimmte Qualifikationen oder
-                                einzelne Mitarbeiter betreffen.
+                                Sperrt einzelne Tage je Wohnbereich für Urlaubs- und
+                                Überstundenfrei-Anträge. Eine Sperre kann den ganzen Wohnbereich,
+                                nur bestimmte Qualifikationen oder einzelne Mitarbeiter betreffen.
                             </p>
                         </div>
 
@@ -203,15 +203,22 @@ export default function RosterBlackoutDaysIndex({
                                             >
                                                 <input
                                                     type="checkbox"
-                                                    checked={data.qualification_levels.includes(level.value)}
-                                                    onChange={() => toggleQualification(level.value)}
+                                                    checked={data.qualification_levels.includes(
+                                                        level.value,
+                                                    )}
+                                                    onChange={() =>
+                                                        toggleQualification(level.value)
+                                                    }
                                                     className="rounded border-gray-300 text-[#9B1C3B] focus:ring-[#9B1C3B]"
                                                 />
                                                 {level.label}
                                             </label>
                                         ))}
                                     </div>
-                                    <InputError message={errors.qualification_levels} className="mt-2" />
+                                    <InputError
+                                        message={errors.qualification_levels}
+                                        className="mt-2"
+                                    />
                                 </div>
                             )}
 
@@ -219,7 +226,9 @@ export default function RosterBlackoutDaysIndex({
                                 <div className="rounded-md border border-gray-200 bg-gray-50 p-4">
                                     <p className="text-sm font-medium text-gray-900">
                                         Betroffene Mitarbeiter
-                                        {data.employee_ids.length > 0 ? ` (${data.employee_ids.length})` : ''}
+                                        {data.employee_ids.length > 0
+                                            ? ` (${data.employee_ids.length})`
+                                            : ''}
                                     </p>
                                     {!data.location_id ? (
                                         <p className="mt-2 text-sm text-gray-600">
@@ -227,7 +236,8 @@ export default function RosterBlackoutDaysIndex({
                                         </p>
                                     ) : staffForLocation.length === 0 ? (
                                         <p className="mt-2 text-sm text-gray-600">
-                                            Für diesen Wohnbereich sind keine Mitarbeiter hinterlegt.
+                                            Für diesen Wohnbereich sind keine Mitarbeiter
+                                            hinterlegt.
                                         </p>
                                     ) : (
                                         <div className="mt-3 grid max-h-64 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
@@ -238,15 +248,19 @@ export default function RosterBlackoutDaysIndex({
                                                 >
                                                     <input
                                                         type="checkbox"
-                                                        checked={data.employee_ids.includes(member.id)}
+                                                        checked={data.employee_ids.includes(
+                                                            member.id,
+                                                        )}
                                                         onChange={() => toggleEmployee(member.id)}
                                                         className="rounded border-gray-300 text-[#9B1C3B] focus:ring-[#9B1C3B]"
                                                     />
                                                     <span className="truncate">
                                                         {member.name}
-                                                        {member.qualificationLabel || member.areaLabel ? (
+                                                        {member.qualificationLabel ||
+                                                        member.areaLabel ? (
                                                             <span className="block text-xs text-gray-500">
-                                                                {member.qualificationLabel ?? member.areaLabel}
+                                                                {member.qualificationLabel ??
+                                                                    member.areaLabel}
                                                             </span>
                                                         ) : null}
                                                     </span>
@@ -275,7 +289,9 @@ export default function RosterBlackoutDaysIndex({
                                     <input
                                         type="checkbox"
                                         checked={data.blocks_vacation}
-                                        onChange={(event) => setData('blocks_vacation', event.target.checked)}
+                                        onChange={(event) =>
+                                            setData('blocks_vacation', event.target.checked)
+                                        }
                                         className="mt-1 rounded border-gray-300 text-[#9B1C3B] shadow-sm focus:ring-[#9B1C3B]"
                                     />
                                     <span>
@@ -293,7 +309,10 @@ export default function RosterBlackoutDaysIndex({
                                         type="checkbox"
                                         checked={data.blocks_overtime_compensation}
                                         onChange={(event) =>
-                                            setData('blocks_overtime_compensation', event.target.checked)
+                                            setData(
+                                                'blocks_overtime_compensation',
+                                                event.target.checked,
+                                            )
                                         }
                                         className="mt-1 rounded border-gray-300 text-[#9B1C3B] shadow-sm focus:ring-[#9B1C3B]"
                                     />
@@ -302,7 +321,8 @@ export default function RosterBlackoutDaysIndex({
                                             Überstundenfrei blockieren
                                         </span>
                                         <span className="block text-sm text-gray-600">
-                                            Neue Anträge auf Überstundenfrei werden für diesen Tag abgelehnt.
+                                            Neue Anträge auf Überstundenfrei werden für diesen Tag
+                                            abgelehnt.
                                         </span>
                                     </span>
                                 </label>
@@ -316,8 +336,12 @@ export default function RosterBlackoutDaysIndex({
 
                     <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
                         <div className="border-b border-gray-200 p-6">
-                            <h3 className="text-lg font-semibold text-gray-900">Vorhandene Sperrtage</h3>
-                            <p className="mt-1 text-sm text-gray-600">Die neuesten Einträge stehen oben.</p>
+                            <h3 className="text-lg font-semibold text-gray-900">
+                                Vorhandene Sperrtage
+                            </h3>
+                            <p className="mt-1 text-sm text-gray-600">
+                                Die neuesten Einträge stehen oben.
+                            </p>
                         </div>
 
                         <div className="p-6">
@@ -360,15 +384,22 @@ export default function RosterBlackoutDaysIndex({
                                                         {blackoutDay.locationName ?? 'Unbekannt'}
                                                     </td>
                                                     <td className="px-3 py-4 text-sm text-gray-700">
-                                                        <span className="font-medium">{blackoutDay.scopeLabel}</span>
-                                                        {blackoutDay.qualificationLabels.length > 0 && (
+                                                        <span className="font-medium">
+                                                            {blackoutDay.scopeLabel}
+                                                        </span>
+                                                        {blackoutDay.qualificationLabels.length >
+                                                            0 && (
                                                             <span className="block text-xs text-gray-500">
-                                                                {blackoutDay.qualificationLabels.join(', ')}
+                                                                {blackoutDay.qualificationLabels.join(
+                                                                    ', ',
+                                                                )}
                                                             </span>
                                                         )}
                                                         {blackoutDay.employeeNames.length > 0 && (
                                                             <span className="block text-xs text-gray-500">
-                                                                {blackoutDay.employeeNames.join(', ')}
+                                                                {blackoutDay.employeeNames.join(
+                                                                    ', ',
+                                                                )}
                                                             </span>
                                                         )}
                                                     </td>
@@ -391,7 +422,9 @@ export default function RosterBlackoutDaysIndex({
                                                     </td>
                                                     <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                                                         {blackoutDay.createdByName ?? 'Unbekannt'}
-                                                        {blackoutDay.createdAt ? ` · ${blackoutDay.createdAt}` : ''}
+                                                        {blackoutDay.createdAt
+                                                            ? ` · ${blackoutDay.createdAt}`
+                                                            : ''}
                                                     </td>
                                                 </tr>
                                             ))}

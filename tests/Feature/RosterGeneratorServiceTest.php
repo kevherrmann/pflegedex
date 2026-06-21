@@ -51,6 +51,7 @@ function createRosterGeneratorEmployee(Location $location, array $profileAttribu
         'can_work_early' => $profileAttributes['can_work_early'] ?? true,
         'can_work_late' => $profileAttributes['can_work_late'] ?? true,
         'can_work_night' => $profileAttributes['can_work_night'] ?? false,
+        'maternity_protection' => $profileAttributes['maternity_protection'] ?? false,
         'active' => $profileAttributes['active'] ?? true,
     ]);
 
@@ -1160,13 +1161,13 @@ it('enforces the weekly maximum working minutes', function (): void {
     $pdl = User::factory()->for($location)->create();
     createRosterGeneratorEmployee($location, ['weekly_hours' => 60.00, 'regular_work_days_per_week' => 7]);
     $roster = createRosterGeneratorRoster($location, $pdl);
-    // 12-Stunden-Dienste: Nach vier Diensten in einer ISO-Woche sind 48h erreicht.
+    // 10-Stunden-Dienste (ArbZG-Tagesmax): Ab dem 5. Dienst je ISO-Woche ist die 48h-Grenze überschritten.
     $longShiftTemplate = createRosterGeneratorShiftTemplate($location, [
         'name' => 'Langdienst',
         'code' => 'long_day',
         'starts_at' => '06:00',
-        'ends_at' => '18:00',
-        'duration_minutes' => 720,
+        'ends_at' => '16:00',
+        'duration_minutes' => 600,
     ]);
     createRosterGeneratorStaffingRule($longShiftTemplate);
 
@@ -1186,6 +1187,70 @@ it('enforces the weekly maximum working minutes', function (): void {
         ->and($weeklyCapSkips)->not->toBeEmpty();
 });
 
+it('enforces the daily maximum working minutes', function (): void {
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    createRosterGeneratorEmployee($location, ['weekly_hours' => 60.00, 'regular_work_days_per_week' => 7]);
+    $roster = createRosterGeneratorRoster($location, $pdl);
+    // 11-Stunden-Dienst überschreitet die Tagesgrenze (§ 3 ArbZG, max. 10 h).
+    $tooLong = createRosterGeneratorShiftTemplate($location, [
+        'name' => 'Überlangdienst',
+        'code' => 'too_long',
+        'starts_at' => '06:00',
+        'ends_at' => '17:00',
+        'duration_minutes' => 660,
+    ]);
+    createRosterGeneratorStaffingRule($tooLong);
+
+    $result = app(RosterGeneratorService::class)->generate($roster);
+
+    $dailyCapSkips = collect($result->skipped)
+        ->filter(fn (array $entry): bool => isset($entry['context']['rejections']['daily_hours_cap']));
+
+    expect(Shift::query()->where('roster_id', $roster->id)->count())->toBe(0)
+        ->and($dailyCapSkips)->not->toBeEmpty();
+});
+
+it('respects maternity protection (no night, sunday or holiday shifts)', function (): void {
+    $location = Location::factory()->create(['state' => 'BY']);
+    $pdl = User::factory()->for($location)->create();
+    // Mitarbeiterin im Mutterschutz, könnte sonst Früh + Nacht arbeiten.
+    $protected = createRosterGeneratorEmployee($location, [
+        'maternity_protection' => true,
+        'can_work_early' => true,
+        'can_work_night' => true,
+        'weekly_hours' => 40.00,
+        'regular_work_days_per_week' => 5,
+    ]);
+
+    $roster = createRosterGeneratorRoster($location, $pdl);
+
+    $early = createRosterGeneratorShiftTemplate($location, [
+        'name' => 'Frühdienst', 'code' => 'early', 'starts_at' => '06:00', 'ends_at' => '14:00', 'duration_minutes' => 480,
+    ]);
+    $night = createRosterGeneratorShiftTemplate($location, [
+        'name' => 'Nachtdienst', 'code' => 'night', 'starts_at' => '22:00', 'ends_at' => '06:00', 'duration_minutes' => 480,
+    ]);
+    createRosterGeneratorStaffingRule($early);
+    createRosterGeneratorStaffingRule($night);
+
+    app(RosterGeneratorService::class)->generate($roster);
+
+    $shifts = Shift::query()
+        ->where('roster_id', $roster->id)
+        ->where('user_id', $protected->id)
+        ->with('shiftTemplate')
+        ->get();
+
+    expect($shifts->where('shiftTemplate.code', 'night')->count())->toBe(0);
+
+    foreach ($shifts as $shift) {
+        expect($shift->date->isSunday())->toBeFalse()
+            // Neujahr 2027 (Feiertag) ebenfalls gesperrt.
+            ->and($shift->date->toDateString())->not->toBe('2027-01-01');
+    }
+});
+
 it('fills blackout days before regular days', function (): void {
     $location = Location::factory()->create();
     $pdl = User::factory()->for($location)->create();
@@ -1195,8 +1260,8 @@ it('fills blackout days before regular days', function (): void {
         'name' => 'Langdienst',
         'code' => 'long_day',
         'starts_at' => '06:00',
-        'ends_at' => '18:00',
-        'duration_minutes' => 720,
+        'ends_at' => '16:00',
+        'duration_minutes' => 600,
     ]);
     createRosterGeneratorStaffingRule($longShiftTemplate);
 
@@ -1243,8 +1308,9 @@ it('warns when an assigned employee has a pending absence request', function ():
     createRosterGeneratorStaffingRule($shiftTemplate, ['weekday' => 5]);
 
     createRosterGeneratorAbsenceRequest($employee, $pdl, [
-        'starts_on' => '2027-01-01',
-        'ends_on' => '2027-01-01',
+        // 8.1.2027 ist ein regulärer Freitag (1.1. wäre Feiertag -> Sonntagsbesetzung).
+        'starts_on' => '2027-01-08',
+        'ends_on' => '2027-01-08',
         'status' => AbsenceRequestStatus::Requested,
         'decided_by' => null,
         'decided_at' => null,
@@ -1257,7 +1323,7 @@ it('warns when an assigned employee has a pending absence request', function ():
 
     expect($result->createdShifts)->toBeGreaterThan(0)
         ->and($pendingWarning)->not->toBeNull()
-        ->and($pendingWarning['context']['date'])->toBe('2027-01-01')
+        ->and($pendingWarning['context']['date'])->toBe('2027-01-08')
         ->and($pendingWarning['context']['userId'])->toBe($employee->id);
 });
 

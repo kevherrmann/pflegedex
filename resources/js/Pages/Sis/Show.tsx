@@ -51,7 +51,15 @@ type Props = {
     latestGeneration: Generation | null;
 };
 
-export default function Show({ resident, sis, canEdit, carePlanExists, topics, risks, latestGeneration }: Props) {
+export default function Show({
+    resident,
+    sis,
+    canEdit,
+    carePlanExists,
+    topics,
+    risks,
+    latestGeneration,
+}: Props) {
     const [generation, setGeneration] = useState<Generation | null>(latestGeneration);
 
     // Polling: solange status='pending' oder 'running' ist, alle 2s den Status holen.
@@ -84,7 +92,11 @@ export default function Show({ resident, sis, canEdit, carePlanExists, topics, r
     }, [generation, resident.id]);
 
     const handleEvaluate = () => {
-        if (!confirm('SIS-Evaluation jetzt speichern? Der nächste Termin wird auf +8 Wochen gesetzt.')) {
+        if (
+            !confirm(
+                'SIS-Evaluation jetzt speichern? Der nächste Termin wird auf +8 Wochen gesetzt.',
+            )
+        ) {
             return;
         }
         router.post(route('residents.sis.evaluate', resident.id));
@@ -112,10 +124,15 @@ export default function Show({ resident, sis, canEdit, carePlanExists, topics, r
         router.post(route('residents.care-plan.generate.start', resident.id));
     };
 
-    const isRunning = generation !== null && (generation.status === 'pending' || generation.status === 'running');
+    const isRunning =
+        generation !== null && (generation.status === 'pending' || generation.status === 'running');
     const justFailed = generation !== null && generation.status === 'failed';
 
-    const aiStatus = (usePage().props as { ai?: { available: boolean; modelPresent: boolean; reason: string | null } }).ai;
+    const aiStatus = (
+        usePage().props as {
+            ai?: { available: boolean; modelPresent: boolean; reason: string | null };
+        }
+    ).ai;
     const aiAvailable = (aiStatus?.available ?? false) && (aiStatus?.modelPresent ?? false);
     const topicByNumber = new Map(sis?.topics.map((t) => [t.topicNumber, t]) ?? []);
     const riskByKind = new Map(sis?.risks.map((r) => [r.riskKind, r]) ?? []);
@@ -124,7 +141,10 @@ export default function Show({ resident, sis, canEdit, carePlanExists, topics, r
         <AuthenticatedLayout
             header={
                 <h2 className="text-xl font-semibold leading-tight text-[#333333]">
-                    SIS · {resident.fullName} <span className="text-sm font-normal text-gray-500">({resident.pseudonym})</span>
+                    SIS · {resident.fullName}{' '}
+                    <span className="text-sm font-normal text-gray-500">
+                        ({resident.pseudonym})
+                    </span>
                 </h2>
             }
         >
@@ -141,7 +161,9 @@ export default function Show({ resident, sis, canEdit, carePlanExists, topics, r
                                     </p>
                                     <p className="mt-1 text-xs text-gray-700">
                                         Schritt {generation.progress} von {generation.totalSteps} ·
-                                        {generation.status === 'pending' ? ' wartet auf Worker …' : ' formuliert …'}
+                                        {generation.status === 'pending'
+                                            ? ' wartet auf Worker …'
+                                            : ' formuliert …'}
                                     </p>
                                     <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-white">
                                         <div
@@ -149,7 +171,11 @@ export default function Show({ resident, sis, canEdit, carePlanExists, topics, r
                                             style={{
                                                 width: `${
                                                     generation.totalSteps > 0
-                                                        ? Math.round((generation.progress / generation.totalSteps) * 100)
+                                                        ? Math.round(
+                                                              (generation.progress /
+                                                                  generation.totalSteps) *
+                                                                  100,
+                                                          )
                                                         : 0
                                                 }%`,
                                             }}
@@ -166,11 +192,12 @@ export default function Show({ resident, sis, canEdit, carePlanExists, topics, r
                                 KI-Generierung fehlgeschlagen
                             </p>
                             <p className="mt-1 text-xs text-red-900">
-                                {generation.errorMessage ?? 'Unbekannter Fehler. Bitte erneut versuchen.'}
+                                {generation.errorMessage ??
+                                    'Unbekannter Fehler. Bitte erneut versuchen.'}
                             </p>
                             <p className="mt-1 text-xs text-red-900">
-                                Die Stichpunkte sind weiterhin gespeichert — Sie können den
-                                Versuch über „Bearbeiten" wiederholen.
+                                Die Stichpunkte sind weiterhin gespeichert — Sie können den Versuch
+                                über „Bearbeiten" wiederholen.
                             </p>
                         </div>
                     )}
@@ -181,14 +208,17 @@ export default function Show({ resident, sis, canEdit, carePlanExists, topics, r
                                 KI-Funktion nicht verfügbar
                             </p>
                             <p className="mt-1 text-xs text-amber-900">
-                                {aiStatus?.reason ?? 'Ollama-Service oder Modell ist gerade nicht erreichbar.'}{' '}
+                                {aiStatus?.reason ??
+                                    'Ollama-Service oder Modell ist gerade nicht erreichbar.'}{' '}
                                 Speichern und Bearbeiten funktioniert weiterhin normal.
                             </p>
                         </div>
                     )}
                     {sis === null ? (
                         <div className="rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-[#E5E7EB]">
-                            <p className="text-gray-700">Für diesen Bewohner ist noch keine SIS angelegt.</p>
+                            <p className="text-gray-700">
+                                Für diesen Bewohner ist noch keine SIS angelegt.
+                            </p>
                             {canEdit && (
                                 <Link
                                     href={route('residents.sis.create', resident.id)}
@@ -204,23 +234,36 @@ export default function Show({ resident, sis, canEdit, carePlanExists, topics, r
                             <div className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-[#E5E7EB]">
                                 <div className="flex flex-wrap items-start justify-between gap-4">
                                     <div>
-                                        <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#9B1C3B]">Strukturierte Informationssammlung</p>
+                                        <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#9B1C3B]">
+                                            Strukturierte Informationssammlung
+                                        </p>
                                         <p className="mt-2 text-sm text-gray-600">
-                                            Begonnen: {sis.startedAt ?? '—'} · Fertiggestellt: {sis.completedAt ?? 'offen'} · Letzte Evaluation:{' '}
+                                            Begonnen: {sis.startedAt ?? '—'} · Fertiggestellt:{' '}
+                                            {sis.completedAt ?? 'offen'} · Letzte Evaluation:{' '}
                                             {sis.evaluatedAt ?? 'noch keine'}
                                         </p>
                                         <p className="mt-1 text-sm">
                                             Nächste Evaluation:{' '}
                                             {sis.nextEvaluationDue ? (
-                                                <span className={sis.isOverdue ? 'font-semibold text-red-700' : 'text-gray-700'}>
+                                                <span
+                                                    className={
+                                                        sis.isOverdue
+                                                            ? 'font-semibold text-red-700'
+                                                            : 'text-gray-700'
+                                                    }
+                                                >
                                                     {sis.nextEvaluationDue}
                                                     {sis.isOverdue && ' (überfällig)'}
                                                 </span>
                                             ) : (
-                                                <span className="text-gray-500">noch nicht geplant</span>
+                                                <span className="text-gray-500">
+                                                    noch nicht geplant
+                                                </span>
                                             )}
                                         </p>
-                                        <p className="mt-1 text-xs text-gray-500">{sis.versionCount} Version(en) im Archiv.</p>
+                                        <p className="mt-1 text-xs text-gray-500">
+                                            {sis.versionCount} Version(en) im Archiv.
+                                        </p>
                                     </div>
                                     {canEdit && (
                                         <div className="flex flex-wrap gap-2">
@@ -256,7 +299,10 @@ export default function Show({ resident, sis, canEdit, carePlanExists, topics, r
                                             )}
                                             {sis.completedAt !== null && carePlanExists && (
                                                 <Link
-                                                    href={route('residents.care-plan.show', resident.id)}
+                                                    href={route(
+                                                        'residents.care-plan.show',
+                                                        resident.id,
+                                                    )}
                                                     className="rounded-md border border-[#9B1C3B] px-4 py-2 text-sm font-semibold uppercase tracking-widest text-[#9B1C3B] hover:bg-[#FAE7EC]"
                                                 >
                                                     Maßnahmenplan
@@ -274,25 +320,38 @@ export default function Show({ resident, sis, canEdit, carePlanExists, topics, r
                                 </div>
                                 {sis.openingQuestion && (
                                     <div className="mt-6 rounded-md bg-[#FAE7EC]/30 p-4">
-                                        <p className="text-xs font-bold uppercase tracking-widest text-[#9B1C3B]">Was bewegt Sie?</p>
-                                        <p className="mt-1 whitespace-pre-line text-sm text-gray-800">{sis.openingQuestion}</p>
+                                        <p className="text-xs font-bold uppercase tracking-widest text-[#9B1C3B]">
+                                            Was bewegt Sie?
+                                        </p>
+                                        <p className="mt-1 whitespace-pre-line text-sm text-gray-800">
+                                            {sis.openingQuestion}
+                                        </p>
                                     </div>
                                 )}
                             </div>
 
                             {/* Themenfelder */}
                             <div className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-[#E5E7EB]">
-                                <h3 className="text-base font-bold uppercase tracking-widest text-[#333333]">Themenfelder</h3>
+                                <h3 className="text-base font-bold uppercase tracking-widest text-[#333333]">
+                                    Themenfelder
+                                </h3>
                                 <ul className="mt-4 space-y-4">
                                     {topics.map((t) => {
                                         const entry = topicByNumber.get(t.number);
                                         return (
-                                            <li key={t.number} className="border-l-4 border-[#9B1C3B] pl-4">
+                                            <li
+                                                key={t.number}
+                                                className="border-l-4 border-[#9B1C3B] pl-4"
+                                            >
                                                 <p className="text-sm font-semibold text-gray-800">
                                                     {t.number}. {t.label}
                                                 </p>
                                                 <p className="mt-1 whitespace-pre-line text-sm text-gray-700">
-                                                    {entry?.content || <span className="italic text-gray-400">Keine Angabe.</span>}
+                                                    {entry?.content || (
+                                                        <span className="italic text-gray-400">
+                                                            Keine Angabe.
+                                                        </span>
+                                                    )}
                                                 </p>
                                             </li>
                                         );
@@ -302,7 +361,9 @@ export default function Show({ resident, sis, canEdit, carePlanExists, topics, r
 
                             {/* Risikomatrix */}
                             <div className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-[#E5E7EB]">
-                                <h3 className="text-base font-bold uppercase tracking-widest text-[#333333]">Risikomatrix</h3>
+                                <h3 className="text-base font-bold uppercase tracking-widest text-[#333333]">
+                                    Risikomatrix
+                                </h3>
                                 <table className="mt-4 w-full text-sm">
                                     <thead>
                                         <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-widest text-gray-500">
@@ -316,11 +377,26 @@ export default function Show({ resident, sis, canEdit, carePlanExists, topics, r
                                         {risks.map((r) => {
                                             const entry = riskByKind.get(r.kind);
                                             return (
-                                                <tr key={r.kind} className="border-b border-gray-100">
-                                                    <td className="py-3 font-medium text-gray-800">{r.label}</td>
-                                                    <td className="py-3">{entry?.isAtRisk ? '✓ ja' : '— nein'}</td>
-                                                    <td className="py-3">{entry?.needsFurtherAssessment ? '✓ ja' : '— nein'}</td>
-                                                    <td className="py-3 text-gray-700">{entry?.notes || <span className="text-gray-400">—</span>}</td>
+                                                <tr
+                                                    key={r.kind}
+                                                    className="border-b border-gray-100"
+                                                >
+                                                    <td className="py-3 font-medium text-gray-800">
+                                                        {r.label}
+                                                    </td>
+                                                    <td className="py-3">
+                                                        {entry?.isAtRisk ? '✓ ja' : '— nein'}
+                                                    </td>
+                                                    <td className="py-3">
+                                                        {entry?.needsFurtherAssessment
+                                                            ? '✓ ja'
+                                                            : '— nein'}
+                                                    </td>
+                                                    <td className="py-3 text-gray-700">
+                                                        {entry?.notes || (
+                                                            <span className="text-gray-400">—</span>
+                                                        )}
+                                                    </td>
                                                 </tr>
                                             );
                                         })}

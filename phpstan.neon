@@ -1,0 +1,10 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+    - phpstan-baseline.neon
+
+parameters:
+    level: 5
+    paths:
+        - app
+    # Bestehende Befunde sind in phpstan-baseline.neon eingefroren; nur NEUE
+    # Befunde lassen CI scheitern. Baseline schrittweise abbauen, Level spaeter erhoehen.

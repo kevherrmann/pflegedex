@@ -7,8 +7,6 @@ use App\Enums\SisTopic;
 use App\Models\Location;
 use App\Models\Resident;
 use App\Models\Sis;
-use App\Models\SisRisk;
-use App\Models\SisTopicEntry;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;

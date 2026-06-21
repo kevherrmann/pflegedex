@@ -17,6 +17,9 @@ Homestead.yaml
 npm-debug.log
 yarn-error.log
 /auth.json
+.env.hostinger
+*.backup-ngrok
+/.claude/settings.local.json
 /.fleet
 /.idea
 /.nova

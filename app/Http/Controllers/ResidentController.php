@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\ResidentStatus;
 use App\Enums\Salutation;
 use App\Models\Location;
 use App\Models\Resident;
@@ -79,12 +80,7 @@ class ResidentController extends Controller
 
         $validated = $request->validate([
             'location_id' => [$locations->count() > 1 ? 'required' : 'nullable', 'string', 'uuid'],
-                                        'salutation' => ['required', Rule::enum(Salutation::class)],
-                                        'first_name' => ['required', 'string', 'max:255'],
-                                        'last_name' => ['required', 'string', 'max:255'],
-                                        'birth_date' => ['nullable', 'date', 'before_or_equal:today'],
-                                        'room_number' => ['nullable', 'string', 'max:50'],
-                                        'care_level' => ['nullable', 'integer', Rule::in([1, 2, 3, 4, 5])],
+            ...$this->residentFieldRules(),
         ]);
 
         $locationId = (string) ($validated['location_id'] ?? $locations->first()->id);
@@ -96,6 +92,10 @@ class ResidentController extends Controller
         }
 
         unset($validated['location_id']);
+
+        // Neuanlage = Aufnahme: Status anwesend, Aufnahmedatum default heute.
+        $validated['status'] = ResidentStatus::Present->value;
+        $validated['admitted_on'] = $validated['admitted_on'] ?? today()->toDateString();
 
         DB::transaction(function () use ($validated, $locationId): void {
             Resident::query()->create($validated + [
@@ -125,9 +125,23 @@ class ResidentController extends Controller
                 'birthDate' => $resident->birth_date?->toDateString(),
                 'roomNumber' => $resident->room_number,
                 'careLevel' => $resident->care_level,
+                'status' => ($resident->status ?? ResidentStatus::Present)->value,
+                'admittedOn' => $resident->admitted_on?->toDateString(),
+                'dischargedOn' => $resident->discharged_on?->toDateString(),
+                'healthInsurance' => $resident->health_insurance,
+                'insuranceNumber' => $resident->insurance_number,
+                'familyDoctor' => $resident->family_doctor,
+                'familyDoctorPhone' => $resident->family_doctor_phone,
+                'guardianName' => $resident->guardian_name,
+                'guardianPhone' => $resident->guardian_phone,
+                'hasLivingWill' => $resident->has_living_will,
+                'hasHealthcareProxy' => $resident->has_healthcare_proxy,
+                'allergies' => $resident->allergies,
+                'diagnoses' => $resident->diagnoses,
             ],
             'locations' => $locations->map(fn (Location $location): array => $this->locationPayload($location))->values(),
             'salutations' => Salutation::options(),
+            'statuses' => ResidentStatus::options(),
         ]);
     }
 
@@ -139,12 +153,8 @@ class ResidentController extends Controller
 
         $validated = $request->validate([
             'location_id' => [$locations->count() > 1 ? 'required' : 'nullable', 'string', 'uuid'],
-            'salutation' => ['required', Rule::enum(Salutation::class)],
-            'first_name' => ['required', 'string', 'max:255'],
-            'last_name' => ['required', 'string', 'max:255'],
-            'birth_date' => ['nullable', 'date', 'before_or_equal:today'],
-            'room_number' => ['nullable', 'string', 'max:50'],
-            'care_level' => ['nullable', 'integer', Rule::in([1, 2, 3, 4, 5])],
+            'status' => ['sometimes', Rule::enum(ResidentStatus::class)],
+            ...$this->residentFieldRules(),
         ]);
 
         $locationId = $locations->count() === 1
@@ -158,6 +168,16 @@ class ResidentController extends Controller
         }
 
         unset($validated['location_id']);
+
+        // Status steuert die Aktiv-Kennzeichnung (Entlassen/Verstorben = inaktiv).
+        $status = isset($validated['status'])
+            ? ResidentStatus::from($validated['status'])
+            : ($resident->status ?? ResidentStatus::Present);
+        $validated['active'] = $status->isActive();
+
+        if (! $status->isActive() && empty($validated['discharged_on'])) {
+            $validated['discharged_on'] = today()->toDateString();
+        }
 
         $resident->update($validated + ['location_id' => $locationId]);
 
@@ -204,6 +224,35 @@ class ResidentController extends Controller
         }
 
         return $locations->firstWhere('id', $locationId);
+    }
+
+    /**
+     * Gemeinsame Validierungsregeln für Stammdaten (ohne location_id/status).
+     *
+     * @return array<string, array<int, mixed>>
+     */
+    private function residentFieldRules(): array
+    {
+        return [
+            'salutation' => ['required', Rule::enum(Salutation::class)],
+            'first_name' => ['required', 'string', 'max:255'],
+            'last_name' => ['required', 'string', 'max:255'],
+            'birth_date' => ['nullable', 'date', 'before_or_equal:today'],
+            'room_number' => ['nullable', 'string', 'max:50'],
+            'care_level' => ['nullable', 'integer', Rule::in([1, 2, 3, 4, 5])],
+            'admitted_on' => ['nullable', 'date', 'before_or_equal:today'],
+            'discharged_on' => ['nullable', 'date', 'after_or_equal:admitted_on'],
+            'health_insurance' => ['nullable', 'string', 'max:150'],
+            'insurance_number' => ['nullable', 'string', 'max:100'],
+            'family_doctor' => ['nullable', 'string', 'max:150'],
+            'family_doctor_phone' => ['nullable', 'string', 'max:50'],
+            'guardian_name' => ['nullable', 'string', 'max:150'],
+            'guardian_phone' => ['nullable', 'string', 'max:50'],
+            'has_living_will' => ['sometimes', 'boolean'],
+            'has_healthcare_proxy' => ['sometimes', 'boolean'],
+            'allergies' => ['nullable', 'string', 'max:2000'],
+            'diagnoses' => ['nullable', 'string', 'max:2000'],
+        ];
     }
 
     /**

@@ -31,6 +31,6 @@ abstract class TestCase extends BaseTestCase
         //
         // Der echte AiHealthService wird im AiHealthServiceTest direkt
         // ueber app()->forgetInstance + new AiHealthService(...) verwendet.
-        $this->app->bind(AiHealthService::class, fn() => FakeAiHealthService::healthy());
+        $this->app->bind(AiHealthService::class, fn () => FakeAiHealthService::healthy());
     }
 }

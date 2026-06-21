@@ -42,7 +42,7 @@ enum Salutation: string
     public static function options(): array
     {
         return array_map(
-            fn(self $s): array => ['value' => $s->value, 'label' => $s->label()],
+            fn (self $s): array => ['value' => $s->value, 'label' => $s->label()],
             self::cases(),
         );
     }

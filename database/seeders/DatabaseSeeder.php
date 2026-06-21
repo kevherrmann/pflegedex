@@ -26,6 +26,15 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        // Rollen werden immer benoetigt. Demo-/Beispieldaten (inkl. Accounts mit dem
+        // Passwort "password") NIEMALS in Produktion seeden -> sonst triviale Zugaenge
+        // auf einer oeffentlich erreichbaren Instanz.
+        if (app()->environment('production')) {
+            $this->call(RoleSeeder::class);
+
+            return;
+        }
+
         Location::withoutAuditing(function (): void {
             Resident::withoutAuditing(function (): void {
                 User::withoutAuditing(function (): void {

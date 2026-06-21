@@ -16,9 +16,7 @@ use Illuminate\Validation\ValidationException;
 
 class ShiftService
 {
-    public function __construct(private readonly RosterDateService $rosterDateService)
-    {
-    }
+    public function __construct(private readonly RosterDateService $rosterDateService) {}
 
     public function assignManualShift(
         Roster $roster,
@@ -185,8 +183,7 @@ class ShiftService
         ShiftTemplate $shiftTemplate,
         string $date,
         ?string $exceptShiftId = null,
-    ): void
-    {
+    ): void {
         $query = Shift::query()
             ->where('user_id', $employee->id)
             ->whereDate('date', $date)

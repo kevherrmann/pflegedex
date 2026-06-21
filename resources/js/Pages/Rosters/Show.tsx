@@ -508,9 +508,7 @@ function MonthOverview({
     const [filter, setFilter] = useState<MonthOverviewFilter>('all');
     const [editingShift, setEditingShift] = useState<ShiftItem | null>(null);
     const validationDayIndex = buildValidationDayIndex(validationResult, roster.id);
-    const generationSkippedDayIndex = buildGenerationSkippedDayIndex(
-        rosterGenerationResult,
-    );
+    const generationSkippedDayIndex = buildGenerationSkippedDayIndex(rosterGenerationResult);
 
     const filterOptions: Array<{
         value: MonthOverviewFilter;
@@ -542,9 +540,7 @@ function MonthOverview({
             label: 'Mit Problemen',
             count: calendarDays.filter((day) => {
                 const hasValidationProblem = Boolean(validationDayIndex[day.date]);
-                const hasGenerationSkipped = Boolean(
-                    generationSkippedDayIndex[day.date]?.length,
-                );
+                const hasGenerationSkipped = Boolean(generationSkippedDayIndex[day.date]?.length);
 
                 return hasValidationProblem || hasGenerationSkipped;
             }).length,
@@ -566,9 +562,7 @@ function MonthOverview({
 
         if (filter === 'with-validation') {
             const hasValidationProblem = Boolean(validationDayIndex[day.date]);
-            const hasGenerationSkipped = Boolean(
-                generationSkippedDayIndex[day.date]?.length,
-            );
+            const hasGenerationSkipped = Boolean(generationSkippedDayIndex[day.date]?.length);
 
             return hasValidationProblem || hasGenerationSkipped;
         }
@@ -618,10 +612,11 @@ function MonthOverview({
                             validationEntries.length - visibleValidationEntries.length,
                             0,
                         );
-                        const generationSkippedEntries =
-                            generationSkippedDayIndex[day.date] ?? [];
-                        const visibleGenerationSkippedEntries =
-                            generationSkippedEntries.slice(0, 3);
+                        const generationSkippedEntries = generationSkippedDayIndex[day.date] ?? [];
+                        const visibleGenerationSkippedEntries = generationSkippedEntries.slice(
+                            0,
+                            3,
+                        );
                         const hiddenGenerationSkippedCount = Math.max(
                             generationSkippedEntries.length -
                                 visibleGenerationSkippedEntries.length,
@@ -792,60 +787,47 @@ function MonthOverview({
 
                                 {hasGenerationSkipped && (
                                     <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
-                                        <p className="font-semibold">
-                                            Automatisch nicht besetzt
-                                        </p>
+                                        <p className="font-semibold">Automatisch nicht besetzt</p>
                                         <ul className="mt-2 space-y-1.5">
-                                            {visibleGenerationSkippedEntries.map(
-                                                (entry, index) => {
-                                                    const shiftTemplateCodeValue =
-                                                        entry.context.shiftTemplateCode;
-                                                    const shiftTemplateCode =
-                                                        typeof shiftTemplateCodeValue ===
-                                                            'string' ||
-                                                        typeof shiftTemplateCodeValue ===
-                                                            'number'
-                                                            ? formatGenerationContextValue(
-                                                                  shiftTemplateCodeValue,
-                                                              )
-                                                            : null;
-                                                    const needLabel =
-                                                        generationSkippedNeedLabel(entry);
+                                            {visibleGenerationSkippedEntries.map((entry, index) => {
+                                                const shiftTemplateCodeValue =
+                                                    entry.context.shiftTemplateCode;
+                                                const shiftTemplateCode =
+                                                    typeof shiftTemplateCodeValue === 'string' ||
+                                                    typeof shiftTemplateCodeValue === 'number'
+                                                        ? formatGenerationContextValue(
+                                                              shiftTemplateCodeValue,
+                                                          )
+                                                        : null;
+                                                const needLabel = generationSkippedNeedLabel(entry);
 
-                                                    return (
-                                                        <li
-                                                            key={`${entry.code}-${index}`}
-                                                            className="rounded bg-white/60 px-2 py-1"
-                                                        >
-                                                            <div className="font-medium">
-                                                                {generationSkippedTitle(entry)}
+                                                return (
+                                                    <li
+                                                        key={`${entry.code}-${index}`}
+                                                        className="rounded bg-white/60 px-2 py-1"
+                                                    >
+                                                        <div className="font-medium">
+                                                            {generationSkippedTitle(entry)}
+                                                        </div>
+                                                        {(shiftTemplateCode || needLabel) && (
+                                                            <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 text-[0.7rem] text-amber-800">
+                                                                {shiftTemplateCode && (
+                                                                    <span>
+                                                                        Schicht: {shiftTemplateCode}
+                                                                    </span>
+                                                                )}
+                                                                {needLabel && (
+                                                                    <span>Bedarf: {needLabel}</span>
+                                                                )}
                                                             </div>
-                                                            {(shiftTemplateCode ||
-                                                                needLabel) && (
-                                                                <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 text-[0.7rem] text-amber-800">
-                                                                    {shiftTemplateCode && (
-                                                                        <span>
-                                                                            Schicht:{' '}
-                                                                            {shiftTemplateCode}
-                                                                        </span>
-                                                                    )}
-                                                                    {needLabel && (
-                                                                        <span>
-                                                                            Bedarf:{' '}
-                                                                            {needLabel}
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                        </li>
-                                                    );
-                                                },
-                                            )}
+                                                        )}
+                                                    </li>
+                                                );
+                                            })}
                                         </ul>
                                         {hiddenGenerationSkippedCount > 0 && (
                                             <p className="mt-2 font-medium">
-                                                + {hiddenGenerationSkippedCount} weitere
-                                                Hinweise
+                                                + {hiddenGenerationSkippedCount} weitere Hinweise
                                             </p>
                                         )}
                                     </div>
@@ -890,11 +872,7 @@ function RosterActions({ roster }: { roster: RosterItem }) {
     };
 
     const preview = () => {
-        router.post(
-            route('rosters.generate-preview', roster.id),
-            {},
-            { preserveScroll: true },
-        );
+        router.post(route('rosters.generate-preview', roster.id), {}, { preserveScroll: true });
     };
 
     const deleteAutoShifts = () => {
@@ -1028,18 +1006,10 @@ function GenerationResult({ result }: { result: RosterGenerationResult | null })
                                 key={`${entry.code}-${index}`}
                                 className="rounded-md bg-white/70 p-3 text-blue-950 ring-1 ring-blue-100"
                             >
-                                <p className="font-semibold">
-                                    {generationWarningTitle(entry)}
-                                </p>
+                                <p className="font-semibold">{generationWarningTitle(entry)}</p>
                                 <p className="mt-1 text-xs text-blue-900">
-                                    {[
-                                        entry.context.employeeName,
-                                        entry.context.date,
-                                        entry.message,
-                                    ]
-                                        .filter(
-                                            (value) => typeof value === 'string',
-                                        )
+                                    {[entry.context.employeeName, entry.context.date, entry.message]
+                                        .filter((value) => typeof value === 'string')
                                         .join(' · ')}
                                 </p>
                             </div>
@@ -1082,10 +1052,7 @@ function formatGenerationRejections(value: unknown): string | null {
 
     return Object.entries(value as Record<string, unknown>)
         .filter(([, count]) => typeof count === 'number')
-        .map(
-            ([code, count]) =>
-                `${generationRejectionLabels[code] ?? code}: ${String(count)}`,
-        )
+        .map(([code, count]) => `${generationRejectionLabels[code] ?? code}: ${String(count)}`)
         .join(' · ');
 }
 
@@ -1146,9 +1113,7 @@ function formatGenerationContextValue(value: unknown): string {
         Array.isArray(value) &&
         value.every(
             (item) =>
-                typeof item === 'string' ||
-                typeof item === 'number' ||
-                typeof item === 'boolean',
+                typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean',
         )
     ) {
         return value.map((item) => formatGenerationContextValue(item)).join(', ');
@@ -1174,9 +1139,7 @@ function GenerationSkippedSummary({ entry }: { entry: GenerationSkippedEntry }) 
         ['Grund', reason],
         ['Abgelehnte Kandidaten', formatGenerationRejections(entry.context.rejections)],
     ];
-    const details = contextDetails.filter(
-        ([, value]) => value !== null && value !== undefined,
-    );
+    const details = contextDetails.filter(([, value]) => value !== null && value !== undefined);
 
     return (
         <div className="rounded-md bg-white/70 p-3 text-blue-950 ring-1 ring-blue-100">
@@ -1197,9 +1160,7 @@ function GenerationSkippedSummary({ entry }: { entry: GenerationSkippedEntry }) 
             )}
 
             <details className="mt-2 text-xs text-blue-900">
-                <summary className="cursor-pointer font-medium">
-                    Technische Details
-                </summary>
+                <summary className="cursor-pointer font-medium">Technische Details</summary>
                 <pre className="mt-2 max-h-48 overflow-auto rounded-md bg-blue-950/5 p-2 font-mono text-[0.7rem] leading-relaxed text-blue-950">
                     {JSON.stringify(entry.context, null, 2)}
                 </pre>
@@ -1247,8 +1208,8 @@ function RosterPreviewModal({
                     Vorschau der automatischen Planung
                 </h3>
                 <p className="mt-2 text-sm text-gray-700">
-                    {result.createdShifts} Dienste würden geplant,{' '}
-                    {result.replacedAutoShifts} bestehende Auto-Dienste ersetzt.
+                    {result.createdShifts} Dienste würden geplant, {result.replacedAutoShifts}{' '}
+                    bestehende Auto-Dienste ersetzt.
                 </p>
 
                 <div
@@ -1262,14 +1223,12 @@ function RosterPreviewModal({
                 >
                     <p className="font-semibold">
                         {validation.status === 'red' && 'Der Dienstplan hätte Fehler.'}
-                        {validation.status === 'yellow' &&
-                            'Der Dienstplan hätte Hinweise.'}
+                        {validation.status === 'yellow' && 'Der Dienstplan hätte Hinweise.'}
                         {validation.status === 'green' &&
                             'Der Dienstplan würde alle aktuell geprüften Regeln erfüllen.'}
                     </p>
                     <p className="mt-1">
-                        {validation.errors.length} Fehler ·{' '}
-                        {validation.warnings.length} Hinweise
+                        {validation.errors.length} Fehler · {validation.warnings.length} Hinweise
                     </p>
                 </div>
 
@@ -1324,14 +1283,9 @@ function RosterPreviewModal({
                         <ul className="mt-2 space-y-1">
                             {result.warnings.map((entry, index) => (
                                 <li key={`${entry.code}-${index}`}>
-                                    {[
-                                        entry.context.employeeName,
-                                        entry.context.date,
-                                        entry.message,
-                                    ]
+                                    {[entry.context.employeeName, entry.context.date, entry.message]
                                         .filter(
-                                            (value): value is string =>
-                                                typeof value === 'string',
+                                            (value): value is string => typeof value === 'string',
                                         )
                                         .join(' · ')}
                                 </li>
@@ -1385,8 +1339,7 @@ function ValidationResult({
                     'Der Dienstplan erfüllt alle aktuell geprüften Regeln.'}
             </p>
 
-            {(validationResult.errors.length > 0 ||
-                validationResult.warnings.length > 0) && (
+            {(validationResult.errors.length > 0 || validationResult.warnings.length > 0) && (
                 <div className="mt-3 space-y-3">
                     {validationResult.errors.length > 0 && (
                         <EntryList title="Fehler" entries={validationResult.errors} />
@@ -1399,7 +1352,6 @@ function ValidationResult({
         </div>
     );
 }
-
 
 const validationContextLabels: Array<[string, string]> = [
     ['employeeName', 'Mitarbeiter'],
@@ -1441,11 +1393,7 @@ function formatValidationContextValue(value: unknown): string {
     }
 
     if (Array.isArray(value)) {
-        if (
-            value.every(
-                (item) => typeof item === 'string' || typeof item === 'number',
-            )
-        ) {
+        if (value.every((item) => typeof item === 'string' || typeof item === 'number')) {
             return value.join(', ');
         }
 
@@ -1468,8 +1416,7 @@ function ValidationContextSummary({ context }: { context: Record<string, unknown
 
     if (Array.isArray(weekendStartsOn)) {
         const weekends = weekendStartsOn.filter(
-            (item): item is string | number =>
-                typeof item === 'string' || typeof item === 'number',
+            (item): item is string | number => typeof item === 'string' || typeof item === 'number',
         );
 
         if (weekends.length > 0) {
@@ -1538,15 +1485,11 @@ function EmployeeWorkloadOverview({
     return (
         <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
             <div className="border-b border-gray-200 p-6">
-                <h3 className="text-lg font-semibold text-gray-900">
-                    Mitarbeiter-Auslastung
-                </h3>
+                <h3 className="text-lg font-semibold text-gray-900">Mitarbeiter-Auslastung</h3>
             </div>
             <div className="p-6">
                 {workload.length === 0 ? (
-                    <p className="text-sm text-gray-600">
-                        Noch keine Auslastung vorhanden.
-                    </p>
+                    <p className="text-sm text-gray-600">Noch keine Auslastung vorhanden.</p>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-200 text-sm">
@@ -1564,19 +1507,13 @@ function EmployeeWorkloadOverview({
                             <tbody className="divide-y divide-gray-100 bg-white text-gray-700">
                                 {workload.map((item) => {
                                     const userValidation = validationUserIndex[item.userId];
-                                    const hasValidationError =
-                                        userValidation?.hasErrors === true;
+                                    const hasValidationError = userValidation?.hasErrors === true;
                                     const hasValidationWarning =
-                                        !hasValidationError &&
-                                        userValidation?.hasWarnings === true;
+                                        !hasValidationError && userValidation?.hasWarnings === true;
                                     const validationEntries = userValidation?.entries ?? [];
-                                    const visibleValidationEntries = validationEntries.slice(
-                                        0,
-                                        2,
-                                    );
+                                    const visibleValidationEntries = validationEntries.slice(0, 2);
                                     const hiddenValidationEntriesCount = Math.max(
-                                        validationEntries.length -
-                                            visibleValidationEntries.length,
+                                        validationEntries.length - visibleValidationEntries.length,
                                         0,
                                     );
 
@@ -1594,21 +1531,15 @@ function EmployeeWorkloadOverview({
                                             <td className="px-4 py-3 font-medium text-gray-900">
                                                 {item.employeeName}
                                             </td>
-                                            <td className="px-4 py-3">
-                                                {item.shiftsCount}
-                                            </td>
+                                            <td className="px-4 py-3">{item.shiftsCount}</td>
                                             <td className="px-4 py-3">
                                                 {formatMinutesAsHours(item.plannedMinutes)}
                                             </td>
-                                            <td className="px-4 py-3">
-                                                {item.workedDays.length}
-                                            </td>
+                                            <td className="px-4 py-3">{item.workedDays.length}</td>
                                             <td className="px-4 py-3">
                                                 {item.workedWeekendStartsOn.length}
                                             </td>
-                                            <td className="px-4 py-3">
-                                                {shiftCountsLabel(item)}
-                                            </td>
+                                            <td className="px-4 py-3">{shiftCountsLabel(item)}</td>
                                             <td className="px-4 py-3">
                                                 {userValidation ? (
                                                     <div className="space-y-1">
@@ -1634,11 +1565,9 @@ function EmployeeWorkloadOverview({
                                                                     </li>
                                                                 ),
                                                             )}
-                                                            {hiddenValidationEntriesCount >
-                                                                0 && (
+                                                            {hiddenValidationEntriesCount > 0 && (
                                                                 <li className="font-medium">
-                                                                    +{' '}
-                                                                    {hiddenValidationEntriesCount}{' '}
+                                                                    + {hiddenValidationEntriesCount}{' '}
                                                                     weitere
                                                                 </li>
                                                             )}
@@ -1725,16 +1654,13 @@ function ShiftForm({
                 <select
                     id="shift_template_id"
                     value={form.data.shift_template_id}
-                    onChange={(event) =>
-                        form.setData('shift_template_id', event.target.value)
-                    }
+                    onChange={(event) => form.setData('shift_template_id', event.target.value)}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]"
                 >
                     <option value="">Bitte wählen</option>
                     {shiftTemplates.map((shiftTemplate) => (
                         <option key={shiftTemplate.id} value={shiftTemplate.id}>
-                            {shiftTemplate.name} · {shiftTemplate.startsAt}-
-                            {shiftTemplate.endsAt}
+                            {shiftTemplate.name} · {shiftTemplate.startsAt}-{shiftTemplate.endsAt}
                         </option>
                     ))}
                 </select>
@@ -1779,120 +1705,6 @@ function deleteShift(roster: RosterItem, shift: ShiftItem): void {
     router.delete(route('rosters.shifts.destroy', [roster.id, shift.id]), {
         preserveScroll: true,
     });
-}
-
-function ShiftEditForm({
-    roster,
-    shift,
-    employees,
-    shiftTemplates,
-    onCancel,
-}: {
-    roster: RosterItem;
-    shift: ShiftItem;
-    employees: EmployeeOption[];
-    shiftTemplates: ShiftTemplateOption[];
-    onCancel: () => void;
-}) {
-    const rosterEmployees = employees.filter(
-        (employee) => employee.locationId === null || employee.locationId === roster.locationId,
-    );
-    const form = useForm({
-        user_id: shift.userId,
-        shift_template_id: shift.shiftTemplateId,
-        date: shift.date,
-        note: shift.note ?? '',
-    });
-
-    const submit: FormEventHandler = (event) => {
-        event.preventDefault();
-
-        form.patch(route('rosters.shifts.update', [roster.id, shift.id]), {
-            preserveScroll: true,
-            onSuccess: onCancel,
-        });
-    };
-
-    return (
-        <form
-            onSubmit={submit}
-            className="mt-3 grid gap-4 rounded-md border border-gray-200 bg-gray-50 p-4 md:grid-cols-2 lg:grid-cols-5 lg:items-end"
-        >
-            <div>
-                <InputLabel htmlFor={`edit-user-${shift.id}`} value="Mitarbeiter" />
-                <select
-                    id={`edit-user-${shift.id}`}
-                    value={form.data.user_id}
-                    onChange={(event) => form.setData('user_id', event.target.value)}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]"
-                >
-                    <option value="">Bitte wählen</option>
-                    {rosterEmployees.map((employee) => (
-                        <option key={employee.id} value={employee.id}>
-                            {employee.name}
-                            {employee.isNursingSpecialist ? ' · Fachkraft' : ''}
-                        </option>
-                    ))}
-                </select>
-                <InputError message={form.errors.user_id} className="mt-2" />
-            </div>
-
-            <div>
-                <InputLabel htmlFor={`edit-shift-template-${shift.id}`} value="Schicht" />
-                <select
-                    id={`edit-shift-template-${shift.id}`}
-                    value={form.data.shift_template_id}
-                    onChange={(event) =>
-                        form.setData('shift_template_id', event.target.value)
-                    }
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]"
-                >
-                    <option value="">Bitte wählen</option>
-                    {shiftTemplates.map((shiftTemplate) => (
-                        <option key={shiftTemplate.id} value={shiftTemplate.id}>
-                            {shiftTemplate.name} · {shiftTemplate.startsAt}-
-                            {shiftTemplate.endsAt}
-                        </option>
-                    ))}
-                </select>
-                <InputError message={form.errors.shift_template_id} className="mt-2" />
-            </div>
-
-            <div>
-                <InputLabel htmlFor={`edit-date-${shift.id}`} value="Datum" />
-                <TextInput
-                    id={`edit-date-${shift.id}`}
-                    type="date"
-                    value={form.data.date}
-                    onChange={(event) => form.setData('date', event.target.value)}
-                    className="mt-1 block w-full"
-                />
-                <InputError message={form.errors.date} className="mt-2" />
-            </div>
-
-            <div>
-                <InputLabel htmlFor={`edit-note-${shift.id}`} value="Notiz" />
-                <TextInput
-                    id={`edit-note-${shift.id}`}
-                    value={form.data.note}
-                    onChange={(event) => form.setData('note', event.target.value)}
-                    className="mt-1 block w-full"
-                />
-                <InputError message={form.errors.note} className="mt-2" />
-            </div>
-
-            <div className="flex gap-2 lg:justify-end">
-                <PrimaryButton disabled={form.processing}>Speichern</PrimaryButton>
-                <button
-                    type="button"
-                    onClick={onCancel}
-                    className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-                >
-                    Abbrechen
-                </button>
-            </div>
-        </form>
-    );
 }
 
 function ShiftEditModal({
@@ -1944,9 +1756,7 @@ function ShiftEditModal({
             >
                 <div className="flex items-start justify-between gap-4">
                     <div>
-                        <h3 className="text-lg font-semibold text-gray-900">
-                            Dienst bearbeiten
-                        </h3>
+                        <h3 className="text-lg font-semibold text-gray-900">Dienst bearbeiten</h3>
                         <p className="mt-0.5 text-sm text-gray-500">
                             {shift.shiftTemplateName ?? shift.shiftTemplateCode ?? 'Dienst'}
                         </p>
@@ -2046,88 +1856,6 @@ function ShiftEditModal({
     );
 }
 
-function ShiftList({
-    roster,
-    employees,
-    shiftTemplates,
-}: {
-    roster: RosterItem;
-    employees: EmployeeOption[];
-    shiftTemplates: ShiftTemplateOption[];
-}) {
-    const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
-
-    if (roster.shifts.length === 0) {
-        return (
-            <p className="mt-3 text-sm text-gray-600">
-                Für diesen Monatsdienstplan sind noch keine Dienste eingetragen.
-            </p>
-        );
-    }
-
-    return (
-        <ul className="mt-3 divide-y divide-gray-200">
-            {roster.shifts.map((shift) => (
-                <li
-                    key={shift.id}
-                    className="py-3 text-sm text-gray-700"
-                >
-                    <div className="grid gap-2 md:grid-cols-[1fr_1.4fr_1.2fr_2fr_auto] md:items-center">
-                        <span className="font-medium text-gray-900">{shift.date}</span>
-                        <span className="flex flex-wrap items-center gap-1.5">
-                            <span>
-                                {shift.shiftTemplateName ?? 'Unbekannte Schicht'}{' '}
-                                {shift.shiftTemplateCode
-                                    ? `(${shift.shiftTemplateCode})`
-                                    : ''}
-                            </span>
-                            <ShiftSourceBadge shift={shift} />
-                        </span>
-                        <span>{shift.employeeName ?? 'Unbekannt'}</span>
-                        <span className="text-gray-500">
-                            {formatDateTime(shift.startsAt)} bis{' '}
-                            {formatDateTime(shift.endsAt)}
-                            {shift.note ? ` · ${shift.note}` : ''}
-                        </span>
-                        {roster.isEditable && (
-                            <span className="flex gap-2 md:justify-end">
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        setEditingShiftId(
-                                            editingShiftId === shift.id ? null : shift.id,
-                                        )
-                                    }
-                                    className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-                                >
-                                    Bearbeiten
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => deleteShift(roster, shift)}
-                                    className="rounded-md border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50"
-                                >
-                                    Löschen
-                                </button>
-                            </span>
-                        )}
-                    </div>
-
-                    {editingShiftId === shift.id && (
-                        <ShiftEditForm
-                            roster={roster}
-                            shift={shift}
-                            employees={employees}
-                            shiftTemplates={shiftTemplates}
-                            onCancel={() => setEditingShiftId(null)}
-                        />
-                    )}
-                </li>
-            ))}
-        </ul>
-    );
-}
-
 export default function RosterShow({
     roster,
     employees,
@@ -2140,9 +1868,7 @@ export default function RosterShow({
     return (
         <AuthenticatedLayout
             header={
-                <h2 className="text-xl font-semibold leading-tight text-gray-800">
-                    Dienstplan
-                </h2>
+                <h2 className="text-xl font-semibold leading-tight text-gray-800">Dienstplan</h2>
             }
         >
             <Head title="Dienstplan" />
@@ -2184,9 +1910,7 @@ export default function RosterShow({
 
                         <div className="grid gap-4 p-6 text-sm text-gray-700 md:grid-cols-3">
                             <div>
-                                <span className="block font-medium text-gray-900">
-                                    Angelegt am
-                                </span>
+                                <span className="block font-medium text-gray-900">Angelegt am</span>
                                 {formatDateTime(roster.createdAt)}
                             </div>
                             <div>
@@ -2196,9 +1920,7 @@ export default function RosterShow({
                                 {formatDateTime(roster.publishedAt)}
                             </div>
                             <div>
-                                <span className="block font-medium text-gray-900">
-                                    Bearbeitbar
-                                </span>
+                                <span className="block font-medium text-gray-900">Bearbeitbar</span>
                                 {roster.isEditable ? 'Ja' : 'Nein'}
                             </div>
                         </div>
@@ -2206,18 +1928,11 @@ export default function RosterShow({
 
                     <GenerationResult result={rosterGenerationResult} />
 
-                    {rosterPreviewResult !== null &&
-                        rosterPreviewResult.rosterId === roster.id && (
-                            <RosterPreviewModal
-                                roster={roster}
-                                result={rosterPreviewResult}
-                            />
-                        )}
+                    {rosterPreviewResult !== null && rosterPreviewResult.rosterId === roster.id && (
+                        <RosterPreviewModal roster={roster} result={rosterPreviewResult} />
+                    )}
 
-                    <ValidationResult
-                        roster={roster}
-                        validationResult={rosterValidationResult}
-                    />
+                    <ValidationResult roster={roster} validationResult={rosterValidationResult} />
 
                     <EmployeeWorkloadOverview
                         roster={roster}
@@ -2240,9 +1955,7 @@ export default function RosterShow({
 
                     <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
                         <div className="border-b border-gray-200 p-6">
-                            <h3 className="text-lg font-semibold text-gray-900">
-                                Monatsübersicht
-                            </h3>
+                            <h3 className="text-lg font-semibold text-gray-900">Monatsübersicht</h3>
                         </div>
                         <div className="p-6">
                             <MonthOverview
@@ -2252,21 +1965,6 @@ export default function RosterShow({
                                 employees={employees}
                                 shiftTemplates={shiftTemplates}
                                 rosterGenerationResult={rosterGenerationResult}
-                            />
-                        </div>
-                    </div>
-
-                    <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
-                        <div className="border-b border-gray-200 p-6">
-                            <h3 className="text-lg font-semibold text-gray-900">
-                                Eingetragene Dienste
-                            </h3>
-                        </div>
-                        <div className="p-6">
-                            <ShiftList
-                                roster={roster}
-                                employees={employees}
-                                shiftTemplates={shiftTemplates}
                             />
                         </div>
                     </div>

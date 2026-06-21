@@ -38,14 +38,14 @@ it('shows PDL users only residents from accessible Wohnbereiche', function (): v
     $pdl->locations()->syncWithoutDetaching([$ownLocation->id]);
 
     $this->actingAs($pdl)
-    ->get('/residents')
-    ->assertOk()
-    ->assertInertia(fn (Assert $page) => $page
-    ->component('Residents/Index')
-    ->has('residents', 1)
-    ->where('residents.0.id', $ownResident->id)
-    ->where('residents.0.fullName', 'Eigene Bewohnerin')
-    );
+        ->get('/residents')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Residents/Index')
+            ->has('residents', 1)
+            ->where('residents.0.id', $ownResident->id)
+            ->where('residents.0.fullName', 'Eigene Bewohnerin')
+        );
 });
 
 it('prevents PDL users from creating residents in foreign Wohnbereiche', function (): void {
@@ -57,16 +57,16 @@ it('prevents PDL users from creating residents in foreign Wohnbereiche', functio
     $pdl->locations()->syncWithoutDetaching([$ownLocation->id]);
 
     $this->actingAs($pdl)
-    ->post('/residents', [
-        'salutation' => 'frau',
-        'location_id' => $foreignLocation->id,
-        'first_name' => 'Fremde',
-        'last_name' => 'Bewohnerin',
-        'birth_date' => '1940-01-01',
-        'room_number' => '99',
-        'care_level' => 2,
-    ])
-    ->assertSessionHasErrors('location_id');
+        ->post('/residents', [
+            'salutation' => 'frau',
+            'location_id' => $foreignLocation->id,
+            'first_name' => 'Fremde',
+            'last_name' => 'Bewohnerin',
+            'birth_date' => '1940-01-01',
+            'room_number' => '99',
+            'care_level' => 2,
+        ])
+        ->assertSessionHasErrors('location_id');
 
     expect(
         Resident::query()->where('last_name', 'Bewohnerin')->exists()
@@ -94,14 +94,14 @@ it('allows Pflegekraft users to view only their own Wohnbereich residents', func
     $pflegekraft->locations()->syncWithoutDetaching([$ownLocation->id]);
 
     $this->actingAs($pflegekraft)
-    ->get('/residents')
-    ->assertOk()
-    ->assertInertia(fn (Assert $page) => $page
-    ->component('Residents/Index')
-    ->has('residents', 1)
-    ->where('residents.0.id', $ownResident->id)
-    ->where('residents.0.fullName', 'Sichtbare Bewohnerin')
-    );
+        ->get('/residents')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Residents/Index')
+            ->has('residents', 1)
+            ->where('residents.0.id', $ownResident->id)
+            ->where('residents.0.fullName', 'Sichtbare Bewohnerin')
+        );
 });
 
 it('prevents Pflegekraft users from creating residents', function (): void {
@@ -112,15 +112,15 @@ it('prevents Pflegekraft users from creating residents', function (): void {
     $pflegekraft->locations()->syncWithoutDetaching([$location->id]);
 
     $this->actingAs($pflegekraft)
-    ->post('/residents', [
-        'location_id' => $location->id,
-        'first_name' => 'Nicht',
-        'last_name' => 'Erlaubt',
-        'birth_date' => '1940-01-01',
-        'room_number' => '1',
-        'care_level' => 1,
-    ])
-    ->assertForbidden();
+        ->post('/residents', [
+            'location_id' => $location->id,
+            'first_name' => 'Nicht',
+            'last_name' => 'Erlaubt',
+            'birth_date' => '1940-01-01',
+            'room_number' => '1',
+            'care_level' => 1,
+        ])
+        ->assertForbidden();
 
     expect(
         Resident::query()->where('last_name', 'Erlaubt')->exists()

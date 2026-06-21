@@ -60,7 +60,7 @@ it('appends a report version when an unsigned care report is changed', function 
     $report->appendVersion('created', $user);
 
     $this->actingAs($user)
-        ->patch('/care-reports/' . $report->id, [
+        ->patch('/care-reports/'.$report->id, [
             'occurred_at' => $report->occurred_at->format('Y-m-d H:i:s'),
             'category' => $report->category,
             'body' => 'Neuer Text.',
@@ -94,7 +94,7 @@ it('prevents changing a signed care report', function (): void {
     ]);
 
     $this->actingAs($user)
-        ->patch('/care-reports/' . $report->id, [
+        ->patch('/care-reports/'.$report->id, [
             'occurred_at' => $report->occurred_at->format('Y-m-d H:i:s'),
             'category' => $report->category,
             'body' => 'Manipulierter Text.',
@@ -121,7 +121,7 @@ it('lets Pflegekraft users sign their own accessible care reports', function ():
     ]);
 
     $this->actingAs($user)
-        ->post('/care-reports/' . $report->id . '/sign')
+        ->post('/care-reports/'.$report->id.'/sign')
         ->assertRedirect();
 
     $report->refresh();
@@ -159,10 +159,10 @@ it('exposes signing state in the care report inertia payload', function (): void
     $report->appendVersion('signed', $user);
 
     $this->actingAs($user)
-        ->get('/care-reports?resident_id=' . $resident->id . '&date=2026-05-03')
+        ->get('/care-reports?resident_id='.$resident->id.'&date=2026-05-03')
         ->assertOk()
         ->assertInertia(
-            fn($page) => $page
+            fn ($page) => $page
                 ->component('CareReports/Index')
                 ->where('reportsByCategory.Grundpflege.0.id', $report->id)
                 ->where('reportsByCategory.Grundpflege.0.signed', true)

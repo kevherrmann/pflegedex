@@ -20,11 +20,7 @@ type ResidentsIndexProps = {
     residents: Resident[];
 };
 
-export default function Index({
-    location,
-    locations,
-    residents,
-}: ResidentsIndexProps) {
+export default function Index({ location, locations, residents }: ResidentsIndexProps) {
     const canManageResidents = usePage().props.auth.permissions.manageResidents;
 
     return (
@@ -34,9 +30,7 @@ export default function Index({
                     <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#9B1C3B]">
                         Bewohnerdokumentation
                     </p>
-                    <h2 className="text-xl font-semibold leading-tight text-[#333333]">
-                        Bewohner
-                    </h2>
+                    <h2 className="text-xl font-semibold leading-tight text-[#333333]">Bewohner</h2>
                 </div>
             }
         >
@@ -54,13 +48,18 @@ export default function Index({
                                     Aktive Bewohner
                                 </h1>
                                 <p className="mt-4 max-w-3xl leading-7 text-[#54595F]">
-                                    Diese Liste zeigt aktuell nur aktive Bewohner aus deinem zugeordneten Wohnbereich. Archivierte Bewohner und andere Wohnbereiche bleiben ausgeblendet.
+                                    Diese Liste zeigt aktuell nur aktive Bewohner aus deinem
+                                    zugeordneten Wohnbereich. Archivierte Bewohner und andere
+                                    Wohnbereiche bleiben ausgeblendet.
                                 </p>
                             </div>
 
                             {canManageResidents && (
                                 <Link
-                                    href={route('residents.create', location ? { location_id: location.id } : {})}
+                                    href={route(
+                                        'residents.create',
+                                        location ? { location_id: location.id } : {},
+                                    )}
                                     className="inline-flex items-center justify-center rounded-md border border-transparent bg-[#9B1C3B] px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white transition duration-150 ease-in-out hover:bg-[#7F1730] focus:bg-[#7F1730] focus:outline-none focus:ring-2 focus:ring-[#9B1C3B] focus:ring-offset-2 active:bg-[#7F1730]"
                                 >
                                     Bewohner anlegen
@@ -106,9 +105,7 @@ export default function Index({
 
                     <section className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-[#E5E7EB]">
                         <div className="border-b border-[#E5E7EB] px-6 py-5">
-                            <h3 className="text-lg font-semibold text-[#333333]">
-                                Bewohnerliste
-                            </h3>
+                            <h3 className="text-lg font-semibold text-[#333333]">Bewohnerliste</h3>
                             <p className="mt-1 text-sm text-[#54595F]">
                                 {residents.length} aktive Einträge
                             </p>
@@ -165,20 +162,83 @@ export default function Index({
                                                 <td className="whitespace-nowrap px-6 py-4 text-right">
                                                     <div className="flex justify-end gap-4">
                                                         <Link
-                                                            href={route('residents.sis.show', resident.id)}
+                                                            href={route(
+                                                                'residents.sis.show',
+                                                                resident.id,
+                                                            )}
                                                             className="text-sm font-semibold text-[#9B1C3B] hover:underline"
                                                         >
                                                             SIS
                                                         </Link>
                                                         <Link
-                                                            href={route('residents.care-plan.show', resident.id)}
+                                                            href={route(
+                                                                'residents.care-plan.show',
+                                                                resident.id,
+                                                            )}
                                                             className="text-sm font-semibold text-[#9B1C3B] hover:underline"
                                                         >
                                                             MP
                                                         </Link>
+                                                        <Link
+                                                            href={route(
+                                                                'residents.vitals.index',
+                                                                resident.id,
+                                                            )}
+                                                            className="text-sm font-semibold text-[#9B1C3B] hover:underline"
+                                                        >
+                                                            Vitalwerte
+                                                        </Link>
+                                                        <Link
+                                                            href={route(
+                                                                'residents.care-tasks.index',
+                                                                resident.id,
+                                                            )}
+                                                            className="text-sm font-semibold text-[#9B1C3B] hover:underline"
+                                                        >
+                                                            Nachweis
+                                                        </Link>
+                                                        <Link
+                                                            href={route(
+                                                                'residents.assessments.index',
+                                                                resident.id,
+                                                            )}
+                                                            className="text-sm font-semibold text-[#9B1C3B] hover:underline"
+                                                        >
+                                                            Assessments
+                                                        </Link>
+                                                        <Link
+                                                            href={route(
+                                                                'residents.medications.index',
+                                                                resident.id,
+                                                            )}
+                                                            className="text-sm font-semibold text-[#9B1C3B] hover:underline"
+                                                        >
+                                                            Medikation
+                                                        </Link>
+                                                        <Link
+                                                            href={route(
+                                                                'residents.wounds.index',
+                                                                resident.id,
+                                                            )}
+                                                            className="text-sm font-semibold text-[#9B1C3B] hover:underline"
+                                                        >
+                                                            Wunden
+                                                        </Link>
+                                                        <Link
+                                                            href={route(
+                                                                'residents.quality.index',
+                                                                resident.id,
+                                                            )}
+                                                            className="text-sm font-semibold text-[#9B1C3B] hover:underline"
+                                                        >
+                                                            Qualität
+                                                        </Link>
                                                         {canManageResidents && (
                                                             <Link
-                                                                href={route('residents.edit', resident.id)}
+                                                                href={route(
+                                                                    'residents.edit',
+                                                                    resident.id,
+                                                                )}
                                                                 className="text-sm font-semibold text-[#9B1C3B] hover:underline"
                                                             >
                                                                 Bearbeiten
@@ -197,7 +257,8 @@ export default function Index({
                                     Noch keine aktiven Bewohner vorhanden
                                 </p>
                                 <p className="mt-2 text-[#54595F]">
-                                    Im nächsten Schritt ergänzen wir das Formular zum Anlegen neuer Bewohner.
+                                    Im nächsten Schritt ergänzen wir das Formular zum Anlegen neuer
+                                    Bewohner.
                                 </p>
                             </div>
                         )}

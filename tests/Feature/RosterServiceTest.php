@@ -84,8 +84,8 @@ function createRosterServiceShift(
     string $date,
 ): Shift {
     $shiftDate = CarbonImmutable::parse($date)->startOfDay();
-    $startsAt = CarbonImmutable::parse($shiftDate->toDateString() . ' ' . $shiftTemplate->starts_at);
-    $endsAt = CarbonImmutable::parse($shiftDate->toDateString() . ' ' . $shiftTemplate->ends_at);
+    $startsAt = CarbonImmutable::parse($shiftDate->toDateString().' '.$shiftTemplate->starts_at);
+    $endsAt = CarbonImmutable::parse($shiftDate->toDateString().' '.$shiftTemplate->ends_at);
 
     if ($endsAt->lessThanOrEqualTo($startsAt)) {
         $endsAt = $endsAt->addDay();

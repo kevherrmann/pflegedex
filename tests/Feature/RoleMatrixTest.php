@@ -22,19 +22,19 @@ it('allows admin users to create PDL accounts', function (): void {
     $admin->assignRole('Admin');
 
     $this->actingAs($admin)
-    ->post('/users/pdl', [
-        'name' => 'PDL Eins',
-        'email' => 'pdl.eins@pflegedex.local',
-        'password' => 'sicheres-passwort',
-    ])
-    ->assertRedirect('/users');
+        ->post('/users/pdl', [
+            'name' => 'PDL Eins',
+            'email' => 'pdl.eins@pflegedex.local',
+            'password' => 'Sicheres-Passwort1',
+        ])
+        ->assertRedirect('/users');
 
     $pdl = User::query()
-    ->where('email', 'pdl.eins@pflegedex.local')
-    ->firstOrFail();
+        ->where('email', 'pdl.eins@pflegedex.local')
+        ->firstOrFail();
 
     expect($pdl->hasRole('PDL'))->toBeTrue()
-    ->and(Hash::check('sicheres-passwort', $pdl->password))->toBeTrue();
+        ->and(Hash::check('Sicheres-Passwort1', $pdl->password))->toBeTrue();
 });
 
 it('prevents PDL users from creating other PDL accounts', function (): void {
@@ -44,12 +44,12 @@ it('prevents PDL users from creating other PDL accounts', function (): void {
     $pdl->assignRole('PDL');
 
     $this->actingAs($pdl)
-    ->post('/users/pdl', [
-        'name' => 'Verbotene PDL',
-        'email' => 'verboten.pdl@pflegedex.local',
-        'password' => 'sicheres-passwort',
-    ])
-    ->assertForbidden();
+        ->post('/users/pdl', [
+            'name' => 'Verbotene PDL',
+            'email' => 'verboten.pdl@pflegedex.local',
+            'password' => 'Sicheres-Passwort1',
+        ])
+        ->assertForbidden();
 
     expect(
         User::query()->where('email', 'verboten.pdl@pflegedex.local')->exists()
@@ -64,23 +64,23 @@ it('allows PDL users to create residents in their accessible Wohnbereich', funct
     $pdl->locations()->syncWithoutDetaching([$location->id]);
 
     $this->actingAs($pdl)
-    ->post('/residents', [
-        'salutation' => 'frau',
-        'location_id' => $location->id,
-        'first_name' => 'Erika',
-        'last_name' => 'Mustermann',
-        'birth_date' => '1942-03-15',
-        'room_number' => '12',
-        'care_level' => 3,
-    ])
-    ->assertRedirect('/residents?location_id='.$location->id);
+        ->post('/residents', [
+            'salutation' => 'frau',
+            'location_id' => $location->id,
+            'first_name' => 'Erika',
+            'last_name' => 'Mustermann',
+            'birth_date' => '1942-03-15',
+            'room_number' => '12',
+            'care_level' => 3,
+        ])
+        ->assertRedirect('/residents?location_id='.$location->id);
 
     $resident = Resident::query()
-    ->where('last_name', 'Mustermann')
-    ->firstOrFail();
+        ->where('last_name', 'Mustermann')
+        ->firstOrFail();
 
     expect($resident->location_id)->toBe($location->id)
-    ->and($resident->pseudonym)->toStartWith('P-');
+        ->and($resident->pseudonym)->toStartWith('P-');
 });
 
 it('allows PDL users to create operational staff but not Admin or PDL accounts', function (): void {
@@ -91,30 +91,30 @@ it('allows PDL users to create operational staff but not Admin or PDL accounts',
     $pdl->locations()->syncWithoutDetaching([$location->id]);
 
     $this->actingAs($pdl)
-    ->post('/staff', [
-        'name' => 'Pflege Eins',
-        'email' => 'pflege.eins@pflegedex.local',
-        'password' => 'sicheres-passwort',
-        'role' => 'Pflegekraft',
-        'location_ids' => [$location->id],
-    ])
-    ->assertRedirect('/staff');
+        ->post('/staff', [
+            'name' => 'Pflege Eins',
+            'email' => 'pflege.eins@pflegedex.local',
+            'password' => 'Sicheres-Passwort1',
+            'role' => 'Pflegekraft',
+            'location_ids' => [$location->id],
+        ])
+        ->assertRedirect('/staff');
 
     $staff = User::query()
-    ->where('email', 'pflege.eins@pflegedex.local')
-    ->firstOrFail();
+        ->where('email', 'pflege.eins@pflegedex.local')
+        ->firstOrFail();
 
     expect($staff->hasRole('Pflegekraft'))->toBeTrue();
 
     foreach (['Admin', 'PDL'] as $forbiddenRole) {
         $this->actingAs($pdl)
-        ->post('/staff', [
-            'name' => 'Verboten '.$forbiddenRole,
-            'email' => strtolower($forbiddenRole).'@pflegedex.local',
-               'password' => 'sicheres-passwort',
-               'role' => $forbiddenRole,
-               'location_ids' => [$location->id],
-        ])
-        ->assertSessionHasErrors('role');
+            ->post('/staff', [
+                'name' => 'Verboten '.$forbiddenRole,
+                'email' => strtolower($forbiddenRole).'@pflegedex.local',
+                'password' => 'Sicheres-Passwort1',
+                'role' => $forbiddenRole,
+                'location_ids' => [$location->id],
+            ])
+            ->assertSessionHasErrors('role');
     }
 });

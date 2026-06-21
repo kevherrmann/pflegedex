@@ -1,0 +1,128 @@
+# Produktions-Setup fuer den Hostinger-Server.
+# Unterschiede zum Dev-docker-compose.yml:
+#  - PostgreSQL mit persistentem Volume (statt tmpfs -> Daten ueberleben Neustarts)
+#  - kein node/Vite-Dev-Service (Frontend-Assets werden vorab gebaut: public/build)
+#  - web nur an 127.0.0.1 gebunden -> nur ueber ngrok/lokal erreichbar, nicht offen im Netz
+#  - keine offenen Host-Ports fuer DB/Redis/Ollama (nur intern im Compose-Netz)
+#  - kein GPU-Reservat fuer Ollama (Server hat keine GPU -> CPU-only)
+#  - restart: unless-stopped ueberall -> kommt nach Reboot automatisch hoch
+services:
+  app:
+    build:
+      context: .
+      args:
+        UID: 1000
+        GID: 1000
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - .:/var/www/html
+    environment:
+      PFLEGEDEX_AUTO_MIGRATE: "false"
+      OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  web:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:80"
+    volumes:
+      - .:/var/www/html:ro
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      - app
+
+  queue:
+    build:
+      context: .
+      args:
+        UID: 1000
+        GID: 1000
+    restart: unless-stopped
+    command: php artisan queue:work --tries=3 --backoff=5
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - .:/var/www/html
+    environment:
+      OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-pflegedex}
+      POSTGRES_USER: ${DB_USERNAME:-pflegedex}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-pflegedex}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-pflegedex} -d ${DB_DATABASE:-pflegedex}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - allkeys-lru
+    volumes:
+      - redis-data:/data
+
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - ollama-data:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  # Einmalbefehl: zieht das konfigurierte Modell, sobald ollama healthy ist.
+  ollama-init:
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    volumes:
+      - ollama-data:/root/.ollama
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      AI_MODEL: ${AI_MODEL:-gemma4:e2b}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Pulling Modell ${AI_MODEL:-gemma4:e2b} ..."
+        ollama pull "${AI_MODEL:-gemma4:e2b}" || {
+          echo "WARN: Pull fehlgeschlagen. Pflegedex laeuft trotzdem, KI-Features sind dann deaktiviert."
+          exit 0
+        }
+        echo "Modell ${AI_MODEL:-gemma4:e2b} bereit."
+    restart: "no"
+
+volumes:
+  pgdata:
+  redis-data:
+  ollama-data:

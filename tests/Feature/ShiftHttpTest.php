@@ -811,7 +811,6 @@ it('calculates night shift end time on the following day when updating through h
         ->and($shift->ends_at->format('Y-m-d H:i:s'))->toBe('2027-01-13 06:00:00');
 });
 
-
 it('returns a user error when assigning an employee from another Wohnbereich', function (): void {
     $location = Location::factory()->create();
     $otherLocation = Location::factory()->create();

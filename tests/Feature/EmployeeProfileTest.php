@@ -3,8 +3,8 @@
 use App\Enums\EmploymentArea;
 use App\Models\EmployeeProfile;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Database\QueryException;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
@@ -51,11 +51,11 @@ it('maps all required employment areas', function (EmploymentArea $area): void {
 
     expect($user->refresh()->employeeProfile->employment_area)->toBe($area);
 })->with([
-            EmploymentArea::Nursing,
-            EmploymentArea::Cleaning,
-            EmploymentArea::Caretaker,
-            EmploymentArea::Pdl,
-        ]);
+    EmploymentArea::Nursing,
+    EmploymentArea::Cleaning,
+    EmploymentArea::Caretaker,
+    EmploymentArea::Pdl,
+]);
 
 it('allows nursing staff to be marked as nursing specialists', function (): void {
     $user = User::factory()->create();
@@ -82,9 +82,9 @@ it('allows nursing and cleaning staff to request absences', function (Employment
 
     expect($user->refresh()->canRequestAbsence())->toBeTrue();
 })->with([
-            EmploymentArea::Nursing,
-            EmploymentArea::Cleaning,
-        ]);
+    EmploymentArea::Nursing,
+    EmploymentArea::Cleaning,
+]);
 
 it('excludes caretakers from absence requests', function (): void {
     $user = User::factory()->create();
@@ -106,7 +106,7 @@ it('prevents more than one employee profile per user', function (): void {
         'employment_area' => EmploymentArea::Nursing,
     ]);
 
-    expect(fn() => EmployeeProfile::query()->create([
+    expect(fn () => EmployeeProfile::query()->create([
         'user_id' => $user->id,
         'employment_area' => EmploymentArea::Cleaning,
     ]))->toThrow(QueryException::class);

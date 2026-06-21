@@ -52,6 +52,7 @@ class CarePlan extends Model implements Auditable
     protected function casts(): array
     {
         return [
+            'grundbotschaft' => 'encrypted',
             'started_at' => 'date',
             'evaluated_at' => 'date',
             'next_evaluation_due' => 'date',
@@ -113,7 +114,7 @@ class CarePlan extends Model implements Auditable
             'started_at' => $this->started_at?->toDateString(),
             'evaluated_at' => $this->evaluated_at?->toDateString(),
             'next_evaluation_due' => $this->next_evaluation_due?->toDateString(),
-            'topics' => $this->topics->map(fn(CarePlanTopicEntry $t): array => [
+            'topics' => $this->topics->map(fn (CarePlanTopicEntry $t): array => [
                 'topic_number' => $t->topic_number,
                 'content' => $t->content,
             ])->all(),

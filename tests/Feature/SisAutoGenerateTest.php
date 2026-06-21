@@ -23,7 +23,7 @@ beforeEach(function (): void {
 
 it('dispatcht beim SIS-Anlegen automatisch einen Generate-Job wenn KI verfuegbar ist', function (): void {
     // Healthy ist Default aus TestCase, aber explizit fuer Lesbarkeit:
-    app()->bind(AiHealthService::class, fn() => FakeAiHealthService::healthy());
+    app()->bind(AiHealthService::class, fn () => FakeAiHealthService::healthy());
 
     $location = Location::factory()->create();
     $resident = Resident::factory()->for($location)->create();
@@ -50,7 +50,7 @@ it('dispatcht beim SIS-Anlegen automatisch einen Generate-Job wenn KI verfuegbar
 });
 
 it('dispatcht KEINEN Generate-Job beim Anlegen wenn KI nicht verfuegbar ist', function (): void {
-    app()->bind(AiHealthService::class, fn() => FakeAiHealthService::unavailable());
+    app()->bind(AiHealthService::class, fn () => FakeAiHealthService::unavailable());
 
     $location = Location::factory()->create();
     $resident = Resident::factory()->for($location)->create();

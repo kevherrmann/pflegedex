@@ -28,8 +28,8 @@ class RosterDateService
      */
     public function buildShiftTimes(CarbonImmutable $shiftDate, ShiftTemplate $shiftTemplate): array
     {
-        $startsAt = CarbonImmutable::parse($shiftDate->toDateString() . ' ' . $shiftTemplate->starts_at);
-        $endsAt = CarbonImmutable::parse($shiftDate->toDateString() . ' ' . $shiftTemplate->ends_at);
+        $startsAt = CarbonImmutable::parse($shiftDate->toDateString().' '.$shiftTemplate->starts_at);
+        $endsAt = CarbonImmutable::parse($shiftDate->toDateString().' '.$shiftTemplate->ends_at);
 
         if ($endsAt->lessThanOrEqualTo($startsAt)) {
             $endsAt = $endsAt->addDay();

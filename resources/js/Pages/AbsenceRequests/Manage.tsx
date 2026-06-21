@@ -196,11 +196,12 @@ export default function ManageAbsenceRequests({
                                     Team-Übersicht · {monthLabel}
                                 </h3>
                                 <p className="mt-1 text-sm text-gray-600">
-                                    Urlaub und Überstundenausgleich pro Mitarbeiter. Klicke auf einen
-                                    Balken für Details und Entscheidung.
+                                    Urlaub und Überstundenausgleich pro Mitarbeiter. Klicke auf
+                                    einen Balken für Details und Entscheidung.
                                     {openRequestsCount > 0 && (
                                         <span className="ml-1 font-medium text-amber-700">
-                                            {openRequestsCount} offene{openRequestsCount === 1 ? 'r' : ''} Antrag
+                                            {openRequestsCount} offene
+                                            {openRequestsCount === 1 ? 'r' : ''} Antrag
                                             {openRequestsCount === 1 ? '' : 'e'}.
                                         </span>
                                     )}
@@ -212,7 +213,10 @@ export default function ManageAbsenceRequests({
                                     ‹ Vormonat
                                 </SecondaryButton>
                                 {month !== currentMonth && (
-                                    <SecondaryButton type="button" onClick={() => goToMonth(currentMonth)}>
+                                    <SecondaryButton
+                                        type="button"
+                                        onClick={() => goToMonth(currentMonth)}
+                                    >
                                         Heute
                                     </SecondaryButton>
                                 )}
@@ -225,22 +229,27 @@ export default function ManageAbsenceRequests({
                         {/* Legende */}
                         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-gray-200 px-6 py-3 text-xs text-gray-600">
                             <span className="flex items-center gap-2">
-                                <span className="inline-block h-3 w-5 rounded bg-emerald-500" /> Urlaub (genehmigt)
+                                <span className="inline-block h-3 w-5 rounded bg-emerald-500" />{' '}
+                                Urlaub (genehmigt)
                             </span>
                             <span className="flex items-center gap-2">
-                                <span className="inline-block h-3 w-5 rounded bg-emerald-100 ring-1 ring-dashed ring-emerald-500" /> Urlaub (offen)
+                                <span className="inline-block h-3 w-5 rounded bg-emerald-100 ring-1 ring-dashed ring-emerald-500" />{' '}
+                                Urlaub (offen)
                             </span>
                             <span className="flex items-center gap-2">
-                                <span className="inline-block h-3 w-5 rounded bg-indigo-500" /> Überstundenausgleich (genehmigt)
+                                <span className="inline-block h-3 w-5 rounded bg-indigo-500" />{' '}
+                                Überstundenausgleich (genehmigt)
                             </span>
                             <span className="flex items-center gap-2">
-                                <span className="inline-block h-3 w-5 rounded bg-indigo-100 ring-1 ring-dashed ring-indigo-500" /> Überstundenausgleich (offen)
+                                <span className="inline-block h-3 w-5 rounded bg-indigo-100 ring-1 ring-dashed ring-indigo-500" />{' '}
+                                Überstundenausgleich (offen)
                             </span>
                         </div>
 
                         {totalEmployees === 0 ? (
                             <p className="p-6 text-sm text-gray-600">
-                                Für deine Wohnbereiche sind keine Mitarbeiter mit Abwesenheitsanspruch hinterlegt.
+                                Für deine Wohnbereiche sind keine Mitarbeiter mit
+                                Abwesenheitsanspruch hinterlegt.
                             </p>
                         ) : (
                             <div className="overflow-x-auto">
@@ -290,7 +299,9 @@ export default function ManageAbsenceRequests({
                                                     <div
                                                         key={employee.id}
                                                         className="grid items-center border-b border-gray-100 hover:bg-gray-50/60"
-                                                        style={{ gridTemplateColumns: gridTemplate }}
+                                                        style={{
+                                                            gridTemplateColumns: gridTemplate,
+                                                        }}
                                                     >
                                                         <div className="sticky left-0 z-10 truncate bg-white px-3 py-2">
                                                             <div className="truncate text-sm font-medium text-gray-800">
@@ -311,9 +322,15 @@ export default function ManageAbsenceRequests({
                                                                 <div
                                                                     key={day.date}
                                                                     className={`h-9 border-l border-gray-100 ${
-                                                                        day.isWeekend ? 'bg-gray-50' : ''
+                                                                        day.isWeekend
+                                                                            ? 'bg-gray-50'
+                                                                            : ''
                                                                     } ${isToday ? 'bg-amber-50' : ''}`}
-                                                                    style={{ gridColumnStart: dayIndex + 2, gridRow: 1 }}
+                                                                    style={{
+                                                                        gridColumnStart:
+                                                                            dayIndex + 2,
+                                                                        gridRow: 1,
+                                                                    }}
                                                                 />
                                                             );
                                                         })}
@@ -323,21 +340,29 @@ export default function ManageAbsenceRequests({
                                                             <button
                                                                 key={absence.id}
                                                                 type="button"
-                                                                onClick={() => openAbsence(employee, absence)}
+                                                                onClick={() =>
+                                                                    openAbsence(employee, absence)
+                                                                }
                                                                 title={`${absence.typeLabel}: ${absence.startsOn} – ${absence.endsOn} (${absence.statusLabel})${
-                                                                    absence.hitsBlackout ? ' · Urlaubssperre' : ''
+                                                                    absence.hitsBlackout
+                                                                        ? ' · Urlaubssperre'
+                                                                        : ''
                                                                 }`}
                                                                 className={`z-10 mx-0.5 flex h-6 items-center gap-1 overflow-hidden rounded px-1.5 text-[11px] font-medium ring-1 ${barClass(
                                                                     absence,
                                                                 )} ${absence.hitsBlackout ? 'ring-2 ring-red-500' : ''} ${
-                                                                    absence.continuesBefore ? 'rounded-l-none' : ''
+                                                                    absence.continuesBefore
+                                                                        ? 'rounded-l-none'
+                                                                        : ''
                                                                 } ${absence.continuesAfter ? 'rounded-r-none' : ''}`}
                                                                 style={{
                                                                     gridColumn: `${absence.startDay + 1} / ${absence.endDay + 2}`,
                                                                     gridRow: 1,
                                                                 }}
                                                             >
-                                                                {absence.hitsBlackout && <span aria-hidden>⚠</span>}
+                                                                {absence.hitsBlackout && (
+                                                                    <span aria-hidden>⚠</span>
+                                                                )}
                                                                 <span className="truncate">
                                                                     {shortTypeLabel(absence)}
                                                                 </span>
@@ -391,7 +416,9 @@ export default function ManageAbsenceRequests({
                         <dl className="mt-4 space-y-2 text-sm">
                             <div className="flex justify-between gap-4">
                                 <dt className="text-gray-500">Art</dt>
-                                <dd className="font-medium text-gray-900">{selection.absence.typeLabel}</dd>
+                                <dd className="font-medium text-gray-900">
+                                    {selection.absence.typeLabel}
+                                </dd>
                             </div>
                             <div className="flex justify-between gap-4">
                                 <dt className="text-gray-500">Zeitraum</dt>
@@ -401,12 +428,16 @@ export default function ManageAbsenceRequests({
                             </div>
                             <div className="flex justify-between gap-4">
                                 <dt className="text-gray-500">Tage</dt>
-                                <dd className="font-medium text-gray-900">{selection.absence.daysCount}</dd>
+                                <dd className="font-medium text-gray-900">
+                                    {selection.absence.daysCount}
+                                </dd>
                             </div>
                             {selection.absence.note && (
                                 <div className="flex justify-between gap-4">
                                     <dt className="text-gray-500">Notiz</dt>
-                                    <dd className="text-right text-gray-800">{selection.absence.note}</dd>
+                                    <dd className="text-right text-gray-800">
+                                        {selection.absence.note}
+                                    </dd>
                                 </div>
                             )}
                             {selection.absence.decidedByName && (
@@ -414,7 +445,9 @@ export default function ManageAbsenceRequests({
                                     <dt className="text-gray-500">Entschieden von</dt>
                                     <dd className="text-right text-gray-700">
                                         {selection.absence.decidedByName}
-                                        {selection.absence.decidedAt ? ` · ${selection.absence.decidedAt}` : ''}
+                                        {selection.absence.decidedAt
+                                            ? ` · ${selection.absence.decidedAt}`
+                                            : ''}
                                     </dd>
                                 </div>
                             )}
@@ -427,12 +460,13 @@ export default function ManageAbsenceRequests({
                             </div>
                         )}
 
-                        {selection.absence.status === 'requested' && selection.absence.hitsBlackout && (
-                            <div className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-800">
-                                ⚠ Dieser Antrag fällt in eine Urlaubssperre. Eine Genehmigung ist nur als
-                                dokumentierte Ausnahme mit Begründung möglich.
-                            </div>
-                        )}
+                        {selection.absence.status === 'requested' &&
+                            selection.absence.hitsBlackout && (
+                                <div className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-800">
+                                    ⚠ Dieser Antrag fällt in eine Urlaubssperre. Eine Genehmigung
+                                    ist nur als dokumentierte Ausnahme mit Begründung möglich.
+                                </div>
+                            )}
 
                         {selection.absence.status === 'requested' ? (
                             <div className="mt-6">
@@ -475,7 +509,9 @@ export default function ManageAbsenceRequests({
 
                                 {showOverrideForm && (
                                     <form
-                                        onSubmit={(event) => submitOverrideApprove(event, selection.absence.id)}
+                                        onSubmit={(event) =>
+                                            submitOverrideApprove(event, selection.absence.id)
+                                        }
                                         className="space-y-3 rounded-xl bg-amber-50 p-4"
                                     >
                                         <label
@@ -487,7 +523,9 @@ export default function ManageAbsenceRequests({
                                         <textarea
                                             id="override_reason"
                                             value={data.override_reason}
-                                            onChange={(event) => setData('override_reason', event.target.value)}
+                                            onChange={(event) =>
+                                                setData('override_reason', event.target.value)
+                                            }
                                             rows={3}
                                             className="block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]"
                                             placeholder="Warum wird trotz Urlaubssperre genehmigt? (z. B. dringender familiärer Grund, Besetzung gesichert)"
@@ -513,7 +551,9 @@ export default function ManageAbsenceRequests({
 
                                 {showRejectForm && (
                                     <form
-                                        onSubmit={(event) => submitReject(event, selection.absence.id)}
+                                        onSubmit={(event) =>
+                                            submitReject(event, selection.absence.id)
+                                        }
                                         className="space-y-3 rounded-xl bg-gray-50 p-4"
                                     >
                                         <label
@@ -525,7 +565,9 @@ export default function ManageAbsenceRequests({
                                         <textarea
                                             id="rejection_reason"
                                             value={data.rejection_reason}
-                                            onChange={(event) => setData('rejection_reason', event.target.value)}
+                                            onChange={(event) =>
+                                                setData('rejection_reason', event.target.value)
+                                            }
                                             rows={3}
                                             className="block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]"
                                             placeholder="Zum Beispiel: Mindestbesetzung wäre gefährdet."

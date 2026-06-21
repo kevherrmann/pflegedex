@@ -31,6 +31,7 @@ class EmployeeProfile extends Model
         'can_work_early',
         'can_work_late',
         'can_work_night',
+        'maternity_protection',
         'active',
     ];
 
@@ -61,6 +62,7 @@ class EmployeeProfile extends Model
             'can_work_early' => 'boolean',
             'can_work_late' => 'boolean',
             'can_work_night' => 'boolean',
+            'maternity_protection' => 'boolean',
             'active' => 'boolean',
         ];
     }

@@ -76,6 +76,7 @@ it('SisFormulator: System-Prompt nutzt fuer Frau "die Bewohnerin" und Pronomen "
         ->once()
         ->andReturnUsing(function ($prompt, $system) use (&$captured): string {
             $captured = $system;
+
             return 'Antwort';
         });
 
@@ -94,6 +95,7 @@ it('SisFormulator: System-Prompt nutzt fuer Herrn "der Bewohner" und Pronomen "e
         ->once()
         ->andReturnUsing(function ($prompt, $system) use (&$captured): string {
             $captured = $system;
+
             return 'Antwort';
         });
 

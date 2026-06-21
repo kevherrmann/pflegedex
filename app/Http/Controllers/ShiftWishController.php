@@ -23,13 +23,19 @@ class ShiftWishController extends Controller
 {
     public function index(Request $request): Response
     {
+        $user = $request->user();
+
         abort_unless(
-            $request->user()?->hasRole('PDL'),
+            $user?->hasRole('PDL'),
             HttpResponse::HTTP_FORBIDDEN,
         );
 
+        // Standort-Scope: nur Wuensche/Stammdaten der eigenen Wohnbereiche.
+        $locationIds = $user->accessibleLocations()->pluck('id')->all();
+
         return Inertia::render('ShiftWishes/Index', [
             'shiftWishes' => ShiftWish::query()
+                ->whereIn('location_id', $locationIds)
                 ->with(['user', 'location', 'shiftTemplate', 'createdBy'])
                 ->orderByDesc('date')
                 ->get()
@@ -47,6 +53,7 @@ class ShiftWishController extends Controller
                 ])
                 ->values(),
             'locations' => Location::query()
+                ->whereIn('id', $locationIds)
                 ->orderBy('name')
                 ->get(['id', 'name'])
                 ->map(fn (Location $location): array => [
@@ -55,6 +62,7 @@ class ShiftWishController extends Controller
                 ])
                 ->values(),
             'staff' => User::query()
+                ->whereIn('location_id', $locationIds)
                 ->whereHas('employeeProfile', fn ($query) => $query->where('active', true))
                 ->with('employeeProfile')
                 ->orderBy('name')
@@ -67,6 +75,7 @@ class ShiftWishController extends Controller
                 ])
                 ->values(),
             'shiftTemplates' => ShiftTemplate::query()
+                ->whereIn('location_id', $locationIds)
                 ->where('active', true)
                 ->orderBy('starts_at')
                 ->get()
@@ -116,6 +125,13 @@ class ShiftWishController extends Controller
         ]);
 
         $employee = User::query()->findOrFail($validated['user_id']);
+
+        // Standort-Scope: PDL darf nur fuer Mitarbeitende eigener Wohnbereiche Wuensche anlegen.
+        abort_unless(
+            $request->user()->canAccessLocation($employee->location_id),
+            HttpResponse::HTTP_FORBIDDEN,
+        );
+
         $kind = ShiftWishKind::from($validated['kind']);
 
         ShiftWish::query()->create([
@@ -139,6 +155,12 @@ class ShiftWishController extends Controller
     {
         abort_unless(
             $request->user()?->hasRole('PDL'),
+            HttpResponse::HTTP_FORBIDDEN,
+        );
+
+        // Standort-Scope: nur Wuensche aus eigenen Wohnbereichen loeschen.
+        abort_unless(
+            $request->user()->canAccessLocation($shiftWish->location_id),
             HttpResponse::HTTP_FORBIDDEN,
         );
 

@@ -240,6 +240,7 @@ class CarePlanController extends Controller
                     ->where('care_plan_id', $carePlan->id)
                     ->where('topic_number', $number)
                     ->delete();
+
                 continue;
             }
 
@@ -278,7 +279,7 @@ class CarePlanController extends Controller
             'nextEvaluationDue' => $carePlan->next_evaluation_due?->toDateString(),
             'isOverdue' => $carePlan->isOverdue(),
             'versionCount' => $carePlan->versions_count ?? 0,
-            'topics' => $carePlan->topics->map(fn(CarePlanTopicEntry $t): array => [
+            'topics' => $carePlan->topics->map(fn (CarePlanTopicEntry $t): array => [
                 'topicNumber' => $t->topic_number,
                 'content' => $t->content,
             ])->values()->all(),
@@ -291,7 +292,7 @@ class CarePlanController extends Controller
     private function topicCatalog(): array
     {
         return array_map(
-            fn(CarePlanTopicEnum $t): array => ['number' => $t->value, 'label' => $t->label()],
+            fn (CarePlanTopicEnum $t): array => ['number' => $t->value, 'label' => $t->label()],
             CarePlanTopicEnum::cases(),
         );
     }

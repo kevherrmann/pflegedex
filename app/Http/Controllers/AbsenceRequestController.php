@@ -309,6 +309,13 @@ class AbsenceRequestController extends Controller
             HttpResponse::HTTP_FORBIDDEN,
         );
 
+        // Standort-Scope: PDL darf nur Antraege aus eigenen Wohnbereichen entscheiden
+        // (sonst Zugriff auf fremde Bereiche moeglich).
+        abort_unless(
+            $request->user()->canAccessLocation($absenceRequest->location_id),
+            HttpResponse::HTTP_FORBIDDEN,
+        );
+
         $validated = $request->validate([
             'override_reason' => ['nullable', 'string', 'max:2000'],
         ]);
@@ -329,6 +336,13 @@ class AbsenceRequestController extends Controller
     ): RedirectResponse {
         abort_unless(
             $request->user()?->hasRole('PDL'),
+            HttpResponse::HTTP_FORBIDDEN,
+        );
+
+        // Standort-Scope: PDL darf nur Antraege aus eigenen Wohnbereichen entscheiden
+        // (sonst Zugriff auf fremde Bereiche moeglich).
+        abort_unless(
+            $request->user()->canAccessLocation($absenceRequest->location_id),
             HttpResponse::HTTP_FORBIDDEN,
         );
 

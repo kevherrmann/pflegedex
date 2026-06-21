@@ -13,6 +13,7 @@ use App\Models\ShiftStaffingRule;
 use App\Models\ShiftTemplate;
 use App\Models\ShiftWish;
 use App\Models\User;
+use App\Services\Rosters\HolidayService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
@@ -53,8 +54,13 @@ class PlanningContext
 
     private readonly int $weeklyMaxMinutes;
 
+    private readonly int $dailyMaxMinutes;
+
     /** @var array<string, array<string, int>> userId => [Y-m-d => Dienste an diesem Tag], fensterweit */
     private array $workDates = [];
+
+    /** @var array<string, array<string, int>> userId => [Y-m-d => Minuten an diesem Tag], fensterweit */
+    private array $dailyMinutes = [];
 
     /** @var array<string, array<string, array{0: int, 1: int}>> userId => [Belegungsschlüssel => Intervall-Timestamps] */
     private array $intervals = [];
@@ -119,6 +125,9 @@ class PlanningContext
     /** @var array<string, array{week: string, weekend: string|null, inMonth: bool}> Y-m-d => Metadaten */
     private array $dateMeta = [];
 
+    /** @var array<string, true> Y-m-d => gesetzlicher Feiertag (bundeslandabhängig) */
+    private array $holidays = [];
+
     public function __construct(
         private readonly Roster $roster,
         bool $ignoreAutoShifts = false,
@@ -127,6 +136,7 @@ class PlanningContext
         $this->maxConsecutiveWorkDays = (int) config('rostering.max_consecutive_work_days');
         $this->maxWeekendsPerMonth = (int) config('rostering.max_weekends_per_month');
         $this->weeklyMaxMinutes = (int) config('rostering.weekly_max_minutes');
+        $this->dailyMaxMinutes = (int) config('rostering.daily_max_minutes');
 
         $this->monthStart = CarbonImmutable::create($roster->year, $roster->month, 1)->startOfDay();
         $this->monthEnd = $this->monthStart->endOfMonth()->startOfDay();
@@ -139,6 +149,27 @@ class PlanningContext
         $this->loadBlackoutDates();
         $this->loadWishes();
         $this->calculateTargets();
+        $this->loadHolidays();
+    }
+
+    private function loadHolidays(): void
+    {
+        $state = $this->roster->location?->state;
+        $service = new HolidayService;
+
+        $startYear = (int) $this->monthStart->subDays(10)->year;
+        $endYear = (int) $this->monthEnd->addDays(10)->year;
+
+        for ($year = $startYear; $year <= $endYear; $year++) {
+            foreach (array_keys($service->holidaysForYear($year, $state)) as $dateKey) {
+                $this->holidays[$dateKey] = true;
+            }
+        }
+    }
+
+    public function isHoliday(CarbonImmutable $date): bool
+    {
+        return isset($this->holidays[$date->toDateString()]);
     }
 
     /**
@@ -419,6 +450,13 @@ class PlanningContext
 
         $this->weeklyMinutes[$userId][$meta['week']] -= $minutes;
 
+        if (isset($this->dailyMinutes[$userId][$dateKey])) {
+            $this->dailyMinutes[$userId][$dateKey] -= $minutes;
+            if ($this->dailyMinutes[$userId][$dateKey] <= 0) {
+                unset($this->dailyMinutes[$userId][$dateKey]);
+            }
+        }
+
         if ($meta['inMonth'] && $meta['weekend'] !== null && isset($this->weekendKeys[$userId][$meta['weekend']])) {
             $this->weekendKeys[$userId][$meta['weekend']]--;
             if ($this->weekendKeys[$userId][$meta['weekend']] <= 0) {
@@ -467,6 +505,7 @@ class PlanningContext
         $this->assignedTemplates[$userId.'|'.$occupancyKey] = true;
 
         $this->weeklyMinutes[$userId][$meta['week']] = ($this->weeklyMinutes[$userId][$meta['week']] ?? 0) + $minutes;
+        $this->dailyMinutes[$userId][$dateKey] = ($this->dailyMinutes[$userId][$dateKey] ?? 0) + $minutes;
 
         if ($rotationRank !== null) {
             $this->rotationRanks[$userId][$dateKey][$rotationRank] =
@@ -500,7 +539,8 @@ class PlanningContext
 
     public function staffingRuleFor(ShiftTemplate $shiftTemplate, CarbonImmutable $date): ?ShiftStaffingRule
     {
-        $weekday = $date->dayOfWeekIso;
+        // Feiertage werden besetzungstechnisch wie Sonntage behandelt (ISO-Wochentag 7).
+        $weekday = isset($this->holidays[$date->toDateString()]) ? 7 : $date->dayOfWeekIso;
 
         return $shiftTemplate->staffingRules
             ->first(fn (ShiftStaffingRule $rule): bool => $rule->weekday === $weekday)
@@ -611,6 +651,13 @@ class PlanningContext
         $currentMinutes = $this->weeklyMinutes[$employee->id][$weekKey] ?? 0;
 
         return $currentMinutes + $shiftMinutes > $this->weeklyMaxMinutes;
+    }
+
+    public function wouldExceedDailyMaxMinutes(User $employee, CarbonImmutable $date, int $shiftMinutes): bool
+    {
+        $currentMinutes = $this->dailyMinutes[$employee->id][$date->toDateString()] ?? 0;
+
+        return $currentMinutes + $shiftMinutes > $this->dailyMaxMinutes;
     }
 
     public function plannedMinutesFor(User $employee): int

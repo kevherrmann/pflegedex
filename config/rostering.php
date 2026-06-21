@@ -29,6 +29,12 @@ return [
     // Harte Obergrenze pro ISO-Kalenderwoche (EU-RL 2003/88: 48 Stunden).
     'weekly_max_minutes' => (int) env('ROSTERING_WEEKLY_MAX_MINUTES', 2880),
 
+    // Tägliche Höchstarbeitszeit. § 3 ArbZG: i.d.R. 8 h, ausdehnbar auf 10 h (600 min) -
+    // das ist der gesetzeskonforme Default. 12-Stunden-Schichten (720 min) sind nur auf
+    // Basis einer Tariföffnung nach § 7 ArbZG zulässig (in der Pflege via TVöD/AVR üblich)
+    // und werden dann pro Einrichtung via ROSTERING_DAILY_MAX_MINUTES=720 freigeschaltet.
+    'daily_max_minutes' => (int) env('ROSTERING_DAILY_MAX_MINUTES', 600),
+
     // Fallback-Schichtlänge, wenn keine aktive Vorlage eine Dauer liefert.
     'default_shift_minutes' => (int) env('ROSTERING_DEFAULT_SHIFT_MINUTES', 480),
 

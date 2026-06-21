@@ -118,14 +118,18 @@ export default function Index({ staffUsers, locations, roles }: StaffIndexProps)
                                 Pflege, Hauswirtschaft und Technik
                             </h1>
                             <p className="mt-3 text-[#54595F]">
-                                PDLs legen hier Pflegekräfte, Putzkräfte und Hausmeister an und ordnen sie Wohnbereichen zu.
+                                PDLs legen hier Pflegekräfte, Putzkräfte und Hausmeister an und
+                                ordnen sie Wohnbereichen zu.
                             </p>
                         </div>
 
                         {staffUsers.length > 0 ? (
                             <div className="divide-y divide-[#E5E7EB]">
                                 {staffUsers.map((user) => (
-                                    <article key={user.id} className="flex flex-col gap-3 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+                                    <article
+                                        key={user.id}
+                                        className="flex flex-col gap-3 px-6 py-5 sm:flex-row sm:items-center sm:justify-between"
+                                    >
                                         <div>
                                             <h3 className="text-lg font-semibold text-[#333333]">
                                                 {user.name}
@@ -134,7 +138,9 @@ export default function Index({ staffUsers, locations, roles }: StaffIndexProps)
                                                 {user.email} · {user.role}
                                             </p>
                                             <p className="mt-1 text-sm text-[#54595F]">
-                                                {user.locations.map((location) => location.name).join(', ')}
+                                                {user.locations
+                                                    .map((location) => location.name)
+                                                    .join(', ')}
                                             </p>
                                         </div>
                                         <Link
@@ -163,55 +169,90 @@ export default function Index({ staffUsers, locations, roles }: StaffIndexProps)
                             Mitarbeiter anlegen
                         </h3>
                         <p className="mt-2 text-sm leading-6 text-[#54595F]">
-                            Das Konto erhält nur die gewählte operative Rolle und Zugriff auf die ausgewählten Wohnbereiche.
+                            Das Konto erhält nur die gewählte operative Rolle und Zugriff auf die
+                            ausgewählten Wohnbereiche.
                         </p>
 
                         <form onSubmit={submit} className="mt-6 space-y-5">
                             <div>
                                 <InputLabel htmlFor="name" value="Name" />
-                                <TextInput id="name" name="name" value={data.name} className="mt-1 block w-full" isFocused={true} onChange={(event) => setData('name', event.target.value)} required />
+                                <TextInput
+                                    id="name"
+                                    name="name"
+                                    value={data.name}
+                                    className="mt-1 block w-full"
+                                    isFocused={true}
+                                    onChange={(event) => setData('name', event.target.value)}
+                                    required
+                                />
                                 <InputError message={errors.name} className="mt-2" />
                             </div>
 
                             <div>
                                 <InputLabel htmlFor="email" value="E-Mail" />
-                                <TextInput id="email" type="email" name="email" value={data.email} className="mt-1 block w-full" onChange={(event) => setData('email', event.target.value)} required />
+                                <TextInput
+                                    id="email"
+                                    type="email"
+                                    name="email"
+                                    value={data.email}
+                                    className="mt-1 block w-full"
+                                    onChange={(event) => setData('email', event.target.value)}
+                                    required
+                                />
                                 <InputError message={errors.email} className="mt-2" />
                             </div>
 
                             <div>
                                 <InputLabel htmlFor="password" value="Startpasswort" />
-                                <TextInput id="password" type="password" name="password" value={data.password} className="mt-1 block w-full" onChange={(event) => setData('password', event.target.value)} required />
+                                <TextInput
+                                    id="password"
+                                    type="password"
+                                    name="password"
+                                    value={data.password}
+                                    className="mt-1 block w-full"
+                                    onChange={(event) => setData('password', event.target.value)}
+                                    required
+                                />
                                 <InputError message={errors.password} className="mt-2" />
                             </div>
 
                             <div>
                                 <InputLabel htmlFor="role" value="Rolle" />
-                                <select id="role" value={data.role} onChange={(event) => {
-                                    const role = event.target.value;
+                                <select
+                                    id="role"
+                                    value={data.role}
+                                    onChange={(event) => {
+                                        const role = event.target.value;
 
-                                    setData((currentData) => {
-                                        // WBL ist immer Pflegefachkraft.
-                                        if (role === 'WBL') {
+                                        setData((currentData) => {
+                                            // WBL ist immer Pflegefachkraft.
+                                            if (role === 'WBL') {
+                                                return {
+                                                    ...currentData,
+                                                    role,
+                                                    qualification_level: 'specialist',
+                                                    is_nursing_specialist: true,
+                                                };
+                                            }
+
                                             return {
                                                 ...currentData,
                                                 role,
-                                                qualification_level: 'specialist',
-                                                is_nursing_specialist: true,
+                                                is_nursing_specialist:
+                                                    role === 'Pflegekraft'
+                                                        ? currentData.qualification_level ===
+                                                          'specialist'
+                                                        : false,
                                             };
-                                        }
-
-                                        return {
-                                            ...currentData,
-                                            role,
-                                            is_nursing_specialist:
-                                                role === 'Pflegekraft'
-                                                    ? currentData.qualification_level === 'specialist'
-                                                    : false,
-                                        };
-                                    });
-                                }} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]">
-                                    {roles.map((role) => <option key={role} value={role}>{role}</option>)}
+                                        });
+                                    }}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]"
+                                >
+                                    {roles.map((role) => (
+                                        <option key={role} value={role}>
+                                            {role}
+                                        </option>
+                                    ))}
                                 </select>
                                 <InputError message={errors.role} className="mt-2" />
                             </div>
@@ -220,11 +261,19 @@ export default function Index({ staffUsers, locations, roles }: StaffIndexProps)
                                 <InputLabel value="Wohnbereiche" />
                                 <div className="mt-2 space-y-2">
                                     {locations.map((location) => (
-                                        <label key={location.id} className="flex items-center gap-2 text-sm text-[#333333]">
+                                        <label
+                                            key={location.id}
+                                            className="flex items-center gap-2 text-sm text-[#333333]"
+                                        >
                                             <input
                                                 type="checkbox"
                                                 checked={data.location_ids.includes(location.id)}
-                                                onChange={(event) => toggleLocation(location.id, event.target.checked)}
+                                                onChange={(event) =>
+                                                    toggleLocation(
+                                                        location.id,
+                                                        event.target.checked,
+                                                    )
+                                                }
                                                 className="rounded border-gray-300 text-[#9B1C3B] focus:ring-[#9B1C3B]"
                                             />
                                             {location.name}

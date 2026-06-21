@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Models\Assessment;
 use App\Models\CarePlan;
 use App\Models\CarePlanGeneration;
 use App\Models\Resident;
@@ -74,7 +75,7 @@ class DashboardController extends Controller
             ->whereDate('started_at', '<', $admissionDeadline)
             ->with('resident:id,pseudonym,first_name,last_name,salutation')
             ->get()
-            ->map(fn(Sis $s): array => [
+            ->map(fn (Sis $s): array => [
                 'residentId' => $s->resident_id,
                 'pseudonym' => $s->resident->pseudonym,
                 'name' => $s->resident->formal_name,
@@ -91,7 +92,7 @@ class DashboardController extends Controller
             ->whereDate('next_evaluation_due', '<', $today)
             ->with('resident:id,pseudonym,first_name,last_name,salutation')
             ->get()
-            ->map(fn(Sis $s): array => [
+            ->map(fn (Sis $s): array => [
                 'residentId' => $s->resident_id,
                 'pseudonym' => $s->resident->pseudonym,
                 'name' => $s->resident->formal_name,
@@ -109,7 +110,7 @@ class DashboardController extends Controller
             ->whereDate('next_evaluation_due', '<=', $soon)
             ->with('resident:id,pseudonym,first_name,last_name,salutation')
             ->get()
-            ->map(fn(Sis $s): array => [
+            ->map(fn (Sis $s): array => [
                 'residentId' => $s->resident_id,
                 'pseudonym' => $s->resident->pseudonym,
                 'name' => $s->resident->formal_name,
@@ -126,7 +127,7 @@ class DashboardController extends Controller
             ->whereDate('next_evaluation_due', '<', $today)
             ->with('resident:id,pseudonym,first_name,last_name,salutation')
             ->get()
-            ->map(fn(CarePlan $c): array => [
+            ->map(fn (CarePlan $c): array => [
                 'residentId' => $c->resident_id,
                 'pseudonym' => $c->resident->pseudonym,
                 'name' => $c->resident->formal_name,
@@ -144,7 +145,7 @@ class DashboardController extends Controller
             ->whereDate('next_evaluation_due', '<=', $soon)
             ->with('resident:id,pseudonym,first_name,last_name,salutation')
             ->get()
-            ->map(fn(CarePlan $c): array => [
+            ->map(fn (CarePlan $c): array => [
                 'residentId' => $c->resident_id,
                 'pseudonym' => $c->resident->pseudonym,
                 'name' => $c->resident->formal_name,
@@ -161,11 +162,47 @@ class DashboardController extends Controller
             ->whereDoesntHave('resident.carePlan')
             ->with('resident:id,pseudonym,first_name,last_name,salutation')
             ->get()
-            ->map(fn(Sis $s): array => [
+            ->map(fn (Sis $s): array => [
                 'residentId' => $s->resident_id,
                 'pseudonym' => $s->resident->pseudonym,
                 'name' => $s->resident->formal_name,
                 'completedAt' => $s->completed_at?->toDateString(),
+                'severity' => 'yellow',
+            ])
+            ->values()
+            ->all();
+
+        // Assessment-Wiedervorlagen: jeweils das juengste Assessment je (Bewohner, Typ).
+        $latestAssessments = Assessment::query()
+            ->whereIn('location_id', $locationIds)
+            ->whereNotNull('next_due')
+            ->with('resident:id,pseudonym,first_name,last_name,salutation')
+            ->orderByDesc('assessed_on')
+            ->orderByDesc('id')
+            ->get()
+            ->unique(fn (Assessment $a): string => $a->resident_id.'|'.$a->type->value);
+
+        $assessmentEvalOverdue = $latestAssessments
+            ->filter(fn (Assessment $a): bool => $a->next_due->isBefore($today))
+            ->map(fn (Assessment $a): array => [
+                'residentId' => $a->resident_id,
+                'pseudonym' => $a->resident->pseudonym,
+                'name' => $a->resident->formal_name,
+                'assessmentType' => $a->type->label(),
+                'dueDate' => $a->next_due?->toDateString(),
+                'severity' => 'red',
+            ])
+            ->values()
+            ->all();
+
+        $assessmentEvalSoon = $latestAssessments
+            ->filter(fn (Assessment $a): bool => ! $a->next_due->isBefore($today) && ! $a->next_due->isAfter($soon))
+            ->map(fn (Assessment $a): array => [
+                'residentId' => $a->resident_id,
+                'pseudonym' => $a->resident->pseudonym,
+                'name' => $a->resident->formal_name,
+                'assessmentType' => $a->type->label(),
+                'dueDate' => $a->next_due?->toDateString(),
                 'severity' => 'yellow',
             ])
             ->values()
@@ -178,10 +215,12 @@ class DashboardController extends Controller
             'mpEvalOverdue' => $mpEvalOverdue,
             'mpEvalSoon' => $mpEvalSoon,
             'sisCompletedNoMp' => $sisCompletedNoMp,
+            'assessmentEvalOverdue' => $assessmentEvalOverdue,
+            'assessmentEvalSoon' => $assessmentEvalSoon,
             // totalRed = ueberfaellige Termine + zu lange offene SIS-Anlage
-            'totalRed' => count($sisOverdueAdmission) + count($sisEvalOverdue) + count($mpEvalOverdue),
+            'totalRed' => count($sisOverdueAdmission) + count($sisEvalOverdue) + count($mpEvalOverdue) + count($assessmentEvalOverdue),
             // totalYellow = Termine in den naechsten 7 Tagen
-            'totalYellow' => count($sisEvalSoon) + count($mpEvalSoon),
+            'totalYellow' => count($sisEvalSoon) + count($mpEvalSoon) + count($assessmentEvalSoon),
             // totalGap = strukturelle Luecken (kein Termin, sondern fehlende Artefakte)
             'totalGap' => count($sisCompletedNoMp),
         ];
@@ -196,12 +235,12 @@ class DashboardController extends Controller
     {
         $sisActive = SisGeneration::query()
             ->whereIn('status', ['pending', 'running'])
-            ->whereHas('sis', fn($q) => $q->whereIn('location_id', $locationIds))
+            ->whereHas('sis', fn ($q) => $q->whereIn('location_id', $locationIds))
             ->with(['sis.resident:id,pseudonym,first_name,last_name,salutation'])
             ->orderByDesc('created_at')
             ->take(20)
             ->get()
-            ->map(fn(SisGeneration $g): array => [
+            ->map(fn (SisGeneration $g): array => [
                 'generationId' => $g->id,
                 'kind' => 'sis',
                 'residentId' => $g->sis->resident_id,
@@ -217,12 +256,12 @@ class DashboardController extends Controller
 
         $mpActive = CarePlanGeneration::query()
             ->whereIn('status', ['pending', 'running'])
-            ->whereHas('carePlan', fn($q) => $q->whereIn('location_id', $locationIds))
+            ->whereHas('carePlan', fn ($q) => $q->whereIn('location_id', $locationIds))
             ->with(['carePlan.resident:id,pseudonym,first_name,last_name,salutation'])
             ->orderByDesc('created_at')
             ->take(20)
             ->get()
-            ->map(fn(CarePlanGeneration $g): array => [
+            ->map(fn (CarePlanGeneration $g): array => [
                 'generationId' => $g->id,
                 'kind' => 'mp',
                 'residentId' => $g->carePlan->resident_id,
@@ -239,12 +278,12 @@ class DashboardController extends Controller
         // Failed-Liste: nur die juengste failed-Generation pro Bewohner
         $sisFailed = SisGeneration::query()
             ->where('status', 'failed')
-            ->whereHas('sis', fn($q) => $q->whereIn('location_id', $locationIds))
+            ->whereHas('sis', fn ($q) => $q->whereIn('location_id', $locationIds))
             ->with(['sis.resident:id,pseudonym,first_name,last_name,salutation'])
             ->orderByDesc('finished_at')
             ->take(10)
             ->get()
-            ->map(fn(SisGeneration $g): array => [
+            ->map(fn (SisGeneration $g): array => [
                 'generationId' => $g->id,
                 'kind' => 'sis',
                 'residentId' => $g->sis->resident_id,
@@ -258,12 +297,12 @@ class DashboardController extends Controller
 
         $mpFailed = CarePlanGeneration::query()
             ->where('status', 'failed')
-            ->whereHas('carePlan', fn($q) => $q->whereIn('location_id', $locationIds))
+            ->whereHas('carePlan', fn ($q) => $q->whereIn('location_id', $locationIds))
             ->with(['carePlan.resident:id,pseudonym,first_name,last_name,salutation'])
             ->orderByDesc('finished_at')
             ->take(10)
             ->get()
-            ->map(fn(CarePlanGeneration $g): array => [
+            ->map(fn (CarePlanGeneration $g): array => [
                 'generationId' => $g->id,
                 'kind' => 'mp',
                 'residentId' => $g->carePlan->resident_id,
@@ -297,7 +336,7 @@ class DashboardController extends Controller
             ->take(5)
             ->with('location:id,name')
             ->get()
-            ->map(fn(Resident $r): array => [
+            ->map(fn (Resident $r): array => [
                 'id' => $r->id,
                 'pseudonym' => $r->pseudonym,
                 'name' => $r->formal_name,

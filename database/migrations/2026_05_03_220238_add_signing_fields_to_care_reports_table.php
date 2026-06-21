@@ -14,11 +14,11 @@ return new class extends Migration
             $table->boolean('signed')->default(false)->after('body');
             $table->timestamp('signed_at')->nullable()->after('signed');
             $table->foreignUuid('signed_by')
-            ->nullable()
-            ->after('signed_at')
-            ->constrained('users')
-            ->cascadeOnUpdate()
-            ->nullOnDelete();
+                ->nullable()
+                ->after('signed_at')
+                ->constrained('users')
+                ->cascadeOnUpdate()
+                ->nullOnDelete();
 
             $table->index(['signed', 'signed_at']);
         });

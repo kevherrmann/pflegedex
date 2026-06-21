@@ -39,7 +39,7 @@ it('allows admins to create PDL accounts', function () {
         ->post('/users/pdl', [
             'name' => 'Neue PDL',
             'email' => 'neue.pdl@pflegedex.local',
-            'password' => 'sicheres-passwort',
+            'password' => 'Sicheres-Passwort1',
         ])
         ->assertRedirect('/users');
 
@@ -47,7 +47,7 @@ it('allows admins to create PDL accounts', function () {
 
     expect($user)->not->toBeNull()
         ->and($user->hasRole('PDL'))->toBeTrue()
-        ->and(Hash::check('sicheres-passwort', $user->password))->toBeTrue();
+        ->and(Hash::check('Sicheres-Passwort1', $user->password))->toBeTrue();
 });
 
 it('prevents non admins from creating PDL accounts', function () {

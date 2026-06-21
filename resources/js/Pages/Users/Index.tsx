@@ -57,14 +57,18 @@ export default function Index({ pdlUsers }: UsersIndexProps) {
                                 Pflegedienstleitungen
                             </h1>
                             <p className="mt-3 text-[#54595F]">
-                                Admins legen ausschließlich PDL-Konten an. PDLs verwalten danach Wohnbereiche und Bewohner.
+                                Admins legen ausschließlich PDL-Konten an. PDLs verwalten danach
+                                Wohnbereiche und Bewohner.
                             </p>
                         </div>
 
                         {pdlUsers.length > 0 ? (
                             <div className="divide-y divide-[#E5E7EB]">
                                 {pdlUsers.map((user) => (
-                                    <article key={user.id} className="flex flex-col gap-3 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+                                    <article
+                                        key={user.id}
+                                        className="flex flex-col gap-3 px-6 py-5 sm:flex-row sm:items-center sm:justify-between"
+                                    >
                                         <div>
                                             <h3 className="text-lg font-semibold text-[#333333]">
                                                 {user.name}
@@ -95,9 +99,7 @@ export default function Index({ pdlUsers }: UsersIndexProps) {
                     </section>
 
                     <section className="h-fit rounded-2xl bg-white p-6 shadow-sm ring-1 ring-[#E5E7EB]">
-                        <h3 className="text-xl font-semibold text-[#333333]">
-                            PDL-Konto anlegen
-                        </h3>
+                        <h3 className="text-xl font-semibold text-[#333333]">PDL-Konto anlegen</h3>
                         <p className="mt-2 text-sm leading-6 text-[#54595F]">
                             Dieses Konto kann anschließend Wohnbereiche und Bewohner verwalten.
                         </p>
@@ -111,9 +113,7 @@ export default function Index({ pdlUsers }: UsersIndexProps) {
                                     value={data.name}
                                     className="mt-1 block w-full"
                                     isFocused={true}
-                                    onChange={(event) =>
-                                        setData('name', event.target.value)
-                                    }
+                                    onChange={(event) => setData('name', event.target.value)}
                                     required
                                 />
                                 <InputError message={errors.name} className="mt-2" />
@@ -127,9 +127,7 @@ export default function Index({ pdlUsers }: UsersIndexProps) {
                                     name="email"
                                     value={data.email}
                                     className="mt-1 block w-full"
-                                    onChange={(event) =>
-                                        setData('email', event.target.value)
-                                    }
+                                    onChange={(event) => setData('email', event.target.value)}
                                     required
                                 />
                                 <InputError message={errors.email} className="mt-2" />
@@ -143,20 +141,13 @@ export default function Index({ pdlUsers }: UsersIndexProps) {
                                     name="password"
                                     value={data.password}
                                     className="mt-1 block w-full"
-                                    onChange={(event) =>
-                                        setData('password', event.target.value)
-                                    }
+                                    onChange={(event) => setData('password', event.target.value)}
                                     required
                                 />
-                                <InputError
-                                    message={errors.password}
-                                    className="mt-2"
-                                />
+                                <InputError message={errors.password} className="mt-2" />
                             </div>
 
-                            <PrimaryButton disabled={processing}>
-                                PDL speichern
-                            </PrimaryButton>
+                            <PrimaryButton disabled={processing}>PDL speichern</PrimaryButton>
                         </form>
                     </section>
                 </div>

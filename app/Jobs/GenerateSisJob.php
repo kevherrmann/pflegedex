@@ -52,9 +52,7 @@ class GenerateSisJob implements ShouldQueue
      */
     public int $timeout = 300;
 
-    public function __construct(public string $generationId)
-    {
-    }
+    public function __construct(public string $generationId) {}
 
     public function handle(SisFormulator $formulator): void
     {
@@ -156,10 +154,15 @@ class GenerateSisJob implements ShouldQueue
                 }
 
                 $topicNumber = (int) substr($key, strlen('topic_'));
-                SisTopicEntry::query()
+
+                // Ueber das Model speichern (nicht per Query-Builder-update), damit der
+                // 'encrypted'-Cast greift und der Inhalt at-rest verschluesselt wird.
+                $entry = SisTopicEntry::query()
                     ->where('sis_id', $sis->id)
                     ->where('topic_number', $topicNumber)
-                    ->update(['content' => $output]);
+                    ->first();
+
+                $entry?->forceFill(['content' => $output])->save();
             }
         });
     }

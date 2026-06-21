@@ -10,8 +10,10 @@ use App\Models\Location;
 use App\Models\Resident;
 use App\Models\Sis;
 use App\Models\User;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Crypt;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -215,10 +217,28 @@ class AuditController extends Controller
             return $value ? 'true' : 'false';
         }
 
+        // Verschluesselte Gesundheits-Freitextwerte (K1) liegen im Audit als Chiffrat vor.
+        // Fuer die autorisierte Anzeige (Audit-Log ist rollengeschuetzt) wieder lesbar machen.
+        if (is_string($value)) {
+            $value = $this->decryptIfEncrypted($value);
+        }
+
         if (is_scalar($value)) {
             return (string) $value;
         }
 
         return json_encode($value, JSON_UNESCAPED_UNICODE);
+    }
+
+    /**
+     * Macht einen ggf. verschluesselten Audit-Wert lesbar. Klartext bleibt unveraendert.
+     */
+    private function decryptIfEncrypted(string $value): string
+    {
+        try {
+            return Crypt::decryptString($value);
+        } catch (DecryptException) {
+            return $value;
+        }
     }
 }

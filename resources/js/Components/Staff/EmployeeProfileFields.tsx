@@ -27,9 +27,7 @@ export type EmployeeProfileFormData = {
     active: boolean;
 };
 
-type EmployeeProfileFieldErrors = Partial<
-    Record<keyof EmployeeProfileFormData, string>
->;
+type EmployeeProfileFieldErrors = Partial<Record<keyof EmployeeProfileFormData, string>>;
 
 type Props<TForm extends EmployeeProfileFormData> = {
     data: TForm;
@@ -80,9 +78,7 @@ export default function EmployeeProfileFields<TForm extends EmployeeProfileFormD
     return (
         <div className="space-y-6 rounded-2xl border border-gray-200 bg-white p-5">
             <div>
-                <h3 className="text-base font-semibold text-gray-900">
-                    Mitarbeiterprofil
-                </h3>
+                <h3 className="text-base font-semibold text-gray-900">Mitarbeiterprofil</h3>
                 <p className="mt-1 text-sm text-gray-500">
                     Diese Daten werden für Urlaub, Überstunden und Dienstplanung genutzt.
                 </p>
@@ -175,10 +171,7 @@ export default function EmployeeProfileFields<TForm extends EmployeeProfileFormD
                         }
                         className="mt-1 block w-full"
                     />
-                    <InputError
-                        message={errors.regular_work_days_per_week}
-                        className="mt-2"
-                    />
+                    <InputError message={errors.regular_work_days_per_week} className="mt-2" />
                 </div>
 
                 <div>
@@ -199,10 +192,7 @@ export default function EmployeeProfileFields<TForm extends EmployeeProfileFormD
                         }
                         className="mt-1 block w-full"
                     />
-                    <InputError
-                        message={errors.annual_vacation_days}
-                        className="mt-2"
-                    />
+                    <InputError message={errors.annual_vacation_days} className="mt-2" />
                 </div>
 
                 <div>
@@ -226,10 +216,7 @@ export default function EmployeeProfileFields<TForm extends EmployeeProfileFormD
                         }
                         className="mt-1 block w-full"
                     />
-                    <InputError
-                        message={errors.vacation_days_carried_over}
-                        className="mt-2"
-                    />
+                    <InputError message={errors.vacation_days_carried_over} className="mt-2" />
                 </div>
 
                 <div className="sm:col-span-2">
@@ -249,10 +236,7 @@ export default function EmployeeProfileFields<TForm extends EmployeeProfileFormD
                         }
                         className="mt-1 block w-full"
                     />
-                    <InputError
-                        message={errors.overtime_minutes_balance}
-                        className="mt-2"
-                    />
+                    <InputError message={errors.overtime_minutes_balance} className="mt-2" />
                 </div>
             </div>
 
@@ -267,7 +251,10 @@ export default function EmployeeProfileFields<TForm extends EmployeeProfileFormD
                         label="Frühdienst"
                         checked={data.can_work_early}
                         onToggle={() =>
-                            setData('can_work_early', !data.can_work_early as TForm['can_work_early'])
+                            setData(
+                                'can_work_early',
+                                !data.can_work_early as TForm['can_work_early'],
+                            )
                         }
                     />
                     <ShiftChip
@@ -281,7 +268,10 @@ export default function EmployeeProfileFields<TForm extends EmployeeProfileFormD
                         label="Nachtdienst"
                         checked={data.can_work_night}
                         onToggle={() =>
-                            setData('can_work_night', !data.can_work_night as TForm['can_work_night'])
+                            setData(
+                                'can_work_night',
+                                !data.can_work_night as TForm['can_work_night'],
+                            )
                         }
                     />
                 </div>
@@ -300,9 +290,7 @@ export default function EmployeeProfileFields<TForm extends EmployeeProfileFormD
                 <input
                     type="checkbox"
                     checked={data.active}
-                    onChange={(event) =>
-                        setData('active', event.target.checked as TForm['active'])
-                    }
+                    onChange={(event) => setData('active', event.target.checked as TForm['active'])}
                     className="h-5 w-5 rounded border-gray-300 text-[#9B1C3B] focus:ring-[#9B1C3B]"
                 />
             </label>

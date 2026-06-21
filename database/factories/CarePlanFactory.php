@@ -59,7 +59,7 @@ class CarePlanFactory extends Factory
 
     public function overdue(): static
     {
-        return $this->state(fn(array $attributes): array => [
+        return $this->state(fn (array $attributes): array => [
             'evaluated_at' => today()->subWeeks(10),
             'next_evaluation_due' => today()->subWeeks(2),
         ]);

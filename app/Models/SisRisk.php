@@ -37,6 +37,7 @@ class SisRisk extends Model
     protected function casts(): array
     {
         return [
+            'notes' => 'encrypted',
             'is_at_risk' => 'boolean',
             'needs_further_assessment' => 'boolean',
         ];

@@ -97,11 +97,10 @@ export default function AbsenceRequestsIndex({
                 <div className="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
                     <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
                         <div className="border-b border-gray-200 p-6">
-                            <h3 className="text-lg font-semibold text-gray-900">
-                                Urlaubskonto
-                            </h3>
+                            <h3 className="text-lg font-semibold text-gray-900">Urlaubskonto</h3>
                             <p className="mt-1 text-sm text-gray-600">
-                                Dein aktueller Überblick über genehmigten, beantragten und verfügbaren Urlaub.
+                                Dein aktueller Überblick über genehmigten, beantragten und
+                                verfügbaren Urlaub.
                             </p>
                         </div>
 
@@ -194,19 +193,13 @@ export default function AbsenceRequestsIndex({
                                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]"
                                         >
                                             {absenceTypes.map((type) => (
-                                                <option
-                                                    key={type.value}
-                                                    value={type.value}
-                                                >
+                                                <option key={type.value} value={type.value}>
                                                     {type.label}
                                                 </option>
                                             ))}
                                         </select>
 
-                                        <InputError
-                                            message={errors.type}
-                                            className="mt-2"
-                                        />
+                                        <InputError message={errors.type} className="mt-2" />
                                     </div>
 
                                     <div>
@@ -228,17 +221,11 @@ export default function AbsenceRequestsIndex({
                                             className="mt-1 block w-full"
                                         />
 
-                                        <InputError
-                                            message={errors.days_count}
-                                            className="mt-2"
-                                        />
+                                        <InputError message={errors.days_count} className="mt-2" />
                                     </div>
 
                                     <div>
-                                        <InputLabel
-                                            htmlFor="starts_on"
-                                            value="Von"
-                                        />
+                                        <InputLabel htmlFor="starts_on" value="Von" />
 
                                         <TextInput
                                             id="starts_on"
@@ -250,10 +237,7 @@ export default function AbsenceRequestsIndex({
                                             className="mt-1 block w-full"
                                         />
 
-                                        <InputError
-                                            message={errors.starts_on}
-                                            className="mt-2"
-                                        />
+                                        <InputError message={errors.starts_on} className="mt-2" />
                                     </div>
 
                                     <div>
@@ -269,10 +253,7 @@ export default function AbsenceRequestsIndex({
                                             className="mt-1 block w-full"
                                         />
 
-                                        <InputError
-                                            message={errors.ends_on}
-                                            className="mt-2"
-                                        />
+                                        <InputError message={errors.ends_on} className="mt-2" />
                                     </div>
                                 </div>
 
@@ -282,9 +263,7 @@ export default function AbsenceRequestsIndex({
                                     <textarea
                                         id="note"
                                         value={data.note}
-                                        onChange={(event) =>
-                                            setData('note', event.target.value)
-                                        }
+                                        onChange={(event) => setData('note', event.target.value)}
                                         rows={4}
                                         className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]"
                                         placeholder="Zum Beispiel: Sommerurlaub, Brückentag, privater Termin ..."
@@ -304,11 +283,10 @@ export default function AbsenceRequestsIndex({
 
                     <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
                         <div className="border-b border-gray-200 p-6">
-                            <h3 className="text-lg font-semibold text-gray-900">
-                                Meine Anträge
-                            </h3>
+                            <h3 className="text-lg font-semibold text-gray-900">Meine Anträge</h3>
                             <p className="mt-1 text-sm text-gray-600">
-                                Hier siehst du deine beantragten, genehmigten und abgelehnten Abwesenheiten.
+                                Hier siehst du deine beantragten, genehmigten und abgelehnten
+                                Abwesenheiten.
                             </p>
                         </div>
 
@@ -350,14 +328,15 @@ export default function AbsenceRequestsIndex({
                                                             >
                                                                 {request.statusLabel}
                                                             </span>
-                                                            {request.status === 'requested' && request.hitsBlackout && (
-                                                                <span
-                                                                    className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-800"
-                                                                    title="Fällt in eine Urlaubssperre. Genehmigung nur als Ausnahme durch die PDL."
-                                                                >
-                                                                    Urlaubssperre
-                                                                </span>
-                                                            )}
+                                                            {request.status === 'requested' &&
+                                                                request.hitsBlackout && (
+                                                                    <span
+                                                                        className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-800"
+                                                                        title="Fällt in eine Urlaubssperre. Genehmigung nur als Ausnahme durch die PDL."
+                                                                    >
+                                                                        Urlaubssperre
+                                                                    </span>
+                                                                )}
                                                         </div>
                                                     </td>
                                                     <td className="py-3 pr-4 text-gray-700">
@@ -370,7 +349,7 @@ export default function AbsenceRequestsIndex({
                                                                 Ausnahme: {request.overrideReason}
                                                             </span>
                                                         ) : (
-                                                            request.note ?? '—'
+                                                            (request.note ?? '—')
                                                         )}
                                                     </td>
                                                 </tr>

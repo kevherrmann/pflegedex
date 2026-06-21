@@ -92,10 +92,7 @@ function RosterActions({ roster }: { roster: RosterItem }) {
     );
 }
 
-export default function RostersIndex({
-    locations,
-    rosters,
-}: Props) {
+export default function RostersIndex({ locations, rosters }: Props) {
     const { data, setData, post, processing, errors } = useForm({
         location_id: locations[0]?.id ?? '',
         year: String(new Date().getFullYear()),
@@ -113,9 +110,7 @@ export default function RostersIndex({
     return (
         <AuthenticatedLayout
             header={
-                <h2 className="text-xl font-semibold leading-tight text-gray-800">
-                    Dienstpläne
-                </h2>
+                <h2 className="text-xl font-semibold leading-tight text-gray-800">Dienstpläne</h2>
             }
         >
             <Head title="Dienstpläne" />
@@ -132,15 +127,16 @@ export default function RostersIndex({
                             </p>
                         </div>
 
-                        <form onSubmit={submit} className="grid gap-4 p-6 lg:grid-cols-4 lg:items-end">
+                        <form
+                            onSubmit={submit}
+                            className="grid gap-4 p-6 lg:grid-cols-4 lg:items-end"
+                        >
                             <div>
                                 <InputLabel htmlFor="location_id" value="Wohnbereich" />
                                 <select
                                     id="location_id"
                                     value={data.location_id}
-                                    onChange={(event) =>
-                                        setData('location_id', event.target.value)
-                                    }
+                                    onChange={(event) => setData('location_id', event.target.value)}
                                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]"
                                 >
                                     <option value="">Bitte wählen</option>
@@ -150,10 +146,7 @@ export default function RostersIndex({
                                         </option>
                                     ))}
                                 </select>
-                                <InputError
-                                    message={errors.location_id}
-                                    className="mt-2"
-                                />
+                                <InputError message={errors.location_id} className="mt-2" />
                             </div>
 
                             <div>
@@ -164,9 +157,7 @@ export default function RostersIndex({
                                     min="2020"
                                     max="2100"
                                     value={data.year}
-                                    onChange={(event) =>
-                                        setData('year', event.target.value)
-                                    }
+                                    onChange={(event) => setData('year', event.target.value)}
                                     className="mt-1 block w-full"
                                 />
                                 <InputError message={errors.year} className="mt-2" />
@@ -177,16 +168,11 @@ export default function RostersIndex({
                                 <select
                                     id="month"
                                     value={data.month}
-                                    onChange={(event) =>
-                                        setData('month', event.target.value)
-                                    }
+                                    onChange={(event) => setData('month', event.target.value)}
                                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]"
                                 >
                                     {months.map((month) => (
-                                        <option
-                                            key={month.value}
-                                            value={String(month.value)}
-                                        >
+                                        <option key={month.value} value={String(month.value)}>
                                             {month.label}
                                         </option>
                                     ))}
@@ -266,9 +252,7 @@ export default function RostersIndex({
                                                         {roster.createdByName ?? '-'}
                                                     </td>
                                                     <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-700">
-                                                        {formatDateTime(
-                                                            roster.publishedAt,
-                                                        )}
+                                                        {formatDateTime(roster.publishedAt)}
                                                     </td>
                                                     <td className="whitespace-nowrap px-3 py-4 text-sm">
                                                         <RosterActions roster={roster} />
@@ -281,7 +265,6 @@ export default function RostersIndex({
                             )}
                         </div>
                     </div>
-
                 </div>
             </div>
         </AuthenticatedLayout>

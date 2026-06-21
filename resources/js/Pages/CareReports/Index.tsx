@@ -76,7 +76,8 @@ export default function Index({
 
         return residents.filter((resident) => {
             const matchesSearch = term === '' || resident.fullName.toLowerCase().includes(term);
-            const matchesLocation = locationFilter === 'all' || resident.locationId === locationFilter;
+            const matchesLocation =
+                locationFilter === 'all' || resident.locationId === locationFilter;
 
             return matchesSearch && matchesLocation;
         });
@@ -200,7 +201,9 @@ export default function Index({
                                                     })}
                                                     preserveScroll
                                                     className={`block px-5 py-3 transition ${
-                                                        selected ? 'bg-[#F7E8ED]' : 'hover:bg-[#F8F8F8]'
+                                                        selected
+                                                            ? 'bg-[#F7E8ED]'
+                                                            : 'hover:bg-[#F8F8F8]'
                                                     }`}
                                                 >
                                                     <div className="flex items-center justify-between gap-3">
@@ -215,11 +218,13 @@ export default function Index({
                                                             }`}
                                                             title="Gefüllte Kategorien"
                                                         >
-                                                            {resident.completedCategoryCount}/{categories.length}
+                                                            {resident.completedCategoryCount}/
+                                                            {categories.length}
                                                         </span>
                                                     </div>
                                                     <p className="mt-0.5 truncate text-xs text-[#54595F]">
-                                                        {resident.locationName ?? 'Wohnbereich offen'}
+                                                        {resident.locationName ??
+                                                            'Wohnbereich offen'}
                                                     </p>
                                                 </Link>
                                             );
@@ -257,8 +262,9 @@ export default function Index({
                                 {selectedResident && (
                                     <p className="mt-2 text-[#54595F]">
                                         {selectedResident.locationName} ·{' '}
-                                        {selectedResident.completedCategoryCount}/{categories.length} Kategorien am{' '}
-                                        {selectedDate} dokumentiert
+                                        {selectedResident.completedCategoryCount}/
+                                        {categories.length} Kategorien am {selectedDate}{' '}
+                                        dokumentiert
                                     </p>
                                 )}
                             </div>
@@ -277,7 +283,9 @@ export default function Index({
                                         <Link
                                             href={route('care-reports.index', {
                                                 date: dateFilter,
-                                                ...(selectedResident ? { resident_id: selectedResident.id } : {}),
+                                                ...(selectedResident
+                                                    ? { resident_id: selectedResident.id }
+                                                    : {}),
                                             })}
                                             preserveScroll
                                             className="inline-flex items-center justify-center rounded-md border border-[#E5E7EB] bg-white px-3 py-2 text-sm font-semibold text-[#7F1730] hover:bg-[#F8F8F8]"
@@ -297,7 +305,8 @@ export default function Index({
 
                         {!selectedResident ? (
                             <div className="px-6 py-16 text-center text-[#54595F]">
-                                Wähle links einen Bewohner aus, um die Berichte nach Kategorien zu sehen.
+                                Wähle links einen Bewohner aus, um die Berichte nach Kategorien zu
+                                sehen.
                             </div>
                         ) : (
                             <>
@@ -320,24 +329,40 @@ export default function Index({
                                         <form onSubmit={submit} className="mt-4 space-y-4">
                                             <div className="grid gap-4 sm:grid-cols-2">
                                                 <div>
-                                                    <InputLabel htmlFor="occurred_at" value="Zeitpunkt" />
+                                                    <InputLabel
+                                                        htmlFor="occurred_at"
+                                                        value="Zeitpunkt"
+                                                    />
                                                     <input
                                                         id="occurred_at"
                                                         type="datetime-local"
                                                         value={data.occurred_at}
-                                                        onChange={(event) => setData('occurred_at', event.target.value)}
+                                                        onChange={(event) =>
+                                                            setData(
+                                                                'occurred_at',
+                                                                event.target.value,
+                                                            )
+                                                        }
                                                         className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]"
                                                         required
                                                     />
-                                                    <InputError message={errors.occurred_at} className="mt-2" />
+                                                    <InputError
+                                                        message={errors.occurred_at}
+                                                        className="mt-2"
+                                                    />
                                                 </div>
 
                                                 <div>
-                                                    <InputLabel htmlFor="category" value="Kategorie" />
+                                                    <InputLabel
+                                                        htmlFor="category"
+                                                        value="Kategorie"
+                                                    />
                                                     <select
                                                         id="category"
                                                         value={data.category}
-                                                        onChange={(event) => setData('category', event.target.value)}
+                                                        onChange={(event) =>
+                                                            setData('category', event.target.value)
+                                                        }
                                                         className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]"
                                                     >
                                                         {categories.map((category) => (
@@ -346,7 +371,10 @@ export default function Index({
                                                             </option>
                                                         ))}
                                                     </select>
-                                                    <InputError message={errors.category} className="mt-2" />
+                                                    <InputError
+                                                        message={errors.category}
+                                                        className="mt-2"
+                                                    />
                                                 </div>
                                             </div>
 
@@ -355,16 +383,24 @@ export default function Index({
                                                 <textarea
                                                     id="body"
                                                     value={data.body}
-                                                    onChange={(event) => setData('body', event.target.value)}
+                                                    onChange={(event) =>
+                                                        setData('body', event.target.value)
+                                                    }
                                                     rows={5}
                                                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]"
                                                     required
                                                 />
-                                                <InputError message={errors.body} className="mt-2" />
+                                                <InputError
+                                                    message={errors.body}
+                                                    className="mt-2"
+                                                />
                                             </div>
 
                                             <div className="flex justify-end gap-2">
-                                                <SecondaryButton type="button" onClick={() => setShowComposer(false)}>
+                                                <SecondaryButton
+                                                    type="button"
+                                                    onClick={() => setShowComposer(false)}
+                                                >
                                                     Abbrechen
                                                 </SecondaryButton>
                                                 <PrimaryButton disabled={processing}>
@@ -437,7 +473,9 @@ export default function Index({
                                                                             {report.occurredAt}
                                                                         </p>
                                                                         <p className="text-xs text-gray-500">
-                                                                            Erfasst von {report.authorName ?? 'unbekannt'}
+                                                                            Erfasst von{' '}
+                                                                            {report.authorName ??
+                                                                                'unbekannt'}
                                                                         </p>
                                                                     </div>
 
@@ -457,17 +495,26 @@ export default function Index({
                                                                 </p>
 
                                                                 <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-3 text-xs text-gray-500">
-                                                                    <span>Versionen: {report.versionCount}</span>
+                                                                    <span>
+                                                                        Versionen:{' '}
+                                                                        {report.versionCount}
+                                                                    </span>
 
                                                                     {report.signed ? (
                                                                         <span>
-                                                                            Signiert von {report.signedByName ?? 'unbekannt'} am{' '}
-                                                                            {report.signedAt ?? 'unbekannt'}
+                                                                            Signiert von{' '}
+                                                                            {report.signedByName ??
+                                                                                'unbekannt'}{' '}
+                                                                            am{' '}
+                                                                            {report.signedAt ??
+                                                                                'unbekannt'}
                                                                         </span>
                                                                     ) : (
                                                                         <button
                                                                             type="button"
-                                                                            onClick={() => signReport(report)}
+                                                                            onClick={() =>
+                                                                                signReport(report)
+                                                                            }
                                                                             className="rounded-md bg-[#7F1730] px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-[#641226]"
                                                                         >
                                                                             Signieren
@@ -479,7 +526,8 @@ export default function Index({
                                                     </div>
                                                 ) : (
                                                     <div className="mt-5 rounded-xl border border-dashed border-[#E5E7EB] p-5 text-sm text-[#54595F]">
-                                                        Für {tab.name} wurde bei diesem Bewohner noch nichts dokumentiert.
+                                                        Für {tab.name} wurde bei diesem Bewohner
+                                                        noch nichts dokumentiert.
                                                     </div>
                                                 )}
                                             </section>

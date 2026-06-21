@@ -70,12 +70,8 @@ function ShiftTemplateCard({
     const colorTaken = currentColor !== '' && takenColors.includes(currentColor);
 
     const staffingForm = useForm({
-        required_total_staff: String(
-            shiftTemplate.defaultStaffingRule?.requiredTotalStaff ?? '',
-        ),
-        required_specialists: String(
-            shiftTemplate.defaultStaffingRule?.requiredSpecialists ?? '',
-        ),
+        required_total_staff: String(shiftTemplate.defaultStaffingRule?.requiredTotalStaff ?? ''),
+        required_specialists: String(shiftTemplate.defaultStaffingRule?.requiredSpecialists ?? ''),
     });
 
     const submitShift: FormEventHandler = (event) => {
@@ -89,12 +85,9 @@ function ShiftTemplateCard({
     const submitStaffingRule: FormEventHandler = (event) => {
         event.preventDefault();
 
-        staffingForm.patch(
-            route('shift-templates.staffing-rule.update', shiftTemplate.id),
-            {
-                preserveScroll: true,
-            },
-        );
+        staffingForm.patch(route('shift-templates.staffing-rule.update', shiftTemplate.id), {
+            preserveScroll: true,
+        });
     };
 
     return (
@@ -110,8 +103,7 @@ function ShiftTemplateCard({
                         </h3>
                         <p className="mt-1 text-sm text-gray-600">
                             Code {shiftTemplate.code} · {shiftTemplate.startsAt} bis{' '}
-                            {shiftTemplate.endsAt} · {shiftTemplate.durationMinutes}{' '}
-                            Minuten
+                            {shiftTemplate.endsAt} · {shiftTemplate.durationMinutes} Minuten
                         </p>
                     </div>
 
@@ -138,8 +130,7 @@ function ShiftTemplateCard({
                     <div>
                         <dt className="text-gray-500">Mindestbesetzung gesamt</dt>
                         <dd className="font-medium text-gray-900">
-                            {shiftTemplate.defaultStaffingRule?.requiredTotalStaff ??
-                                'Keine Regel'}
+                            {shiftTemplate.defaultStaffingRule?.requiredTotalStaff ?? 'Keine Regel'}
                         </dd>
                     </div>
                     <div>
@@ -174,55 +165,36 @@ function ShiftTemplateCard({
 
             <div className="grid gap-6 p-6 lg:grid-cols-2">
                 <form onSubmit={submitShift} className="space-y-4">
-                    <h4 className="text-base font-semibold text-gray-900">
-                        Schichtdaten
-                    </h4>
+                    <h4 className="text-base font-semibold text-gray-900">Schichtdaten</h4>
 
                     <div>
                         <InputLabel htmlFor={`name_${shiftTemplate.id}`} value="Name" />
                         <TextInput
                             id={`name_${shiftTemplate.id}`}
                             value={shiftForm.data.name}
-                            onChange={(event) =>
-                                shiftForm.setData('name', event.target.value)
-                            }
+                            onChange={(event) => shiftForm.setData('name', event.target.value)}
                             className="mt-1 block w-full"
                         />
-                        <InputError
-                            message={shiftForm.errors.name}
-                            className="mt-2"
-                        />
+                        <InputError message={shiftForm.errors.name} className="mt-2" />
                     </div>
 
                     <div className="grid gap-4 sm:grid-cols-2">
                         <div>
-                            <InputLabel
-                                htmlFor={`starts_at_${shiftTemplate.id}`}
-                                value="Von"
-                            />
+                            <InputLabel htmlFor={`starts_at_${shiftTemplate.id}`} value="Von" />
                             <TextInput
                                 id={`starts_at_${shiftTemplate.id}`}
                                 type="time"
                                 value={shiftForm.data.starts_at}
                                 onChange={(event) =>
-                                    shiftForm.setData(
-                                        'starts_at',
-                                        event.target.value,
-                                    )
+                                    shiftForm.setData('starts_at', event.target.value)
                                 }
                                 className="mt-1 block w-full"
                             />
-                            <InputError
-                                message={shiftForm.errors.starts_at}
-                                className="mt-2"
-                            />
+                            <InputError message={shiftForm.errors.starts_at} className="mt-2" />
                         </div>
 
                         <div>
-                            <InputLabel
-                                htmlFor={`ends_at_${shiftTemplate.id}`}
-                                value="Bis"
-                            />
+                            <InputLabel htmlFor={`ends_at_${shiftTemplate.id}`} value="Bis" />
                             <TextInput
                                 id={`ends_at_${shiftTemplate.id}`}
                                 type="time"
@@ -232,10 +204,7 @@ function ShiftTemplateCard({
                                 }
                                 className="mt-1 block w-full"
                             />
-                            <InputError
-                                message={shiftForm.errors.ends_at}
-                                className="mt-2"
-                            />
+                            <InputError message={shiftForm.errors.ends_at} className="mt-2" />
                         </div>
                     </div>
 
@@ -252,10 +221,7 @@ function ShiftTemplateCard({
                                 max="1440"
                                 value={shiftForm.data.duration_minutes}
                                 onChange={(event) =>
-                                    shiftForm.setData(
-                                        'duration_minutes',
-                                        event.target.value,
-                                    )
+                                    shiftForm.setData('duration_minutes', event.target.value)
                                 }
                                 className="mt-1 block w-full"
                             />
@@ -266,10 +232,7 @@ function ShiftTemplateCard({
                         </div>
 
                         <div>
-                            <InputLabel
-                                htmlFor={`color_${shiftTemplate.id}`}
-                                value="Farbe"
-                            />
+                            <InputLabel htmlFor={`color_${shiftTemplate.id}`} value="Farbe" />
                             <div className="mt-1 flex items-center gap-3">
                                 <input
                                     id={`color_${shiftTemplate.id}`}
@@ -293,18 +256,12 @@ function ShiftTemplateCard({
                                                 key={preset}
                                                 type="button"
                                                 disabled={taken}
-                                                onClick={() =>
-                                                    shiftForm.setData('color', preset)
-                                                }
+                                                onClick={() => shiftForm.setData('color', preset)}
                                                 className={`h-6 w-6 rounded-full border ${
                                                     selected
                                                         ? 'border-gray-900 ring-2 ring-gray-400 ring-offset-1'
                                                         : 'border-gray-300'
-                                                } ${
-                                                    taken
-                                                        ? 'cursor-not-allowed opacity-30'
-                                                        : ''
-                                                }`}
+                                                } ${taken ? 'cursor-not-allowed opacity-30' : ''}`}
                                                 style={{ backgroundColor: preset }}
                                                 title={
                                                     taken
@@ -322,10 +279,7 @@ function ShiftTemplateCard({
                                     Diese Farbe ist in diesem Wohnbereich bereits vergeben.
                                 </p>
                             )}
-                            <InputError
-                                message={shiftForm.errors.color}
-                                className="mt-2"
-                            />
+                            <InputError message={shiftForm.errors.color} className="mt-2" />
                         </div>
                     </div>
 
@@ -333,9 +287,7 @@ function ShiftTemplateCard({
                         <input
                             type="checkbox"
                             checked={shiftForm.data.active}
-                            onChange={(event) =>
-                                shiftForm.setData('active', event.target.checked)
-                            }
+                            onChange={(event) => shiftForm.setData('active', event.target.checked)}
                             className="rounded border-gray-300 text-[#9B1C3B] shadow-sm focus:ring-[#9B1C3B]"
                         />
                         <span className="text-sm font-medium text-gray-700">Aktiv</span>
@@ -365,10 +317,7 @@ function ShiftTemplateCard({
                             max="50"
                             value={staffingForm.data.required_total_staff}
                             onChange={(event) =>
-                                staffingForm.setData(
-                                    'required_total_staff',
-                                    event.target.value,
-                                )
+                                staffingForm.setData('required_total_staff', event.target.value)
                             }
                             className="mt-1 block w-full"
                         />
@@ -390,10 +339,7 @@ function ShiftTemplateCard({
                             max="50"
                             value={staffingForm.data.required_specialists}
                             onChange={(event) =>
-                                staffingForm.setData(
-                                    'required_specialists',
-                                    event.target.value,
-                                )
+                                staffingForm.setData('required_specialists', event.target.value)
                             }
                             className="mt-1 block w-full"
                         />
@@ -414,16 +360,11 @@ function ShiftTemplateCard({
     );
 }
 
-export default function ShiftTemplatesIndex({
-    locations,
-    shiftTemplates,
-}: Props) {
+export default function ShiftTemplatesIndex({ locations, shiftTemplates }: Props) {
     return (
         <AuthenticatedLayout
             header={
-                <h2 className="text-xl font-semibold leading-tight text-gray-800">
-                    Schichten
-                </h2>
+                <h2 className="text-xl font-semibold leading-tight text-gray-800">Schichten</h2>
             }
         >
             <Head title="Schichten" />
@@ -432,11 +373,10 @@ export default function ShiftTemplatesIndex({
                 <div className="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
                     <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
                         <div className="p-6">
-                            <h3 className="text-lg font-semibold text-gray-900">
-                                Schichtvorlagen
-                            </h3>
+                            <h3 className="text-lg font-semibold text-gray-900">Schichtvorlagen</h3>
                             <p className="mt-1 text-sm text-gray-600">
-                                Hier verwaltest du Schichtzeiten und Mindestbesetzung je Wohnbereich.
+                                Hier verwaltest du Schichtzeiten und Mindestbesetzung je
+                                Wohnbereich.
                             </p>
                             <p className="mt-3 text-sm text-gray-500">
                                 Wohnbereiche: {locations.length}
@@ -447,7 +387,8 @@ export default function ShiftTemplatesIndex({
                     {shiftTemplates.length === 0 ? (
                         <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
                             <div className="p-6 text-sm text-gray-600">
-                                Noch keine Schichtvorlagen vorhanden. Führe zuerst php artisan pflegedex:create-default-shifts aus.
+                                Noch keine Schichtvorlagen vorhanden. Führe zuerst php artisan
+                                pflegedex:create-default-shifts aus.
                             </div>
                         </div>
                     ) : (

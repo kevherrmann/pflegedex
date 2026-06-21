@@ -59,7 +59,9 @@ export default function Index({ locations }: LocationsIndexProps) {
                                 Angelegte Wohnbereiche
                             </h1>
                             <p className="mt-3 text-[#54595F]">
-                                Hier kannst du Wohnbereiche anlegen. Neu angelegte Wohnbereiche werden direkt deinem Konto zugeordnet, damit du Bewohner darin erfassen kannst.
+                                Hier kannst du Wohnbereiche anlegen. Neu angelegte Wohnbereiche
+                                werden direkt deinem Konto zugeordnet, damit du Bewohner darin
+                                erfassen kannst.
                             </p>
                         </div>
 
@@ -75,8 +77,7 @@ export default function Index({ locations }: LocationsIndexProps) {
                                                 {location.name}
                                             </h3>
                                             <p className="mt-1 text-sm text-[#54595F]">
-                                                Kürzel:{' '}
-                                                {location.shortName ?? '—'}
+                                                Kürzel: {location.shortName ?? '—'}
                                             </p>
                                             {location.description && (
                                                 <p className="mt-2 text-sm leading-6 text-[#54595F]">
@@ -123,7 +124,8 @@ export default function Index({ locations }: LocationsIndexProps) {
                             Wohnbereich anlegen
                         </h3>
                         <p className="mt-2 text-sm leading-6 text-[#54595F]">
-                            Nutze sprechende Namen wie „Wohnbereich A“, „EG Demenz“ oder „Kurzzeitpflege“.
+                            Nutze sprechende Namen wie „Wohnbereich A“, „EG Demenz“ oder
+                            „Kurzzeitpflege“.
                         </p>
 
                         <form onSubmit={submit} className="mt-6 space-y-5">
@@ -135,9 +137,7 @@ export default function Index({ locations }: LocationsIndexProps) {
                                     value={data.name}
                                     className="mt-1 block w-full"
                                     isFocused={true}
-                                    onChange={(event) =>
-                                        setData('name', event.target.value)
-                                    }
+                                    onChange={(event) => setData('name', event.target.value)}
                                     required
                                 />
                                 <InputError message={errors.name} className="mt-2" />
@@ -150,34 +150,21 @@ export default function Index({ locations }: LocationsIndexProps) {
                                     name="short_name"
                                     value={data.short_name}
                                     className="mt-1 block w-full"
-                                    onChange={(event) =>
-                                        setData('short_name', event.target.value)
-                                    }
+                                    onChange={(event) => setData('short_name', event.target.value)}
                                 />
-                                <InputError
-                                    message={errors.short_name}
-                                    className="mt-2"
-                                />
+                                <InputError message={errors.short_name} className="mt-2" />
                             </div>
 
                             <div>
-                                <InputLabel
-                                    htmlFor="description"
-                                    value="Beschreibung"
-                                />
+                                <InputLabel htmlFor="description" value="Beschreibung" />
                                 <textarea
                                     id="description"
                                     name="description"
                                     value={data.description}
                                     className="mt-1 block min-h-28 w-full rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]"
-                                    onChange={(event) =>
-                                        setData('description', event.target.value)
-                                    }
+                                    onChange={(event) => setData('description', event.target.value)}
                                 />
-                                <InputError
-                                    message={errors.description}
-                                    className="mt-2"
-                                />
+                                <InputError message={errors.description} className="mt-2" />
                             </div>
 
                             <PrimaryButton disabled={processing}>

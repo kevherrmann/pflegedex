@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Support\Concerns\AppendOnly;
 use App\Support\Concerns\HasUuidV7;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 final class CarePlanVersion extends Model
 {
+    use AppendOnly;
     use HasFactory;
     use HasUuidV7;
 
@@ -39,6 +41,7 @@ final class CarePlanVersion extends Model
     protected function casts(): array
     {
         return [
+            'content_snapshot' => 'encrypted',
             'created_at' => 'datetime',
         ];
     }

@@ -6,9 +6,9 @@ use App\Enums\CarePlanTopic;
 use App\Models\CarePlan;
 use App\Models\CarePlanTopicEntry;
 use App\Models\CarePlanVersion;
-use App\Models\Location;
 use App\Models\Resident;
 use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Spatie\Permission\Models\Role;
@@ -90,8 +90,8 @@ it('unique-Constraint verhindert doppelte Topic-Eintraege fuer dieselbe Topic-Nu
         'topic_number' => 1,
     ]);
 
-    expect(fn() => CarePlanTopicEntry::factory()->create([
+    expect(fn () => CarePlanTopicEntry::factory()->create([
         'care_plan_id' => $cp->id,
         'topic_number' => 1,
-    ]))->toThrow(\Illuminate\Database\QueryException::class);
+    ]))->toThrow(QueryException::class);
 });

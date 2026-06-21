@@ -71,7 +71,10 @@ export default function Welcome({
                             <a className="hidden text-[#9B1C3B] md:inline" href="#module">
                                 Module
                             </a>
-                            <a className="hidden text-[#54595F] transition hover:text-[#9B1C3B] md:inline" href="#betrieb">
+                            <a
+                                className="hidden text-[#54595F] transition hover:text-[#9B1C3B] md:inline"
+                                href="#betrieb"
+                            >
                                 Betrieb
                             </a>
                             {auth.user ? (
@@ -114,10 +117,14 @@ export default function Welcome({
                                     On-Premise Pflegedokumentation
                                 </p>
                                 <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-[#333333] md:text-6xl">
-                                    Pflegedex bringt SIS, Pflegeberichte und lokale KI in einen ruhigen Arbeitsplatz.
+                                    Pflegedex bringt SIS, Pflegeberichte und lokale KI in einen
+                                    ruhigen Arbeitsplatz.
                                 </h1>
                                 <p className="mt-6 max-w-2xl text-lg leading-8 text-[#54595F]">
-                                    Das MVP startet lokal in Docker und bleibt später per Konfiguration auf die Intranet-Domain im Heim umziehbar. Datenschutz, append-only Berichte und manuelle Signatur stehen von Anfang an im Fokus.
+                                    Das MVP startet lokal in Docker und bleibt später per
+                                    Konfiguration auf die Intranet-Domain im Heim umziehbar.
+                                    Datenschutz, append-only Berichte und manuelle Signatur stehen
+                                    von Anfang an im Fokus.
                                 </p>
                                 <div className="mt-10 grid gap-4 sm:grid-cols-2">
                                     <Link
@@ -147,11 +154,16 @@ export default function Welcome({
                                             ['KI', 'Ollama lokal angebunden'],
                                             ['Berichte', 'Entwurf → Prüfung → Signatur'],
                                         ].map(([label, value]) => (
-                                            <div key={label} className="rounded-2xl bg-white p-5 text-[#333333] shadow-sm">
+                                            <div
+                                                key={label}
+                                                className="rounded-2xl bg-white p-5 text-[#333333] shadow-sm"
+                                            >
                                                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#9B1C3B]">
                                                     {label}
                                                 </p>
-                                                <p className="mt-2 text-lg font-semibold">{value}</p>
+                                                <p className="mt-2 text-lg font-semibold">
+                                                    {value}
+                                                </p>
                                             </div>
                                         ))}
                                     </div>
@@ -163,10 +175,17 @@ export default function Welcome({
                     <section id="module" className="mx-auto max-w-7xl px-6 py-14 lg:px-8">
                         <div className="grid gap-6 lg:grid-cols-3">
                             {modules.map((module) => (
-                                <article key={module.title} className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-[#E5E7EB]">
+                                <article
+                                    key={module.title}
+                                    className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-[#E5E7EB]"
+                                >
                                     <div className="mb-6 h-2 w-16 rounded-full bg-[#9B1C3B]" />
-                                    <h2 className="text-xl font-semibold text-[#333333]">{module.title}</h2>
-                                    <p className="mt-4 leading-7 text-[#54595F]">{module.description}</p>
+                                    <h2 className="text-xl font-semibold text-[#333333]">
+                                        {module.title}
+                                    </h2>
+                                    <p className="mt-4 leading-7 text-[#54595F]">
+                                        {module.description}
+                                    </p>
                                 </article>
                             ))}
                         </div>
@@ -181,8 +200,12 @@ export default function Welcome({
                                 ['KI-Endpunkt', 'host.docker.internal:11434'],
                             ].map(([label, value]) => (
                                 <div key={label}>
-                                    <p className="text-sm font-bold uppercase tracking-[0.2em] text-[#9B1C3B]">{label}</p>
-                                    <p className="mt-3 text-lg font-semibold text-[#333333]">{value}</p>
+                                    <p className="text-sm font-bold uppercase tracking-[0.2em] text-[#9B1C3B]">
+                                        {label}
+                                    </p>
+                                    <p className="mt-3 text-lg font-semibold text-[#333333]">
+                                        {value}
+                                    </p>
                                 </div>
                             ))}
                         </div>
@@ -190,8 +213,13 @@ export default function Welcome({
                 </main>
 
                 <footer className="mx-auto flex max-w-7xl flex-col gap-2 px-6 py-8 text-sm text-[#6B7280] lg:px-8">
-                    <p>Laravel {laravelVersion} · PHP {phpVersion}</p>
-                    <p>Designbasis: Sander Pflege — Bordeaux, Weißraum, klare Karten und große Aktionsflächen.</p>
+                    <p>
+                        Laravel {laravelVersion} · PHP {phpVersion}
+                    </p>
+                    <p>
+                        Designbasis: Sander Pflege — Bordeaux, Weißraum, klare Karten und große
+                        Aktionsflächen.
+                    </p>
                 </footer>
             </div>
         </>

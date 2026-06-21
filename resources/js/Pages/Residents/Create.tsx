@@ -31,6 +31,17 @@ export default function Create({ location, locations, salutations }: ResidentCre
         birth_date: '',
         room_number: '',
         care_level: '',
+        admitted_on: '',
+        health_insurance: '',
+        insurance_number: '',
+        family_doctor: '',
+        family_doctor_phone: '',
+        guardian_name: '',
+        guardian_phone: '',
+        has_living_will: false as boolean,
+        has_healthcare_proxy: false as boolean,
+        allergies: '',
+        diagnoses: '',
     });
 
     const submit: FormEventHandler = (event) => {
@@ -63,13 +74,15 @@ export default function Create({ location, locations, salutations }: ResidentCre
                             Neuer Bewohner
                         </h1>
                         <p className="mt-4 leading-7 text-[#54595F]">
-                            Lege hier die Stammdaten für deinen Wohnbereich an. Der Bewohner wird automatisch deinem zugeordneten Wohnbereich zugewiesen.
+                            Lege hier die Stammdaten für deinen Wohnbereich an. Der Bewohner wird
+                            automatisch deinem zugeordneten Wohnbereich zugewiesen.
                         </p>
                     </section>
 
                     {!location && (
                         <div className="mb-6 rounded-2xl border border-[#F3D1DC] bg-[#F7E8ED] p-5 text-[#7F1730]">
-                            Bitte ordne deinem Konto zuerst einen Wohnbereich zu, bevor du Bewohner anlegst.
+                            Bitte ordne deinem Konto zuerst einen Wohnbereich zu, bevor du Bewohner
+                            anlegst.
                         </div>
                     )}
 
@@ -79,18 +92,13 @@ export default function Create({ location, locations, salutations }: ResidentCre
                     >
                         {locations.length > 1 && (
                             <div className="mb-6">
-                                <InputLabel
-                                    htmlFor="location_id"
-                                    value="Wohnbereich"
-                                />
+                                <InputLabel htmlFor="location_id" value="Wohnbereich" />
                                 <select
                                     id="location_id"
                                     name="location_id"
                                     value={data.location_id}
                                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]"
-                                    onChange={(event) =>
-                                        setData('location_id', event.target.value)
-                                    }
+                                    onChange={(event) => setData('location_id', event.target.value)}
                                     required
                                 >
                                     {locations.map((item) => (
@@ -99,10 +107,7 @@ export default function Create({ location, locations, salutations }: ResidentCre
                                         </option>
                                     ))}
                                 </select>
-                                <InputError
-                                    message={errors.location_id}
-                                    className="mt-2"
-                                />
+                                <InputError message={errors.location_id} className="mt-2" />
                             </div>
                         )}
 
@@ -136,15 +141,10 @@ export default function Create({ location, locations, salutations }: ResidentCre
                                     className="mt-1 block w-full"
                                     autoComplete="given-name"
                                     isFocused={true}
-                                    onChange={(event) =>
-                                        setData('first_name', event.target.value)
-                                    }
+                                    onChange={(event) => setData('first_name', event.target.value)}
                                     required
                                 />
-                                <InputError
-                                    message={errors.first_name}
-                                    className="mt-2"
-                                />
+                                <InputError message={errors.first_name} className="mt-2" />
                             </div>
 
                             <div>
@@ -155,71 +155,45 @@ export default function Create({ location, locations, salutations }: ResidentCre
                                     value={data.last_name}
                                     className="mt-1 block w-full"
                                     autoComplete="family-name"
-                                    onChange={(event) =>
-                                        setData('last_name', event.target.value)
-                                    }
+                                    onChange={(event) => setData('last_name', event.target.value)}
                                     required
                                 />
-                                <InputError
-                                    message={errors.last_name}
-                                    className="mt-2"
-                                />
+                                <InputError message={errors.last_name} className="mt-2" />
                             </div>
 
                             <div>
-                                <InputLabel
-                                    htmlFor="birth_date"
-                                    value="Geburtsdatum"
-                                />
+                                <InputLabel htmlFor="birth_date" value="Geburtsdatum" />
                                 <TextInput
                                     id="birth_date"
                                     type="date"
                                     name="birth_date"
                                     value={data.birth_date}
                                     className="mt-1 block w-full"
-                                    onChange={(event) =>
-                                        setData('birth_date', event.target.value)
-                                    }
+                                    onChange={(event) => setData('birth_date', event.target.value)}
                                 />
-                                <InputError
-                                    message={errors.birth_date}
-                                    className="mt-2"
-                                />
+                                <InputError message={errors.birth_date} className="mt-2" />
                             </div>
 
                             <div>
-                                <InputLabel
-                                    htmlFor="room_number"
-                                    value="Zimmer"
-                                />
+                                <InputLabel htmlFor="room_number" value="Zimmer" />
                                 <TextInput
                                     id="room_number"
                                     name="room_number"
                                     value={data.room_number}
                                     className="mt-1 block w-full"
-                                    onChange={(event) =>
-                                        setData('room_number', event.target.value)
-                                    }
+                                    onChange={(event) => setData('room_number', event.target.value)}
                                 />
-                                <InputError
-                                    message={errors.room_number}
-                                    className="mt-2"
-                                />
+                                <InputError message={errors.room_number} className="mt-2" />
                             </div>
 
                             <div>
-                                <InputLabel
-                                    htmlFor="care_level"
-                                    value="Pflegegrad"
-                                />
+                                <InputLabel htmlFor="care_level" value="Pflegegrad" />
                                 <select
                                     id="care_level"
                                     name="care_level"
                                     value={data.care_level}
                                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]"
-                                    onChange={(event) =>
-                                        setData('care_level', event.target.value)
-                                    }
+                                    onChange={(event) => setData('care_level', event.target.value)}
                                 >
                                     <option value="">Noch nicht gesetzt</option>
                                     <option value="1">1</option>
@@ -228,10 +202,156 @@ export default function Create({ location, locations, salutations }: ResidentCre
                                     <option value="4">4</option>
                                     <option value="5">5</option>
                                 </select>
-                                <InputError
-                                    message={errors.care_level}
-                                    className="mt-2"
+                                <InputError message={errors.care_level} className="mt-2" />
+                            </div>
+
+                            <div>
+                                <InputLabel htmlFor="admitted_on" value="Aufnahmedatum" />
+                                <TextInput
+                                    id="admitted_on"
+                                    type="date"
+                                    value={data.admitted_on}
+                                    className="mt-1 block w-full"
+                                    onChange={(event) => setData('admitted_on', event.target.value)}
                                 />
+                                <InputError message={errors.admitted_on} className="mt-2" />
+                            </div>
+
+                            <div>
+                                <InputLabel
+                                    htmlFor="health_insurance"
+                                    value="Pflegekasse / Kostenträger"
+                                />
+                                <TextInput
+                                    id="health_insurance"
+                                    value={data.health_insurance}
+                                    className="mt-1 block w-full"
+                                    onChange={(event) =>
+                                        setData('health_insurance', event.target.value)
+                                    }
+                                />
+                            </div>
+
+                            <div>
+                                <InputLabel htmlFor="insurance_number" value="Versichertennummer" />
+                                <TextInput
+                                    id="insurance_number"
+                                    value={data.insurance_number}
+                                    className="mt-1 block w-full"
+                                    onChange={(event) =>
+                                        setData('insurance_number', event.target.value)
+                                    }
+                                />
+                            </div>
+
+                            <div>
+                                <InputLabel htmlFor="family_doctor" value="Hausarzt" />
+                                <TextInput
+                                    id="family_doctor"
+                                    value={data.family_doctor}
+                                    className="mt-1 block w-full"
+                                    onChange={(event) =>
+                                        setData('family_doctor', event.target.value)
+                                    }
+                                />
+                            </div>
+
+                            <div>
+                                <InputLabel
+                                    htmlFor="family_doctor_phone"
+                                    value="Hausarzt – Telefon"
+                                />
+                                <TextInput
+                                    id="family_doctor_phone"
+                                    value={data.family_doctor_phone}
+                                    className="mt-1 block w-full"
+                                    onChange={(event) =>
+                                        setData('family_doctor_phone', event.target.value)
+                                    }
+                                />
+                            </div>
+
+                            <div>
+                                <InputLabel
+                                    htmlFor="guardian_name"
+                                    value="Betreuer / Bevollmächtigter"
+                                />
+                                <TextInput
+                                    id="guardian_name"
+                                    value={data.guardian_name}
+                                    className="mt-1 block w-full"
+                                    onChange={(event) =>
+                                        setData('guardian_name', event.target.value)
+                                    }
+                                />
+                            </div>
+
+                            <div>
+                                <InputLabel htmlFor="guardian_phone" value="Betreuer – Telefon" />
+                                <TextInput
+                                    id="guardian_phone"
+                                    value={data.guardian_phone}
+                                    className="mt-1 block w-full"
+                                    onChange={(event) =>
+                                        setData('guardian_phone', event.target.value)
+                                    }
+                                />
+                            </div>
+                        </div>
+
+                        <div className="mt-6 flex flex-wrap gap-6">
+                            <label className="flex items-center gap-2 text-sm text-[#333333]">
+                                <input
+                                    type="checkbox"
+                                    className="rounded border-gray-300 text-[#9B1C3B] focus:ring-[#9B1C3B]"
+                                    checked={data.has_living_will}
+                                    onChange={(event) =>
+                                        setData('has_living_will', event.target.checked)
+                                    }
+                                />
+                                Patientenverfügung vorhanden
+                            </label>
+                            <label className="flex items-center gap-2 text-sm text-[#333333]">
+                                <input
+                                    type="checkbox"
+                                    className="rounded border-gray-300 text-[#9B1C3B] focus:ring-[#9B1C3B]"
+                                    checked={data.has_healthcare_proxy}
+                                    onChange={(event) =>
+                                        setData('has_healthcare_proxy', event.target.checked)
+                                    }
+                                />
+                                Vorsorgevollmacht vorhanden
+                            </label>
+                        </div>
+
+                        <div className="mt-6 grid gap-6 sm:grid-cols-2">
+                            <div>
+                                <InputLabel
+                                    htmlFor="allergies"
+                                    value="Allergien / Unverträglichkeiten"
+                                />
+                                <textarea
+                                    id="allergies"
+                                    rows={2}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]"
+                                    value={data.allergies}
+                                    onChange={(event) => setData('allergies', event.target.value)}
+                                />
+                                <InputError message={errors.allergies} className="mt-2" />
+                            </div>
+                            <div>
+                                <InputLabel
+                                    htmlFor="diagnoses"
+                                    value="Diagnosen (ICD / Freitext)"
+                                />
+                                <textarea
+                                    id="diagnoses"
+                                    rows={2}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#9B1C3B] focus:ring-[#9B1C3B]"
+                                    value={data.diagnoses}
+                                    onChange={(event) => setData('diagnoses', event.target.value)}
+                                />
+                                <InputError message={errors.diagnoses} className="mt-2" />
                             </div>
                         </div>
 

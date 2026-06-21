@@ -50,9 +50,7 @@ class GenerateCarePlanJob implements ShouldQueue
     /** 17 Felder * ~30s = 510s plus Puffer */
     public int $timeout = 900;
 
-    public function __construct(public string $generationId)
-    {
-    }
+    public function __construct(public string $generationId) {}
 
     public function handle(CarePlanFormulator $formulator): void
     {

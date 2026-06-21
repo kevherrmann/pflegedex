@@ -15,6 +15,7 @@ class CareReport extends Model implements Auditable
 {
     /** @use HasFactory<CareReportFactory> */
     use AuditableTrait;
+
     use HasFactory;
     use HasUuidV7;
 
@@ -40,6 +41,7 @@ class CareReport extends Model implements Auditable
     protected function casts(): array
     {
         return [
+            'body' => 'encrypted',
             'occurred_at' => 'datetime',
             'signed' => 'boolean',
             'signed_at' => 'datetime',

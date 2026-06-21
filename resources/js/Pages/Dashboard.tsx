@@ -9,6 +9,7 @@ type TodoItem = {
     startedAt?: string;
     dueDate?: string;
     completedAt?: string;
+    assessmentType?: string;
 };
 
 type RunningItem = {
@@ -52,6 +53,8 @@ type Props = {
         mpEvalOverdue: TodoItem[];
         mpEvalSoon: TodoItem[];
         sisCompletedNoMp: TodoItem[];
+        assessmentEvalOverdue: TodoItem[];
+        assessmentEvalSoon: TodoItem[];
         totalRed: number;
         totalYellow: number;
         totalGap: number;
@@ -111,8 +114,12 @@ export default function Dashboard({ todo, running, recent }: Props) {
         <AuthenticatedLayout
             header={
                 <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#9B1C3B]">Pflegedex</p>
-                    <h2 className="mt-1 text-xl font-semibold leading-tight text-[#333333]">Dashboard</h2>
+                    <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#9B1C3B]">
+                        Pflegedex
+                    </p>
+                    <h2 className="mt-1 text-xl font-semibold leading-tight text-[#333333]">
+                        Dashboard
+                    </h2>
                 </div>
             }
         >
@@ -123,7 +130,9 @@ export default function Dashboard({ todo, running, recent }: Props) {
                     {/* ============ Block 1: Was muss ich tun? ============ */}
                     <section className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-[#E5E7EB]">
                         <div className="flex items-baseline justify-between">
-                            <h3 className="text-base font-bold uppercase tracking-widest text-[#333333]">Aufgaben</h3>
+                            <h3 className="text-base font-bold uppercase tracking-widest text-[#333333]">
+                                Aufgaben
+                            </h3>
                             <div className="flex gap-4 text-xs">
                                 {todo.totalRed > 0 && (
                                     <span className="font-semibold text-red-700">
@@ -155,7 +164,9 @@ export default function Dashboard({ todo, running, recent }: Props) {
                                         item={item}
                                         label="SIS nicht fertiggestellt (>14 Tage)"
                                         targetRoute={targetRoute('sis', item.residentId)}
-                                        extraText={item.startedAt ? `begonnen ${item.startedAt}` : null}
+                                        extraText={
+                                            item.startedAt ? `begonnen ${item.startedAt}` : null
+                                        }
                                     />
                                 ))}
                                 {todo.sisEvalOverdue.map((item) => (
@@ -164,7 +175,9 @@ export default function Dashboard({ todo, running, recent }: Props) {
                                         item={item}
                                         label="SIS-Evaluation überfällig"
                                         targetRoute={targetRoute('sis', item.residentId)}
-                                        extraText={item.dueDate ? `fällig seit ${item.dueDate}` : null}
+                                        extraText={
+                                            item.dueDate ? `fällig seit ${item.dueDate}` : null
+                                        }
                                     />
                                 ))}
                                 {todo.mpEvalOverdue.map((item) => (
@@ -173,7 +186,23 @@ export default function Dashboard({ todo, running, recent }: Props) {
                                         item={item}
                                         label="MP-Evaluation überfällig"
                                         targetRoute={targetRoute('mp', item.residentId)}
-                                        extraText={item.dueDate ? `fällig seit ${item.dueDate}` : null}
+                                        extraText={
+                                            item.dueDate ? `fällig seit ${item.dueDate}` : null
+                                        }
+                                    />
+                                ))}
+                                {todo.assessmentEvalOverdue.map((item) => (
+                                    <TodoRow
+                                        key={`as-eo-${item.residentId}-${item.assessmentType}`}
+                                        item={item}
+                                        label={`Assessment überfällig: ${item.assessmentType}`}
+                                        targetRoute={route(
+                                            'residents.assessments.index',
+                                            item.residentId,
+                                        )}
+                                        extraText={
+                                            item.dueDate ? `fällig seit ${item.dueDate}` : null
+                                        }
                                     />
                                 ))}
                                 {todo.sisEvalSoon.map((item) => (
@@ -194,13 +223,27 @@ export default function Dashboard({ todo, running, recent }: Props) {
                                         extraText={item.dueDate ?? null}
                                     />
                                 ))}
+                                {todo.assessmentEvalSoon.map((item) => (
+                                    <TodoRow
+                                        key={`as-es-${item.residentId}-${item.assessmentType}`}
+                                        item={item}
+                                        label={`Assessment in <7 Tagen: ${item.assessmentType}`}
+                                        targetRoute={route(
+                                            'residents.assessments.index',
+                                            item.residentId,
+                                        )}
+                                        extraText={item.dueDate ?? null}
+                                    />
+                                ))}
                                 {todo.sisCompletedNoMp.map((item) => (
                                     <TodoRow
                                         key={`nomp-${item.residentId}`}
                                         item={item}
                                         label="SIS fertig, MP fehlt"
                                         targetRoute={targetRoute('sis', item.residentId)}
-                                        extraText={item.completedAt ? `seit ${item.completedAt}` : null}
+                                        extraText={
+                                            item.completedAt ? `seit ${item.completedAt}` : null
+                                        }
                                     />
                                 ))}
                             </div>
@@ -216,7 +259,9 @@ export default function Dashboard({ todo, running, recent }: Props) {
 
                             {(running.sisActive.length > 0 || running.mpActive.length > 0) && (
                                 <div className="mt-4">
-                                    <p className="text-xs font-semibold uppercase tracking-widest text-emerald-700">Aktiv</p>
+                                    <p className="text-xs font-semibold uppercase tracking-widest text-emerald-700">
+                                        Aktiv
+                                    </p>
                                     <div className="mt-2 space-y-2">
                                         {[...running.sisActive, ...running.mpActive].map((g) => {
                                             const pct =
@@ -231,14 +276,19 @@ export default function Dashboard({ todo, running, recent }: Props) {
                                                 >
                                                     <div className="flex items-center justify-between">
                                                         <div className="text-sm">
-                                                            <span className="font-semibold text-gray-800">{g.name}</span>
-                                                            <span className="ml-2 text-xs text-gray-500">{g.pseudonym}</span>
+                                                            <span className="font-semibold text-gray-800">
+                                                                {g.name}
+                                                            </span>
+                                                            <span className="ml-2 text-xs text-gray-500">
+                                                                {g.pseudonym}
+                                                            </span>
                                                             <span className="ml-3 rounded bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800">
                                                                 {g.kind === 'sis' ? 'SIS' : 'MP'}
                                                             </span>
                                                         </div>
                                                         <div className="text-xs text-gray-600">
-                                                            {g.progress} / {g.totalSteps} ({g.status})
+                                                            {g.progress} / {g.totalSteps} (
+                                                            {g.status})
                                                         </div>
                                                     </div>
                                                     <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-gray-200">
@@ -256,7 +306,9 @@ export default function Dashboard({ todo, running, recent }: Props) {
 
                             {(running.sisFailed.length > 0 || running.mpFailed.length > 0) && (
                                 <div className="mt-4">
-                                    <p className="text-xs font-semibold uppercase tracking-widest text-red-700">Fehlgeschlagen</p>
+                                    <p className="text-xs font-semibold uppercase tracking-widest text-red-700">
+                                        Fehlgeschlagen
+                                    </p>
                                     <div className="mt-2 space-y-2">
                                         {[...running.sisFailed, ...running.mpFailed].map((g) => (
                                             <Link
@@ -266,15 +318,21 @@ export default function Dashboard({ todo, running, recent }: Props) {
                                             >
                                                 <div className="flex items-center justify-between">
                                                     <div className="text-sm">
-                                                        <span className="font-semibold text-gray-800">{g.name}</span>
-                                                        <span className="ml-2 text-xs text-gray-500">{g.pseudonym}</span>
+                                                        <span className="font-semibold text-gray-800">
+                                                            {g.name}
+                                                        </span>
+                                                        <span className="ml-2 text-xs text-gray-500">
+                                                            {g.pseudonym}
+                                                        </span>
                                                         <span className="ml-3 rounded bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-800">
                                                             {g.kind === 'sis' ? 'SIS' : 'MP'}
                                                         </span>
                                                     </div>
                                                 </div>
                                                 {g.errorMessage && (
-                                                    <p className="mt-1 text-xs text-red-700">{g.errorMessage}</p>
+                                                    <p className="mt-1 text-xs text-red-700">
+                                                        {g.errorMessage}
+                                                    </p>
                                                 )}
                                             </Link>
                                         ))}
@@ -314,12 +372,18 @@ export default function Dashboard({ todo, running, recent }: Props) {
                                             >
                                                 {r.name}
                                             </Link>
-                                            <span className="ml-2 text-xs text-gray-500">{r.pseudonym}</span>
+                                            <span className="ml-2 text-xs text-gray-500">
+                                                {r.pseudonym}
+                                            </span>
                                             {r.locationName && (
-                                                <span className="ml-2 text-xs text-gray-500">· {r.locationName}</span>
+                                                <span className="ml-2 text-xs text-gray-500">
+                                                    · {r.locationName}
+                                                </span>
                                             )}
                                             {r.createdAt && (
-                                                <span className="ml-2 text-xs text-gray-500">· seit {r.createdAt}</span>
+                                                <span className="ml-2 text-xs text-gray-500">
+                                                    · seit {r.createdAt}
+                                                </span>
                                             )}
                                         </div>
                                         <div className="flex shrink-0 gap-2">

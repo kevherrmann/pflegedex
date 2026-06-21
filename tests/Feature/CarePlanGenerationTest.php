@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Jobs\GenerateCarePlanJob;
 use App\Models\CarePlan;
 use App\Models\CarePlanGeneration;
-use App\Models\CarePlanTopicEntry;
 use App\Models\CarePlanVersion;
 use App\Models\Location;
 use App\Models\Resident;
@@ -110,7 +109,7 @@ it('Generation-Start scheitert wenn SIS noch nicht fertiggestellt ist', function
 });
 
 it('Generation-Start scheitert wenn KI nicht verfuegbar ist', function (): void {
-    app()->bind(AiHealthService::class, fn() => FakeAiHealthService::unavailable());
+    app()->bind(AiHealthService::class, fn () => FakeAiHealthService::unavailable());
 
     [$location, $resident, $sis, $pdl] = setupResidentWithCompletedSis();
 
@@ -257,7 +256,7 @@ it('GenerateCarePlanJob setzt status=failed bei Ollama-Fehler', function (): voi
 
     try {
         (new GenerateCarePlanJob($generation->id))->handle(app(CarePlanFormulator::class));
-    } catch (\Throwable $e) {
+    } catch (Throwable $e) {
         // erwartet - der Job rethrowt fuer Retry
     }
 
@@ -324,7 +323,7 @@ it('SIS-Show liefert carePlanExists=false wenn noch kein MP angelegt ist', funct
 
     $this->actingAs($pdl)
         ->get(route('residents.sis.show', $resident))
-        ->assertInertia(fn($page) => $page
+        ->assertInertia(fn ($page) => $page
             ->component('Sis/Show')
             ->where('carePlanExists', false));
 });
@@ -338,7 +337,7 @@ it('SIS-Show liefert carePlanExists=true wenn MP existiert', function (): void {
 
     $this->actingAs($pdl)
         ->get(route('residents.sis.show', $resident))
-        ->assertInertia(fn($page) => $page
+        ->assertInertia(fn ($page) => $page
             ->component('Sis/Show')
             ->where('carePlanExists', true));
 });
@@ -360,7 +359,7 @@ it('CarePlan-Show liefert latestGeneration im Inertia-Payload', function (): voi
 
     $this->actingAs($pdl)
         ->get(route('residents.care-plan.show', $resident))
-        ->assertInertia(fn($page) => $page
+        ->assertInertia(fn ($page) => $page
             ->component('CarePlan/Show')
             ->where('latestGeneration.status', 'running')
             ->where('latestGeneration.progress', 8)

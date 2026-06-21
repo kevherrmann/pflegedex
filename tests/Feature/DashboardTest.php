@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Enums\AssessmentType;
+use App\Models\Assessment;
 use App\Models\CarePlan;
 use App\Models\CarePlanGeneration;
 use App\Models\Location;
@@ -49,7 +51,7 @@ it('PDL sieht leeres Dashboard wenn keine Daten existieren', function (): void {
     $this->actingAs($pdl)
         ->get(route('dashboard'))
         ->assertOk()
-        ->assertInertia(fn($page) => $page
+        ->assertInertia(fn ($page) => $page
             ->component('Dashboard')
             ->where('todo.totalRed', 0)
             ->where('todo.totalYellow', 0)
@@ -75,7 +77,7 @@ it('Dashboard zeigt SIS ueber 14 Tage ohne completed_at als rot', function (): v
 
     $this->actingAs($pdl)
         ->get(route('dashboard'))
-        ->assertInertia(fn($page) => $page
+        ->assertInertia(fn ($page) => $page
             ->has('todo.sisOverdueAdmission', 1)
             ->where('todo.sisOverdueAdmission.0.residentId', $resident->id)
             ->where('todo.sisOverdueAdmission.0.severity', 'red')
@@ -95,7 +97,7 @@ it('Dashboard zeigt SIS unter 14 Tagen NICHT als ueberfaellig', function (): voi
 
     $this->actingAs($pdl)
         ->get(route('dashboard'))
-        ->assertInertia(fn($page) => $page->has('todo.sisOverdueAdmission', 0));
+        ->assertInertia(fn ($page) => $page->has('todo.sisOverdueAdmission', 0));
 });
 
 it('Dashboard zeigt ueberfaellige SIS-Evaluationen als rot', function (): void {
@@ -110,7 +112,7 @@ it('Dashboard zeigt ueberfaellige SIS-Evaluationen als rot', function (): void {
 
     $this->actingAs($pdl)
         ->get(route('dashboard'))
-        ->assertInertia(fn($page) => $page
+        ->assertInertia(fn ($page) => $page
             ->has('todo.sisEvalOverdue', 1)
             ->where('todo.sisEvalOverdue.0.severity', 'red')
             ->where('todo.totalRed', 1));
@@ -128,7 +130,7 @@ it('Dashboard zeigt bald-faellige SIS-Evaluationen als gelb', function (): void 
 
     $this->actingAs($pdl)
         ->get(route('dashboard'))
-        ->assertInertia(fn($page) => $page
+        ->assertInertia(fn ($page) => $page
             ->has('todo.sisEvalSoon', 1)
             ->where('todo.sisEvalSoon.0.severity', 'yellow')
             ->where('todo.totalYellow', 1));
@@ -149,7 +151,7 @@ it('Dashboard zeigt ueberfaellige MP-Evaluationen als rot', function (): void {
 
     $this->actingAs($pdl)
         ->get(route('dashboard'))
-        ->assertInertia(fn($page) => $page
+        ->assertInertia(fn ($page) => $page
             ->has('todo.mpEvalOverdue', 1)
             ->where('todo.mpEvalOverdue.0.severity', 'red'));
 });
@@ -166,7 +168,7 @@ it('Dashboard zeigt SIS fertig aber MP fehlt als gelb', function (): void {
 
     $this->actingAs($pdl)
         ->get(route('dashboard'))
-        ->assertInertia(fn($page) => $page
+        ->assertInertia(fn ($page) => $page
             ->has('todo.sisCompletedNoMp', 1)
             ->where('todo.sisCompletedNoMp.0.severity', 'yellow'));
 });
@@ -185,7 +187,7 @@ it('Dashboard filtert nach Wohnbereich-Zugehoerigkeit des PDL', function (): voi
 
     $this->actingAs($pdl)
         ->get(route('dashboard'))
-        ->assertInertia(fn($page) => $page
+        ->assertInertia(fn ($page) => $page
             ->has('todo.sisOverdueAdmission', 0)
             ->has('recent', 0));
 });
@@ -208,7 +210,7 @@ it('Dashboard listet aktive SIS-Generationen', function (): void {
 
     $this->actingAs($pdl)
         ->get(route('dashboard'))
-        ->assertInertia(fn($page) => $page
+        ->assertInertia(fn ($page) => $page
             ->has('running.sisActive', 1)
             ->where('running.sisActive.0.status', 'running')
             ->where('running.sisActive.0.progress', 4)
@@ -233,7 +235,7 @@ it('Dashboard listet aktive MP-Generationen', function (): void {
 
     $this->actingAs($pdl)
         ->get(route('dashboard'))
-        ->assertInertia(fn($page) => $page
+        ->assertInertia(fn ($page) => $page
             ->has('running.mpActive', 1)
             ->where('running.mpActive.0.kind', 'mp'));
 });
@@ -258,7 +260,7 @@ it('Dashboard listet fehlgeschlagene Generationen', function (): void {
 
     $this->actingAs($pdl)
         ->get(route('dashboard'))
-        ->assertInertia(fn($page) => $page
+        ->assertInertia(fn ($page) => $page
             ->has('running.sisFailed', 1)
             ->where('running.sisFailed.0.errorMessage', 'Ollama timeout nach 30s'));
 });
@@ -274,8 +276,8 @@ it('Dashboard recent-Block zeigt zuletzt aufgenommene Bewohner', function (): vo
 
     $this->actingAs($pdl)
         ->get(route('dashboard'))
-        ->assertInertia(fn($page) => $page
-            ->has('recent', 3, fn($item) => $item
+        ->assertInertia(fn ($page) => $page
+            ->has('recent', 3, fn ($item) => $item
                 ->has('id')
                 ->has('pseudonym')
                 ->has('name')
@@ -293,10 +295,55 @@ it('Dashboard recent-Block zeigt SIS-Status korrekt pro Bewohner', function (): 
 
     $this->actingAs($pdl)
         ->get(route('dashboard'))
-        ->assertInertia(fn($page) => $page
+        ->assertInertia(fn ($page) => $page
             ->has('recent', 1)
             ->where('recent.0.id', $resident->id)
             ->where('recent.0.hasSis', true)
             ->where('recent.0.sisCompleted', true)
             ->where('recent.0.hasCarePlan', false));
+});
+
+function dashOverdueAssessment(Location $location, User $pdl, Resident $resident, $nextDue): Assessment
+{
+    return Assessment::query()->create([
+        'resident_id' => $resident->id,
+        'location_id' => $location->id,
+        'type' => AssessmentType::Braden,
+        'assessed_on' => today()->subWeeks(5),
+        'answers' => ['sensory_perception' => 3],
+        'total_score' => 18,
+        'risk_level' => 'Geringes Risiko',
+        'next_due' => $nextDue,
+        'assessed_by' => $pdl->id,
+    ]);
+}
+
+it('Dashboard zeigt überfällige Assessment-Wiedervorlagen als rot', function (): void {
+    [$location, $pdl] = dashLocationAndPdl();
+    $resident = Resident::factory()->for($location)->create();
+    dashOverdueAssessment($location, $pdl, $resident, today()->subDays(3));
+
+    $this->actingAs($pdl)
+        ->get(route('dashboard'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('todo.assessmentEvalOverdue', 1)
+            ->where('todo.assessmentEvalOverdue.0.residentId', $resident->id)
+            ->where('todo.assessmentEvalOverdue.0.assessmentType', 'Braden-Skala (Dekubitusrisiko)')
+            ->where('todo.assessmentEvalOverdue.0.severity', 'red')
+            ->where('todo.totalRed', 1));
+});
+
+it('Dashboard zeigt bald fällige Assessment-Wiedervorlagen als gelb', function (): void {
+    [$location, $pdl] = dashLocationAndPdl();
+    $resident = Resident::factory()->for($location)->create();
+    dashOverdueAssessment($location, $pdl, $resident, today()->addDays(4));
+
+    $this->actingAs($pdl)
+        ->get(route('dashboard'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('todo.assessmentEvalSoon', 1)
+            ->where('todo.assessmentEvalSoon.0.severity', 'yellow')
+            ->where('todo.totalYellow', 1));
 });

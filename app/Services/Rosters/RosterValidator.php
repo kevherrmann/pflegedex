@@ -31,6 +31,9 @@ class RosterValidator
     // Unter diesem Anteil der Soll-Kapazitaet gilt ein Mitarbeiter als deutlich unter Soll geplant.
     private readonly float $underPlannedFactor;
 
+    /** @var array<string, true> Y-m-d => Feiertag (für den geprüften Dienstplan-Standort) */
+    private array $holidayDates = [];
+
     public function __construct(
         private readonly RosterDateService $rosterDateService,
         private readonly TargetMinutesCalculator $targetMinutesCalculator = new TargetMinutesCalculator,
@@ -55,6 +58,7 @@ class RosterValidator
         $result = new RosterValidationResult;
 
         $roster->loadMissing(['location']);
+        $this->loadHolidayDates($roster);
 
         if ($shiftsOverride === null) {
             $roster->loadMissing([
@@ -85,6 +89,7 @@ class RosterValidator
         $this->validateMonthlyFreeDays($roster, $shifts, $boundaryShiftsByUser, $result);
         $this->validateSundayCompensationRestDays($roster, $shifts, $boundaryShiftsByUser, $result);
         $this->validateRestPeriods($roster, $shifts, $boundaryShiftsByUser, $result);
+        $this->validateDailyWorkingHours($roster, $shifts, $boundaryShiftsByUser, $result);
 
         return $result;
     }
@@ -188,10 +193,27 @@ class RosterValidator
         }
     }
 
+    private function loadHolidayDates(Roster $roster): void
+    {
+        $this->holidayDates = [];
+        $state = $roster->location?->state;
+        $service = new HolidayService;
+
+        $monthStart = CarbonImmutable::create($roster->year, $roster->month, 1)->startOfDay();
+        $startYear = (int) $monthStart->subDays(10)->year;
+        $endYear = (int) $monthStart->endOfMonth()->addDays(10)->year;
+
+        for ($year = $startYear; $year <= $endYear; $year++) {
+            foreach (array_keys($service->holidaysForYear($year, $state)) as $dateKey) {
+                $this->holidayDates[$dateKey] = true;
+            }
+        }
+    }
+
     private function findStaffingRule(ShiftTemplate $shiftTemplate, CarbonImmutable $date): ?ShiftStaffingRule
     {
-        // ISO weekday: 1 = Montag, 7 = Sonntag.
-        $weekday = $date->dayOfWeekIso;
+        // ISO weekday: 1 = Montag, 7 = Sonntag. Feiertage zählen wie Sonntag.
+        $weekday = isset($this->holidayDates[$date->toDateString()]) ? 7 : $date->dayOfWeekIso;
 
         return $shiftTemplate->staffingRules
             ->first(fn (ShiftStaffingRule $rule): bool => $rule->weekday === $weekday)
@@ -261,6 +283,59 @@ class RosterValidator
                             'Zwischen zwei Diensten liegt weniger als die erforderliche Ruhezeit.',
                         );
                     }
+                }
+            });
+    }
+
+    /**
+     * Tägliche Höchstarbeitszeit (§ 3 ArbZG): Summe der Dienstminuten pro
+     * Kalendertag und Mitarbeiter darf die Tagesgrenze nicht überschreiten.
+     *
+     * @param  Collection<string, Collection<int, Shift>>  $boundaryShiftsByUser
+     */
+    private function validateDailyWorkingHours(Roster $roster, Collection $shifts, Collection $boundaryShiftsByUser, RosterValidationResult $result): void
+    {
+        $dailyMaxMinutes = (int) config('rostering.daily_max_minutes');
+
+        $shifts
+            ->groupBy('user_id')
+            ->each(function (Collection $userShifts, string $userId) use ($roster, $boundaryShiftsByUser, $result, $dailyMaxMinutes): void {
+                $all = $userShifts->concat($boundaryShiftsByUser->get($userId, collect()));
+
+                $minutesByDay = [];
+                $sampleByDay = [];
+                $ownDays = [];
+
+                foreach ($all as $shift) {
+                    $dateKey = $shift->date->toDateString();
+                    $minutesByDay[$dateKey] = ($minutesByDay[$dateKey] ?? 0)
+                        + (int) $shift->starts_at->diffInMinutes($shift->ends_at, true);
+                    $sampleByDay[$dateKey] = $shift;
+
+                    if ($shift->roster_id === $roster->id) {
+                        $ownDays[$dateKey] = true;
+                    }
+                }
+
+                foreach ($minutesByDay as $dateKey => $minutes) {
+                    // Nur melden, wenn an dem Tag ein Dienst aus DIESEM Plan liegt.
+                    if ($minutes <= $dailyMaxMinutes || ! isset($ownDays[$dateKey])) {
+                        continue;
+                    }
+
+                    $result->addError(
+                        'daily_hours_violation',
+                        'Die tägliche Höchstarbeitszeit ist überschritten.',
+                        [
+                            'userId' => $userId,
+                            'employeeName' => $sampleByDay[$dateKey]->user?->name,
+                            'date' => $dateKey,
+                            'minutes' => $minutes,
+                            'dailyMaxMinutes' => $dailyMaxMinutes,
+                        ],
+                        'Tägliche Höchstarbeitszeit überschritten',
+                        'An einem Tag wurde mehr als die zulässige Höchstarbeitszeit verplant.',
+                    );
                 }
             });
     }

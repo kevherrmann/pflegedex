@@ -13,17 +13,17 @@ return new class extends Migration
         Schema::create('report_versions', function (Blueprint $table): void {
             $table->uuid('id')->primary();
             $table->foreignUuid('care_report_id')
-            ->constrained()
-            ->cascadeOnUpdate()
-            ->restrictOnDelete();
+                ->constrained()
+                ->cascadeOnUpdate()
+                ->restrictOnDelete();
 
             $table->longText('content_snapshot');
             $table->string('snapshot_reason', 80);
             $table->foreignUuid('created_by')
-            ->nullable()
-            ->constrained('users')
-            ->cascadeOnUpdate()
-            ->nullOnDelete();
+                ->nullable()
+                ->constrained('users')
+                ->cascadeOnUpdate()
+                ->nullOnDelete();
 
             $table->timestamp('created_at')->useCurrent();
 

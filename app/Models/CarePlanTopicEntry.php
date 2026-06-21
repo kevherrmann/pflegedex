@@ -35,6 +35,7 @@ class CarePlanTopicEntry extends Model
     protected function casts(): array
     {
         return [
+            'content' => 'encrypted',
             'topic_number' => 'integer',
         ];
     }

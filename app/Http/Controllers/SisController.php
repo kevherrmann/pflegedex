@@ -34,7 +34,7 @@ class SisController extends Controller
         // Aktive oder zuletzt fertiggestellte Generation - Frontend kann pollen
         // bis status terminal ist und blendet danach den Hinweis aus.
         $latestGeneration = $sis !== null
-            ? \App\Models\SisGeneration::query()
+            ? SisGeneration::query()
                 ->where('sis_id', $sis->id)
                 ->orderByDesc('created_at')
                 ->first()
@@ -143,7 +143,7 @@ class SisController extends Controller
     {
         return [
             'opening_question' => $sis->opening_question,
-            'topics' => $sis->topicEntries->map(fn(SisTopicEntry $t): array => [
+            'topics' => $sis->topicEntries->map(fn (SisTopicEntry $t): array => [
                 'topic_number' => $t->topic_number,
                 'content' => $t->content,
             ])->all(),
@@ -340,14 +340,14 @@ class SisController extends Controller
             'isOverdue' => $sis->isOverdue(),
             'versionCount' => (int) ($sis->versions_count ?? $sis->versions()->count()),
             'topics' => $sis->topicEntries
-                ->map(fn(SisTopicEntry $t): array => [
+                ->map(fn (SisTopicEntry $t): array => [
                     'topicNumber' => $t->topic_number,
                     'content' => $t->content,
                 ])
                 ->values()
                 ->all(),
             'risks' => $sis->risks
-                ->map(fn(SisRisk $r): array => [
+                ->map(fn (SisRisk $r): array => [
                     'riskKind' => $r->risk_kind,
                     'isAtRisk' => $r->is_at_risk,
                     'needsFurtherAssessment' => $r->needs_further_assessment,
@@ -364,7 +364,7 @@ class SisController extends Controller
     private function topicCatalog(): array
     {
         return array_map(
-            fn(SisTopic $t): array => [
+            fn (SisTopic $t): array => [
                 'number' => $t->value,
                 'label' => $t->label(),
             ],
@@ -378,7 +378,7 @@ class SisController extends Controller
     private function riskCatalog(): array
     {
         return array_map(
-            fn(SisRiskKind $r): array => [
+            fn (SisRiskKind $r): array => [
                 'kind' => $r->value,
                 'label' => $r->label(),
             ],

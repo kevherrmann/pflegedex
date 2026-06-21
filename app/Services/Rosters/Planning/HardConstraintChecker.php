@@ -36,6 +36,17 @@ class HardConstraintChecker
             return 'shift_capability';
         }
 
+        // Mutterschutz (MuSchG): kein Nacht- und kein Sonntagsdienst (Feiertage: s. isHoliday).
+        if ($employee->employeeProfile?->maternity_protection) {
+            if ($shiftTemplate->code === 'night') {
+                return 'maternity_night';
+            }
+
+            if ($date->isSunday() || $context->isHoliday($date)) {
+                return 'maternity_sunday';
+            }
+        }
+
         if ($context->isAlreadyAssigned($employee, $shiftTemplate, $date)) {
             return 'already_assigned';
         }
@@ -60,6 +71,10 @@ class HardConstraintChecker
 
         if ($context->wouldExceedWeeklyMaxMinutes($employee, $date, $shiftMinutes)) {
             return 'weekly_hours_cap';
+        }
+
+        if ($context->wouldExceedDailyMaxMinutes($employee, $date, $shiftMinutes)) {
+            return 'daily_hours_cap';
         }
 
         return null;

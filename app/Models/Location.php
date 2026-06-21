@@ -14,6 +14,7 @@ class Location extends Model implements Auditable
 {
     /** @use HasFactory<LocationFactory> */
     use AuditableTrait;
+
     use HasFactory;
     use HasUuidV7;
 
@@ -24,6 +25,7 @@ class Location extends Model implements Auditable
     protected $fillable = [
         'name',
         'short_name',
+        'state',
         'description',
         'active',
     ];
