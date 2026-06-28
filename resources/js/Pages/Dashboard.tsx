@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link } from '@inertiajs/react';
+import { ReactNode } from 'react';
 
 type TodoItem = {
     residentId: string;
@@ -74,6 +75,44 @@ function targetRoute(kind: 'sis' | 'mp', residentId: string): string {
         : route('residents.care-plan.show', residentId);
 }
 
+function initials(name: string): string {
+    return name
+        .split(' ')
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part.charAt(0).toUpperCase())
+        .join('');
+}
+
+function StatCard({
+    value,
+    label,
+    hint,
+    tone,
+}: {
+    value: number;
+    label: string;
+    hint: string;
+    tone: 'red' | 'amber' | 'neutral';
+}) {
+    const toneClass =
+        value === 0
+            ? 'text-gray-300'
+            : tone === 'red'
+              ? 'text-red-600'
+              : tone === 'amber'
+                ? 'text-amber-600'
+                : 'text-[#9B1C3B]';
+
+    return (
+        <div className="rounded-2xl bg-white p-4 text-center shadow-sm ring-1 ring-[#E5E7EB] sm:p-5">
+            <p className={`text-3xl font-bold tabular-nums ${toneClass}`}>{value}</p>
+            <p className="mt-1 text-xs font-medium text-[#54595F] sm:text-sm">{label}</p>
+            <p className="mt-0.5 text-[10px] leading-tight text-gray-400 sm:text-xs">{hint}</p>
+        </div>
+    );
+}
+
 function TodoRow({
     item,
     label,
@@ -86,19 +125,105 @@ function TodoRow({
     extraText: string | null;
 }) {
     const dotClass = item.severity === 'red' ? 'bg-red-600' : 'bg-amber-500';
+
     return (
         <Link
             href={target}
-            className="flex items-center gap-3 rounded-md px-3 py-2 hover:bg-gray-50"
+            className="flex items-start gap-3 rounded-xl px-3 py-2.5 transition hover:bg-[#F7E8ED]/40 active:bg-[#F7E8ED]/60"
         >
-            <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${dotClass}`} />
-            <span className="flex flex-1 flex-wrap items-baseline gap-x-2">
-                <span className="text-sm font-semibold text-gray-800">{item.name}</span>
-                <span className="text-xs text-gray-500">{item.pseudonym}</span>
-                <span className="text-xs text-gray-600">· {label}</span>
-                {extraText && <span className="text-xs text-gray-500">· {extraText}</span>}
+            <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${dotClass}`} />
+            <span className="min-w-0 flex-1">
+                <span className="flex flex-wrap items-baseline gap-x-2">
+                    <span className="font-semibold text-gray-800">{item.name}</span>
+                    <span className="text-xs text-gray-400">{item.pseudonym}</span>
+                </span>
+                <span className="mt-0.5 block text-sm text-gray-600">
+                    {label}
+                    {extraText && <span className="text-gray-400"> · {extraText}</span>}
+                </span>
             </span>
         </Link>
+    );
+}
+
+function RecentCard({ r }: { r: RecentItem }) {
+    const meta = [r.pseudonym, r.locationName, r.createdAt ? `seit ${r.createdAt}` : null]
+        .filter(Boolean)
+        .join(' · ');
+
+    return (
+        <div className="min-w-0 rounded-xl bg-white p-3 ring-1 ring-[#E5E7EB] sm:p-4">
+            <Link href={route('residents.show', r.id)} className="group flex items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#F7E8ED] text-sm font-bold text-[#7F1730]">
+                    {initials(r.name)}
+                </span>
+                <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold text-[#333333] group-hover:text-[#9B1C3B]">
+                        {r.name}
+                    </p>
+                    <p className="mt-0.5 truncate text-xs text-[#54595F]">{meta}</p>
+                </div>
+                <svg
+                    className="h-5 w-5 shrink-0 text-gray-300 transition group-hover:text-[#9B1C3B]"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={2}
+                    stroke="currentColor"
+                >
+                    <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M8.25 4.5l7.5 7.5-7.5 7.5"
+                    />
+                </svg>
+            </Link>
+            <div className="mt-3 flex flex-wrap gap-2">
+                <Link
+                    href={route('residents.sis.show', r.id)}
+                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                        r.hasSis
+                            ? r.sisCompleted
+                                ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200'
+                                : 'bg-amber-50 text-amber-800 ring-1 ring-amber-200'
+                            : 'bg-gray-100 text-gray-500 ring-1 ring-gray-200'
+                    }`}
+                >
+                    SIS {r.hasSis ? (r.sisCompleted ? '✓' : '…') : '—'}
+                </Link>
+                <Link
+                    href={route('residents.care-plan.show', r.id)}
+                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                        r.hasCarePlan
+                            ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200'
+                            : 'bg-gray-100 text-gray-500 ring-1 ring-gray-200'
+                    }`}
+                >
+                    MP {r.hasCarePlan ? '✓' : '—'}
+                </Link>
+            </div>
+        </div>
+    );
+}
+
+function SectionCard({
+    title,
+    action,
+    children,
+}: {
+    title: string;
+    action?: ReactNode;
+    children: ReactNode;
+}) {
+    return (
+        <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-[#E5E7EB] sm:p-6">
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                <h3 className="text-sm font-bold uppercase tracking-[0.18em] text-[#333333]">
+                    {title}
+                </h3>
+                {action}
+            </div>
+            {children}
+        </section>
     );
 }
 
@@ -125,39 +250,44 @@ export default function Dashboard({ todo, running, recent }: Props) {
         >
             <Head title="Dashboard" />
 
-            <div className="py-6 sm:py-8 lg:py-12">
+            <div className="bg-[#F8F8F8] py-6 sm:py-8 lg:py-12">
                 <div className="mx-auto max-w-6xl space-y-6 px-4 sm:px-6 lg:px-8">
-                    {/* ============ Block 1: Was muss ich tun? ============ */}
-                    <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-[#E5E7EB] sm:p-6">
-                        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
-                            <h3 className="text-base font-bold uppercase tracking-widest text-[#333333]">
-                                Aufgaben
-                            </h3>
-                            <div className="flex gap-4 text-xs">
-                                {todo.totalRed > 0 && (
-                                    <span className="font-semibold text-red-700">
-                                        {todo.totalRed} überfällig
-                                    </span>
-                                )}
-                                {todo.totalYellow > 0 && (
-                                    <span className="font-semibold text-amber-700">
-                                        {todo.totalYellow} demnächst
-                                    </span>
-                                )}
-                                {todo.totalGap > 0 && (
-                                    <span className="font-semibold text-amber-700">
-                                        {todo.totalGap} ohne MP
-                                    </span>
-                                )}
-                            </div>
-                        </div>
+                    {/* Kennzahlen */}
+                    <div className="grid grid-cols-3 gap-3 sm:gap-4">
+                        <StatCard
+                            value={todo.totalRed}
+                            label="Überfällig"
+                            hint="Termine fällig"
+                            tone="red"
+                        />
+                        <StatCard
+                            value={todo.totalYellow}
+                            label="Demnächst"
+                            hint="in ≤ 7 Tagen"
+                            tone="amber"
+                        />
+                        <StatCard
+                            value={todo.totalGap}
+                            label="MP offen"
+                            hint="SIS fertig, MP fehlt"
+                            tone="neutral"
+                        />
+                    </div>
 
+                    {/* ============ Block 1: Aufgaben ============ */}
+                    <SectionCard title="Aufgaben">
                         {allTodoEmpty ? (
-                            <p className="mt-4 text-sm text-gray-500">
-                                Nichts überfällig, nichts in den nächsten 7 Tagen fällig.
-                            </p>
+                            <div className="mt-4 flex items-center gap-3 rounded-xl bg-emerald-50 px-4 py-4 ring-1 ring-emerald-200">
+                                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+                                    ✓
+                                </span>
+                                <p className="text-sm font-medium text-emerald-800">
+                                    Alles erledigt – nichts überfällig oder in den nächsten 7 Tagen
+                                    fällig.
+                                </p>
+                            </div>
                         ) : (
-                            <div className="mt-4 space-y-1">
+                            <div className="mt-3 space-y-0.5">
                                 {todo.sisOverdueAdmission.map((item) => (
                                     <TodoRow
                                         key={`sis-adm-${item.residentId}`}
@@ -248,15 +378,11 @@ export default function Dashboard({ todo, running, recent }: Props) {
                                 ))}
                             </div>
                         )}
-                    </section>
+                    </SectionCard>
 
-                    {/* ============ Block 2: Was läuft gerade? ============ */}
+                    {/* ============ Block 2: KI-Generierungen ============ */}
                     {anyRunning && (
-                        <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-[#E5E7EB] sm:p-6">
-                            <h3 className="text-base font-bold uppercase tracking-widest text-[#333333]">
-                                KI-Generierungen
-                            </h3>
-
+                        <SectionCard title="KI-Generierungen">
                             {(running.sisActive.length > 0 || running.mpActive.length > 0) && (
                                 <div className="mt-4">
                                     <p className="text-xs font-semibold uppercase tracking-widest text-emerald-700">
@@ -268,30 +394,30 @@ export default function Dashboard({ todo, running, recent }: Props) {
                                                 g.totalSteps > 0
                                                     ? Math.round((g.progress / g.totalSteps) * 100)
                                                     : 0;
+
                                             return (
                                                 <Link
                                                     key={g.generationId}
                                                     href={targetRoute(g.kind, g.residentId)}
-                                                    className="block rounded-md px-3 py-2 hover:bg-gray-50"
+                                                    className="block rounded-xl px-3 py-2.5 transition hover:bg-[#F8F8F8]"
                                                 >
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="text-sm">
+                                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                                        <div className="flex flex-wrap items-center gap-2">
                                                             <span className="font-semibold text-gray-800">
                                                                 {g.name}
                                                             </span>
-                                                            <span className="ml-2 text-xs text-gray-500">
+                                                            <span className="text-xs text-gray-400">
                                                                 {g.pseudonym}
                                                             </span>
-                                                            <span className="ml-3 rounded bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800">
+                                                            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800">
                                                                 {g.kind === 'sis' ? 'SIS' : 'MP'}
                                                             </span>
                                                         </div>
-                                                        <div className="text-xs text-gray-600">
-                                                            {g.progress} / {g.totalSteps} (
-                                                            {g.status})
-                                                        </div>
+                                                        <span className="text-xs text-gray-600">
+                                                            {g.progress} / {g.totalSteps}
+                                                        </span>
                                                     </div>
-                                                    <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-gray-200">
+                                                    <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
                                                         <div
                                                             className="h-full bg-emerald-600 transition-all"
                                                             style={{ width: `${pct}%` }}
@@ -314,20 +440,18 @@ export default function Dashboard({ todo, running, recent }: Props) {
                                             <Link
                                                 key={g.generationId}
                                                 href={targetRoute(g.kind, g.residentId)}
-                                                className="block rounded-md px-3 py-2 hover:bg-gray-50"
+                                                className="block rounded-xl px-3 py-2.5 transition hover:bg-[#F8F8F8]"
                                             >
-                                                <div className="flex items-center justify-between">
-                                                    <div className="text-sm">
-                                                        <span className="font-semibold text-gray-800">
-                                                            {g.name}
-                                                        </span>
-                                                        <span className="ml-2 text-xs text-gray-500">
-                                                            {g.pseudonym}
-                                                        </span>
-                                                        <span className="ml-3 rounded bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-800">
-                                                            {g.kind === 'sis' ? 'SIS' : 'MP'}
-                                                        </span>
-                                                    </div>
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <span className="font-semibold text-gray-800">
+                                                        {g.name}
+                                                    </span>
+                                                    <span className="text-xs text-gray-400">
+                                                        {g.pseudonym}
+                                                    </span>
+                                                    <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-800">
+                                                        {g.kind === 'sis' ? 'SIS' : 'MP'}
+                                                    </span>
                                                 </div>
                                                 {g.errorMessage && (
                                                     <p className="mt-1 text-xs text-red-700">
@@ -339,94 +463,31 @@ export default function Dashboard({ todo, running, recent }: Props) {
                                     </div>
                                 </div>
                             )}
-                        </section>
+                        </SectionCard>
                     )}
 
-                    {/* ============ Block 3: Schnellzugriff ============ */}
-                    <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-[#E5E7EB] sm:p-6">
-                        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
-                            <h3 className="text-base font-bold uppercase tracking-widest text-[#333333]">
-                                Zuletzt aufgenommen
-                            </h3>
+                    {/* ============ Block 3: Zuletzt aufgenommen ============ */}
+                    <SectionCard
+                        title="Zuletzt aufgenommen"
+                        action={
                             <Link
                                 href={route('residents.index')}
                                 className="text-xs font-semibold uppercase tracking-widest text-[#9B1C3B] hover:underline"
                             >
                                 Alle Bewohner
                             </Link>
-                        </div>
-
+                        }
+                    >
                         {recent.length === 0 ? (
                             <p className="mt-4 text-sm text-gray-500">Noch keine Bewohner.</p>
                         ) : (
-                            <div className="mt-4 space-y-1">
+                            <div className="mt-4 space-y-3">
                                 {recent.map((r) => (
-                                    <div
-                                        key={r.id}
-                                        className="flex flex-wrap items-center justify-between gap-2 rounded-md px-3 py-2 hover:bg-gray-50"
-                                    >
-                                        <div className="min-w-0">
-                                            <Link
-                                                href={route('residents.edit', r.id)}
-                                                className="text-sm font-semibold text-gray-800 hover:underline"
-                                            >
-                                                {r.name}
-                                            </Link>
-                                            <span className="ml-2 text-xs text-gray-500">
-                                                {r.pseudonym}
-                                            </span>
-                                            {r.locationName && (
-                                                <span className="ml-2 text-xs text-gray-500">
-                                                    · {r.locationName}
-                                                </span>
-                                            )}
-                                            {r.createdAt && (
-                                                <span className="ml-2 text-xs text-gray-500">
-                                                    · seit {r.createdAt}
-                                                </span>
-                                            )}
-                                        </div>
-                                        <div className="flex shrink-0 gap-2">
-                                            {r.hasSis ? (
-                                                <Link
-                                                    href={route('residents.sis.show', r.id)}
-                                                    className={`rounded px-2 py-0.5 text-xs font-semibold ${
-                                                        r.sisCompleted
-                                                            ? 'bg-emerald-50 text-emerald-800'
-                                                            : 'bg-amber-50 text-amber-800'
-                                                    }`}
-                                                >
-                                                    SIS {r.sisCompleted ? '✓' : '…'}
-                                                </Link>
-                                            ) : (
-                                                <Link
-                                                    href={route('residents.sis.show', r.id)}
-                                                    className="rounded bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600"
-                                                >
-                                                    SIS —
-                                                </Link>
-                                            )}
-                                            {r.hasCarePlan ? (
-                                                <Link
-                                                    href={route('residents.care-plan.show', r.id)}
-                                                    className="rounded bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800"
-                                                >
-                                                    MP ✓
-                                                </Link>
-                                            ) : (
-                                                <Link
-                                                    href={route('residents.care-plan.show', r.id)}
-                                                    className="rounded bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600"
-                                                >
-                                                    MP —
-                                                </Link>
-                                            )}
-                                        </div>
-                                    </div>
+                                    <RecentCard key={r.id} r={r} />
                                 ))}
                             </div>
                         )}
-                    </section>
+                    </SectionCard>
                 </div>
             </div>
         </AuthenticatedLayout>

@@ -76,6 +76,7 @@ class CareReportController extends Controller
                 'name' => $location->name,
             ])->values(),
             'categories' => $categories,
+            'textBlocks' => CareReportCategory::textBlockMap(),
         ]);
     }
 

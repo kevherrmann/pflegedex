@@ -348,18 +348,6 @@ export default function Edit({ resident, locations, salutations, statuses }: Res
                         </div>
                         <div className="mt-8 flex justify-end gap-3">
                             <Link
-                                href={route('residents.sis.show', resident.id)}
-                                className="rounded-md px-4 py-2 text-sm font-semibold text-[#9B1C3B] hover:underline"
-                            >
-                                SIS öffnen
-                            </Link>
-                            <Link
-                                href={route('residents.care-plan.show', resident.id)}
-                                className="rounded-md px-4 py-2 text-sm font-semibold text-[#9B1C3B] hover:underline"
-                            >
-                                Maßnahmenplan öffnen
-                            </Link>
-                            <Link
                                 href={route('residents.index', { location_id: data.location_id })}
                                 className="rounded-md px-4 py-2 text-sm font-semibold text-[#54595F] hover:underline"
                             >

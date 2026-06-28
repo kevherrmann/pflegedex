@@ -32,11 +32,11 @@ function initials(name: string): string {
 }
 
 function ResidentCard({ resident, showLocation }: { resident: Resident; showLocation: boolean }) {
-    const details = [
+    const chips = [
         `Zimmer ${resident.roomNumber ?? '—'}`,
         `Pflegegrad ${resident.careLevel ?? '—'}`,
         showLocation && resident.locationName ? resident.locationName : null,
-    ].filter(Boolean);
+    ].filter((chip): chip is string => Boolean(chip));
 
     return (
         <Link
@@ -47,11 +47,20 @@ function ResidentCard({ resident, showLocation }: { resident: Resident; showLoca
                 {initials(resident.fullName)}
             </span>
             <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold text-[#333333]">{resident.fullName}</p>
-                <p className="mt-0.5 truncate text-sm text-[#54595F]">{details.join(' · ')}</p>
+                <p className="font-semibold text-[#333333]">{resident.fullName}</p>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {chips.map((chip) => (
+                        <span
+                            key={chip}
+                            className="rounded-full bg-[#F8F8F8] px-2 py-0.5 text-xs text-[#54595F] ring-1 ring-[#E5E7EB]"
+                        >
+                            {chip}
+                        </span>
+                    ))}
+                </div>
             </div>
             <svg
-                className="h-5 w-5 shrink-0 text-gray-300 transition group-hover:text-[#9B1C3B]"
+                className="h-5 w-5 shrink-0 self-center text-gray-300 transition group-hover:text-[#9B1C3B]"
                 fill="none"
                 viewBox="0 0 24 24"
                 strokeWidth={2}

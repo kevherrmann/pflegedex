@@ -72,3 +72,28 @@ it('lehnt unbekannte Kategorien beim Speichern ab', function (): void {
 
     expect(CareReport::query()->count())->toBe(0);
 });
+
+it('liefert für jede Kategorie nicht-leere, kuratierte Textbausteine', function (): void {
+    foreach (CareReportCategory::cases() as $category) {
+        $blocks = $category->textBlocks();
+
+        expect($blocks)->toBeArray()->not->toBeEmpty();
+
+        foreach ($blocks as $block) {
+            expect($block)->toBeString()->and(trim($block))->not->toBe('');
+        }
+
+        // Keine Duplikate innerhalb einer Kategorie.
+        expect(array_values(array_unique($blocks)))->toBe(array_values($blocks));
+    }
+});
+
+it('bildet in der Textbaustein-Map exakt alle Kategorien ab', function (): void {
+    $map = CareReportCategory::textBlockMap();
+
+    expect(array_keys($map))->toBe(CareReportCategory::values());
+
+    foreach (CareReportCategory::cases() as $category) {
+        expect($map[$category->value])->toBe($category->textBlocks());
+    }
+});
