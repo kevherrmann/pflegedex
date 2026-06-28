@@ -718,3 +718,42 @@ it('forbids a pdl from deciding an absence request of another location', functio
 
     expect($absenceRequest->fresh()->status)->toBe(AbsenceRequestStatus::Requested);
 });
+
+it('lets a PDL report a nursing employee sick via http', function (): void {
+    $location = Location::factory()->create();
+
+    $pdl = User::factory()->for($location)->create();
+    $pdl->assignRole('PDL');
+
+    $employee = createAbsenceHttpEmployeeWithProfile(EmploymentArea::Nursing);
+    $employee->forceFill(['location_id' => $location->id])->save();
+
+    $this->actingAs($pdl)
+        ->from('/absence-requests/manage')
+        ->post('/absence-requests/report-sick', [
+            'user_id' => $employee->id,
+            'starts_on' => '2027-02-10',
+            'ends_on' => '2027-02-12',
+            'note' => 'Telefonisch gemeldet',
+        ])
+        ->assertRedirect('/absence-requests/manage')
+        ->assertSessionHas('status', 'absence-sick-reported');
+
+    expect(AbsenceRequest::query()
+        ->where('user_id', $employee->id)
+        ->where('type', AbsenceRequestType::Sick->value)
+        ->where('status', AbsenceRequestStatus::Approved->value)
+        ->exists())->toBeTrue();
+});
+
+it('forbids non-PDL users from reporting sick', function (): void {
+    $employee = createAbsenceHttpEmployeeWithProfile(EmploymentArea::Nursing);
+
+    $this->actingAs($employee)
+        ->post('/absence-requests/report-sick', [
+            'user_id' => $employee->id,
+            'starts_on' => '2027-02-10',
+            'ends_on' => '2027-02-10',
+        ])
+        ->assertForbidden();
+});

@@ -64,4 +64,7 @@ it('verhindert das Loeschen eines Audit-Eintrags (DB-Trigger)', function (): voi
     // und die umschliessende Test-Transaktion (RefreshDatabase) nutzbar bleibt.
     expect(fn () => DB::transaction(fn () => $audit->delete()))->toThrow(Exception::class);
     expect(Audit::query()->count())->toBe($countBefore);
-});
+})->skip(
+    fn (): bool => DB::getDriverName() !== 'pgsql',
+    'Der Audit-Löschschutz ist ein PostgreSQL-Trigger; SQLite (lokale Testdatenbank) kennt ihn nicht. Auf der PostgreSQL-CI läuft der Test.',
+);

@@ -3,7 +3,7 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$employment_area\.$#'
 			identifier: property.notFound
-			count: 1
+			count: 2
 			path: app/Http/Controllers/AbsenceRequestController.php
 
 		-
@@ -47,6 +47,30 @@ parameters:
 			identifier: argument.unresolvableType
 			count: 1
 			path: app/Http/Controllers/AbsenceRequestController.php
+
+		-
+			message: '#^Cannot access property \$value on string\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: app/Http/Controllers/AiModelController.php
+
+		-
+			message: '#^Cannot call method label\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/AiModelController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\AiModel\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/AiModelController.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between string and App\\Enums\\AiProvider\:\:OpenAi will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: app/Http/Controllers/AiModelController.php
 
 		-
 			message: '#^Call to function is_array\(\) with string will always evaluate to false\.$#'
@@ -163,6 +187,12 @@ parameters:
 			path: app/Http/Controllers/CareTaskController.php
 
 		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$active\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/DashboardController.php
+
+		-
 			message: '#^Cannot access property \$value on string\.$#'
 			identifier: property.nonObject
 			count: 1
@@ -271,9 +301,15 @@ parameters:
 			path: app/Http/Controllers/MyRosterController.php
 
 		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$category\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/MyRosterController.php
+
+		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$code\.$#'
 			identifier: property.notFound
-			count: 3
+			count: 2
 			path: app/Http/Controllers/MyRosterController.php
 
 		-
@@ -375,7 +411,7 @@ parameters:
 		-
 			message: '#^Cannot call method toDateString\(\) on string\.$#'
 			identifier: method.nonObject
-			count: 3
+			count: 5
 			path: app/Http/Controllers/ResidentController.php
 
 		-
@@ -440,6 +476,12 @@ parameters:
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$can_work_night\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/RosterController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$category\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Http/Controllers/RosterController.php
@@ -541,25 +583,37 @@ parameters:
 			path: app/Http/Controllers/RosterController.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$is_nursing_specialist\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Http/Controllers/ShiftTemplateController.php
+			path: app/Http/Controllers/RosterReplacementController.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Http/Controllers/ShiftTemplateController.php
+			path: app/Http/Controllers/RosterReplacementController.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$required_specialists\.$#'
-			identifier: property.notFound
+			message: '#^Cannot access property \$value on string\.$#'
+			identifier: property.nonObject
 			count: 1
-			path: app/Http/Controllers/ShiftTemplateController.php
+			path: app/Http/Controllers/RosterReplacementController.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$required_total_staff\.$#'
+			message: '#^Cannot call method label\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/RosterReplacementController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>is_nursing_specialist" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/RosterReplacementController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Http/Controllers/ShiftTemplateController.php
@@ -571,21 +625,15 @@ parameters:
 			path: app/Http/Controllers/ShiftTemplateController.php
 
 		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:first\(\) expects \(callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: bool\)\|null, Closure\(App\\Models\\ShiftStaffingRule\)\: bool given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Http/Controllers/ShiftTemplateController.php
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$active\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/ShiftWishController.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
 			identifier: property.notFound
-			count: 4
-			path: app/Http/Controllers/ShiftWishController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$qualification_level\.$#'
-			identifier: property.notFound
-			count: 1
+			count: 3
 			path: app/Http/Controllers/ShiftWishController.php
 
 		-
@@ -609,8 +657,26 @@ parameters:
 		-
 			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\ShiftWish\>\:\:map\(\) contains unresolvable type\.$#'
 			identifier: argument.unresolvableType
-			count: 1
+			count: 2
 			path: app/Http/Controllers/ShiftWishController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>active" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Http/Controllers/ShiftWishController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/ShoppingListController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\ShoppingItem\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/ShoppingListController.php
 
 		-
 			message: '#^Cannot call method toDateString\(\) on string\.$#'
@@ -638,6 +704,12 @@ parameters:
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$annual_vacation_days\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/StaffController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$avoids_weekends\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Http/Controllers/StaffController.php
@@ -673,6 +745,12 @@ parameters:
 			path: app/Http/Controllers/StaffController.php
 
 		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$max_consecutive_days_override\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/StaffController.php
+
+		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$overtime_minutes_balance\.$#'
 			identifier: property.notFound
 			count: 1
@@ -691,7 +769,19 @@ parameters:
 			path: app/Http/Controllers/StaffController.php
 
 		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$scheduling_note\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/StaffController.php
+
+		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$vacation_days_carried_over\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/StaffController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$week_rotation\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Http/Controllers/StaffController.php
@@ -987,12 +1077,24 @@ parameters:
 		-
 			message: '#^Cannot call method toDateString\(\) on string\.$#'
 			identifier: method.nonObject
-			count: 2
+			count: 4
+			path: app/Services/Absences/AbsenceRequestService.php
+
+		-
+			message: '#^If condition is always true\.$#'
+			identifier: if.alwaysTrue
+			count: 1
 			path: app/Services/Absences/AbsenceRequestService.php
 
 		-
 			message: '#^Parameter \#2 \$type of method App\\Services\\Absences\\AbsenceRequestService\:\:applicableBlackoutExists\(\) expects App\\Enums\\AbsenceRequestType, string given\.$#'
 			identifier: argument.type
+			count: 1
+			path: app/Services/Absences/AbsenceRequestService.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between string and App\\Enums\\AbsenceRequestType\:\:Sick will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
 			count: 1
 			path: app/Services/Absences/AbsenceRequestService.php
 
@@ -1021,10 +1123,40 @@ parameters:
 			path: app/Services/Absences/VacationBalanceService.php
 
 		-
+			message: '#^Instanceof between string and App\\Enums\\AiProvider will always evaluate to false\.$#'
+			identifier: instanceof.alwaysFalse
+			count: 1
+			path: app/Services/Ai/AiModelResolver.php
+
+		-
 			message: '#^Constant App\\Services\\Ai\\CarePlanFormulator\:\:NOT_APPLICABLE_TOKEN is unused\.$#'
 			identifier: classConstant.unused
 			count: 1
 			path: app/Services/Ai/CarePlanFormulator.php
+
+		-
+			message: '#^Cannot call method diffInMinutes\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Services/Rosters/OvertimeBookingService.php
+
+		-
+			message: '#^Expression on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.expr
+			count: 1
+			path: app/Services/Rosters/OvertimeBookingService.php
+
+		-
+			message: '#^Parameter \#1 \$profile of method App\\Services\\Rosters\\Planning\\TargetMinutesCalculator\:\:monthlyTargetMinutes\(\) expects App\\Models\\EmployeeProfile\|null, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Rosters/OvertimeBookingService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$avoids_weekends\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Rosters/Planning/HardConstraintChecker.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$can_work_early\.$#'
@@ -1046,6 +1178,12 @@ parameters:
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$maternity_protection\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Rosters/Planning/HardConstraintChecker.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$week_rotation\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Services/Rosters/Planning/HardConstraintChecker.php
@@ -1075,9 +1213,9 @@ parameters:
 			path: app/Services/Rosters/Planning/PlanImprover.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$code\.$#'
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$category\.$#'
 			identifier: property.notFound
-			count: 2
+			count: 3
 			path: app/Services/Rosters/Planning/PlanningContext.php
 
 		-
@@ -1090,6 +1228,18 @@ parameters:
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$is_nursing_specialist\.$#'
 			identifier: property.notFound
 			count: 2
+			path: app/Services/Rosters/Planning/PlanningContext.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$max_consecutive_days_override\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Rosters/Planning/PlanningContext.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$overtime_minutes_balance\.$#'
+			identifier: property.notFound
+			count: 1
 			path: app/Services/Rosters/Planning/PlanningContext.php
 
 		-
@@ -1147,6 +1297,12 @@ parameters:
 			path: app/Services/Rosters/Planning/PlanningContext.php
 
 		-
+			message: '#^Using nullsafe property access "\?\-\>overtime_minutes_balance" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/Rosters/Planning/PlanningContext.php
+
+		-
 			message: '#^Using nullsafe property access "\?\-\>regular_work_days_per_week" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
 			count: 1
@@ -1165,13 +1321,67 @@ parameters:
 			path: app/Services/Rosters/RosterDemoDataSeeder.php
 
 		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 3
+			path: app/Services/Rosters/RosterGeneratorService.php
+
+		-
+			message: '#^Method App\\Services\\Rosters\\RosterGeneratorService\:\:bestTopUpSlot\(\) never returns array\{date\: Carbon\\CarbonImmutable, template\: App\\Models\\ShiftTemplate, rule\: App\\Models\\ShiftStaffingRule, startsAt\: Carbon\\CarbonImmutable, endsAt\: Carbon\\CarbonImmutable\} so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Services/Rosters/RosterGeneratorService.php
+
+		-
+			message: '#^Method App\\Services\\Rosters\\RosterGeneratorService\:\:bestTopUpSlot\(\) should return array\{date\: Carbon\\CarbonImmutable, template\: App\\Models\\ShiftTemplate, rule\: App\\Models\\ShiftStaffingRule, startsAt\: Carbon\\CarbonImmutable, endsAt\: Carbon\\CarbonImmutable\}\|null but returns array\{slot\: array\{date\: Carbon\\CarbonImmutable, template\: App\\Models\\ShiftTemplate, rule\: App\\Models\\ShiftStaffingRule, startsAt\: Carbon\\CarbonImmutable, endsAt\: Carbon\\CarbonImmutable\}, entry\: mixed\}\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Services/Rosters/RosterGeneratorService.php
+
+		-
+			message: '#^Method App\\Services\\Rosters\\RosterGeneratorService\:\:plannableSlots\(\) should return array\<int, array\{date\: Carbon\\CarbonImmutable, template\: App\\Models\\ShiftTemplate, rule\: App\\Models\\ShiftStaffingRule, startsAt\: Carbon\\CarbonImmutable, endsAt\: Carbon\\CarbonImmutable\}\> but returns list\<array\{date\: Carbon\\CarbonImmutable, category\: string, rule\: App\\Models\\ShiftCategoryStaffingRule, templates\: non\-empty\-list\<array\{template\: App\\Models\\ShiftTemplate, startsAt\: Carbon\\CarbonImmutable, endsAt\: Carbon\\CarbonImmutable\}\>\}\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Services/Rosters/RosterGeneratorService.php
+
+		-
 			message: '#^Method App\\Services\\Rosters\\RosterGeneratorService\:\:previewShiftModels\(\) should return Illuminate\\Support\\Collection\<int, App\\Models\\Shift\> but returns Illuminate\\Support\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\.$#'
 			identifier: return.type
 			count: 1
 			path: app/Services/Rosters/RosterGeneratorService.php
 
 		-
+			message: '#^Offset ''category'' does not exist on array\{date\: Carbon\\CarbonImmutable, template\: App\\Models\\ShiftTemplate, rule\: App\\Models\\ShiftStaffingRule, startsAt\: Carbon\\CarbonImmutable, endsAt\: Carbon\\CarbonImmutable\}\.$#'
+			identifier: offsetAccess.notFound
+			count: 5
+			path: app/Services/Rosters/RosterGeneratorService.php
+
+		-
+			message: '#^Offset ''entry'' does not exist on array\{date\: Carbon\\CarbonImmutable, template\: App\\Models\\ShiftTemplate, rule\: App\\Models\\ShiftStaffingRule, startsAt\: Carbon\\CarbonImmutable, endsAt\: Carbon\\CarbonImmutable\}\.$#'
+			identifier: offsetAccess.notFound
+			count: 1
+			path: app/Services/Rosters/RosterGeneratorService.php
+
+		-
+			message: '#^Offset ''slot'' does not exist on array\{date\: Carbon\\CarbonImmutable, template\: App\\Models\\ShiftTemplate, rule\: App\\Models\\ShiftStaffingRule, startsAt\: Carbon\\CarbonImmutable, endsAt\: Carbon\\CarbonImmutable\}\.$#'
+			identifier: offsetAccess.notFound
+			count: 1
+			path: app/Services/Rosters/RosterGeneratorService.php
+
+		-
+			message: '#^Offset ''templates'' does not exist on array\{date\: Carbon\\CarbonImmutable, template\: App\\Models\\ShiftTemplate, rule\: App\\Models\\ShiftStaffingRule, startsAt\: Carbon\\CarbonImmutable, endsAt\: Carbon\\CarbonImmutable\}\.$#'
+			identifier: offsetAccess.notFound
+			count: 3
+			path: app/Services/Rosters/RosterGeneratorService.php
+
+		-
 			message: '#^Using nullsafe property access "\?\-\>required_specialists" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Services/Rosters/RosterGeneratorService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>required_total_staff" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
 			count: 1
 			path: app/Services/Rosters/RosterGeneratorService.php
@@ -1187,6 +1397,12 @@ parameters:
 			identifier: deadCode.unreachable
 			count: 2
 			path: app/Services/Rosters/RosterService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$category\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Rosters/RosterValidator.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$employeeProfile\.$#'
@@ -1233,7 +1449,7 @@ parameters:
 		-
 			message: '#^Cannot call method toDateString\(\) on string\.$#'
 			identifier: method.nonObject
-			count: 12
+			count: 14
 			path: app/Services/Rosters/RosterValidator.php
 
 		-
@@ -1246,18 +1462,6 @@ parameters:
 			message: '#^Method App\\Services\\Rosters\\RosterValidator\:\:boundaryShiftsByUser\(\) should return Illuminate\\Support\\Collection\<string, Illuminate\\Support\\Collection\<int, App\\Models\\Shift\>\> but returns Illuminate\\Database\\Eloquent\\Collection\<\(int\|string\), Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Shift\>\>\.$#'
 			identifier: return.type
 			count: 1
-			path: app/Services/Rosters/RosterValidator.php
-
-		-
-			message: '#^Method App\\Services\\Rosters\\RosterValidator\:\:findStaffingRule\(\) should return App\\Models\\ShiftStaffingRule\|null but returns Illuminate\\Database\\Eloquent\\Model\|null\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Services/Rosters/RosterValidator.php
-
-		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:first\(\) expects \(callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: bool\)\|null, Closure\(App\\Models\\ShiftStaffingRule\)\: bool given\.$#'
-			identifier: argument.type
-			count: 2
 			path: app/Services/Rosters/RosterValidator.php
 
 		-

@@ -13,6 +13,7 @@ use App\Models\Location;
 use App\Models\Roster;
 use App\Models\RosterBlackoutDay;
 use App\Models\Shift;
+use App\Models\ShiftStaffingRule;
 use App\Models\ShiftTemplate;
 use App\Models\User;
 use App\Services\Absences\AbsenceRequestService;
@@ -463,4 +464,73 @@ it('removes conflicting roster shifts when an absence is approved', function ():
         ->count();
 
     expect($remaining)->toBe(0);
+});
+
+it('reports a sick employee and leaves the freed shifts open for manual replacement', function (): void {
+    $employee = createEmployeeWithProfile(EmploymentArea::Nursing);
+    $location = $employee->location;
+    $pdl = User::factory()->for($location)->create();
+
+    // Weitere einsetzbare Pflegekraft – würde bei Auto-Nachbesetzung einspringen.
+    $other = User::factory()->for($location)->create();
+    EmployeeProfile::query()->create([
+        'user_id' => $other->id,
+        'employment_area' => EmploymentArea::Nursing,
+        'can_work_early' => true,
+        'active' => true,
+    ]);
+
+    $roster = Roster::query()->create([
+        'location_id' => $location->id,
+        'year' => 2027,
+        'month' => 1,
+        'status' => RosterStatus::Draft,
+        'created_by' => $pdl->id,
+    ]);
+
+    $template = ShiftTemplate::query()->create([
+        'location_id' => $location->id,
+        'name' => 'Frühdienst',
+        'code' => 'early',
+        'category' => 'early',
+        'starts_at' => '06:00',
+        'ends_at' => '14:00',
+        'duration_minutes' => 480,
+        'color' => '#F59E0B',
+        'active' => true,
+    ]);
+    ShiftStaffingRule::query()->create([
+        'location_id' => $location->id,
+        'shift_template_id' => $template->id,
+        'weekday' => null,
+        'required_total_staff' => 1,
+        'required_specialists' => 0,
+    ]);
+
+    Shift::query()->create([
+        'roster_id' => $roster->id,
+        'location_id' => $location->id,
+        'user_id' => $employee->id,
+        'shift_template_id' => $template->id,
+        'date' => '2027-01-20',
+        'starts_at' => '2027-01-20 06:00:00',
+        'ends_at' => '2027-01-20 14:00:00',
+        'source' => ShiftSource::Auto,
+    ]);
+
+    app(AbsenceRequestService::class)->reportSick($employee, $pdl, [
+        'starts_on' => '2027-01-20',
+        'ends_on' => '2027-01-20',
+    ]);
+
+    // Krank-Abwesenheit ist sofort als genehmigt erfasst.
+    expect(AbsenceRequest::query()
+        ->where('user_id', $employee->id)
+        ->where('type', AbsenceRequestType::Sick->value)
+        ->where('status', AbsenceRequestStatus::Approved->value)
+        ->exists())->toBeTrue()
+        // Der Dienst des Erkrankten ist entfernt …
+        ->and(Shift::query()->where('user_id', $employee->id)->whereDate('date', '2027-01-20')->count())->toBe(0)
+        // … und NICHT automatisch nachbesetzt – der Tag bleibt offen.
+        ->and(Shift::query()->where('roster_id', $roster->id)->whereDate('date', '2027-01-20')->count())->toBe(0);
 });

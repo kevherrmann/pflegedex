@@ -65,6 +65,45 @@ class AbsenceRequestService
         ]);
     }
 
+    /**
+     * Krankmeldung durch die PDL: Eine Krankheit ist kein Antrag, sondern eine
+     * Tatsache – sie wird sofort als genehmigte Abwesenheit erfasst. Die
+     * betroffenen Dienste werden freigeräumt, aber NICHT automatisch nachbesetzt
+     * (siehe {@see resolveRosterConflicts}). Die Vertretung wird anschließend
+     * vom Planer über die Vertretungssuche abgestimmt (Human-in-the-Loop).
+     *
+     * @param  array{starts_on: string, ends_on?: string|null, location_id?: string|null, note?: string|null}  $data
+     */
+    public function reportSick(User $employee, User $reportedBy, array $data): AbsenceRequest
+    {
+        $startsOn = CarbonImmutable::parse($data['starts_on'])->startOfDay();
+        $endsOn = CarbonImmutable::parse($data['ends_on'] ?? $data['starts_on'])->startOfDay();
+
+        if ($endsOn->lt($startsOn)) {
+            throw ValidationException::withMessages([
+                'ends_on' => 'Das Enddatum darf nicht vor dem Startdatum liegen.',
+            ]);
+        }
+
+        $absenceRequest = AbsenceRequest::query()->create([
+            'user_id' => $employee->id,
+            'location_id' => $data['location_id'] ?? $employee->location_id,
+            'type' => AbsenceRequestType::Sick,
+            'starts_on' => $startsOn->toDateString(),
+            'ends_on' => $endsOn->toDateString(),
+            'days_count' => $startsOn->diffInDays($endsOn) + 1,
+            'status' => AbsenceRequestStatus::Approved,
+            'requested_by' => $reportedBy->id,
+            'decided_by' => $reportedBy->id,
+            'decided_at' => now(),
+            'note' => $data['note'] ?? null,
+        ]);
+
+        $this->resolveRosterConflicts($absenceRequest);
+
+        return $absenceRequest->refresh();
+    }
+
     private function ensureNoOverlappingRequest(User $employee, string $startsOn, string $endsOn): void
     {
         $hasOverlap = $employee
@@ -171,18 +210,31 @@ class AbsenceRequestService
     /**
      * Nach der Genehmigung darf es keine Doppelbuchung (Abwesenheit + Dienst)
      * geben: In editierbaren Dienstplänen werden die Dienste des Mitarbeiters im
-     * Abwesenheitszeitraum entfernt und der Plan neu generiert, damit die frei
-     * gewordenen Slots nachbesetzt werden (die genehmigte Abwesenheit ist jetzt
-     * eine harte Regel). Veröffentlichte/gesperrte Pläne bleiben unangetastet.
+     * Abwesenheitszeitraum entfernt. Veröffentlichte/gesperrte Pläne sowie
+     * bereits gelaufene Tage (vor heute) bleiben unangetastet.
+     *
+     * Geplante Abwesenheiten (Urlaub, Überstundenfrei) werden anschließend
+     * automatisch neu generiert, damit die frei gewordenen Slots nachbesetzt
+     * werden. Kurzfristige Ausfälle (Krankmeldung) werden bewusst NICHT
+     * automatisch nachbesetzt – die Vertretung muss mit den Mitarbeitenden
+     * abgestimmt werden und läuft über die Vertretungssuche (Human-in-the-Loop).
      */
     private function resolveRosterConflicts(AbsenceRequest $absenceRequest): void
     {
+        $today = CarbonImmutable::today()->toDateString();
         $start = $absenceRequest->starts_on->toDateString();
         $end = $absenceRequest->ends_on->toDateString();
 
+        // Eingefrorene Vergangenheit: nur ab heute aufräumen.
+        $deleteFrom = $start >= $today ? $start : $today;
+
+        if ($deleteFrom > $end) {
+            return; // Abwesenheit liegt vollständig in der Vergangenheit.
+        }
+
         $rosterIds = Shift::query()
             ->where('user_id', $absenceRequest->user_id)
-            ->whereDate('date', '>=', $start)
+            ->whereDate('date', '>=', $deleteFrom)
             ->whereDate('date', '<=', $end)
             ->distinct()
             ->pluck('roster_id');
@@ -191,6 +243,7 @@ class AbsenceRequestService
             return;
         }
 
+        $autoRefill = $absenceRequest->type !== AbsenceRequestType::Sick;
         $generator = app(RosterGeneratorService::class);
 
         foreach (Roster::query()->whereIn('id', $rosterIds)->get() as $roster) {
@@ -202,12 +255,16 @@ class AbsenceRequestService
             Shift::query()
                 ->where('roster_id', $roster->id)
                 ->where('user_id', $absenceRequest->user_id)
-                ->whereDate('date', '>=', $start)
+                ->whereDate('date', '>=', $deleteFrom)
                 ->whereDate('date', '<=', $end)
                 ->delete();
 
-            // Neu generieren – berücksichtigt die Abwesenheit als harte Regel.
-            $generator->generate($roster);
+            // Geplante Abwesenheiten automatisch neu generieren (berücksichtigt
+            // die Abwesenheit als harte Regel). Krankmeldungen bleiben offen für
+            // die manuelle Vertretungssuche.
+            if ($autoRefill) {
+                $generator->generate($roster);
+            }
         }
     }
 

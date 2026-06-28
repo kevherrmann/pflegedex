@@ -18,6 +18,10 @@ return [
     // Maximale Arbeitstage am Stück ohne freien Kalendertag.
     'max_consecutive_work_days' => (int) env('ROSTERING_MAX_CONSECUTIVE_WORK_DAYS', 6),
 
+    // Maximale Nachtschichten am Stück. Arbeitsmedizinische Empfehlung (DGUV/BAuA):
+    // möglichst nicht mehr als 3 Nachtdienste in Folge. 0 = Regel deaktiviert.
+    'max_consecutive_night_shifts' => (int) env('ROSTERING_MAX_CONSECUTIVE_NIGHT_SHIFTS', 3),
+
     // Maximale Wochenenden mit Diensten pro Dienstplanmonat.
     'max_weekends_per_month' => (int) env('ROSTERING_MAX_WEEKENDS_PER_MONTH', 2),
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Ai;
 
+use App\Enums\AiProvider;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\Facades\Cache;
 use Throwable;
@@ -72,7 +73,7 @@ class AiHealthService
 
         // Externe API (z. B. DeepSeek): als verfügbar gewertet, wenn URL + API-Key
         // hinterlegt sind. Einen echten Probe-Call macht die "Verbindung testen"-Aktion.
-        if ($active['provider'] === \App\Enums\AiProvider::OpenAi->value) {
+        if ($active['provider'] === AiProvider::OpenAi->value) {
             if ($active['base_url'] === '' || ($active['api_key'] ?? '') === '' || $model === '') {
                 $result['reason'] = 'Externes KI-Modell ist nicht vollständig konfiguriert (URL/Modell/API-Key).';
 

@@ -47,9 +47,15 @@ class RosterGeneratorService
 
             $roster->load(['location']);
 
+            $planningStart = $this->planningStartDate($roster);
+
+            // Nur ab dem Planungsstart neu planen. Bereits gelaufene Tage des
+            // Monats bleiben unangetastet: Auto-Dienste davor werden nicht
+            // gelöscht und zählen als feste Anker in die Planung der Resttage.
             $deletedAutoShifts = Shift::query()
                 ->where('roster_id', $roster->id)
                 ->where('source', ShiftSource::Auto->value)
+                ->whereDate('date', '>=', $planningStart->toDateString())
                 ->delete();
 
             $result->addDeletedAutoShifts($deletedAutoShifts);
@@ -57,9 +63,9 @@ class RosterGeneratorService
             // Selbstheilung: Dienste entfernen, die mit einer genehmigten
             // Abwesenheit kollidieren (auch manuelle) – niemand kann im Urlaub
             // arbeiten. So lösen sich auch Alt-Konflikte beim Neugenerieren.
-            $this->removeApprovedAbsenceConflicts($roster);
+            $this->removeApprovedAbsenceConflicts($roster, $planningStart);
 
-            $context = new PlanningContext($roster);
+            $context = new PlanningContext($roster, planningStart: $planningStart);
             $assignments = $this->plan($roster, $context, $result);
 
             foreach ($assignments as $assignment) {
@@ -81,26 +87,43 @@ class RosterGeneratorService
     }
 
     /**
-     * Entfernt Dienste, die mit einer genehmigten Abwesenheit kollidieren
-     * (jede Quelle). So kann niemand im Urlaub eingeplant sein und Alt-Konflikte
-     * lösen sich beim Neugenerieren von selbst.
+     * Planungsstart: ab welchem Tag (neu) geplant wird. Liegt der Monat (teil-
+     * weise) in der Vergangenheit, beginnt die Planung erst heute – bereits
+     * gelaufene Tage werden nie umgeplant. Sonst ab Monatsanfang.
      */
-    private function removeApprovedAbsenceConflicts(Roster $roster): void
+    private function planningStartDate(Roster $roster): CarbonImmutable
     {
         $monthStart = CarbonImmutable::create($roster->year, $roster->month, 1)->startOfDay();
-        $monthEnd = $monthStart->endOfMonth();
+        $today = CarbonImmutable::today();
+
+        return $today->greaterThan($monthStart) ? $today : $monthStart;
+    }
+
+    /**
+     * Entfernt Dienste, die mit einer genehmigten Abwesenheit kollidieren
+     * (jede Quelle). So kann niemand im Urlaub eingeplant sein und Alt-Konflikte
+     * lösen sich beim Neugenerieren von selbst. Tage vor dem Planungsstart sind
+     * eingefroren und werden nicht angefasst.
+     */
+    private function removeApprovedAbsenceConflicts(Roster $roster, CarbonImmutable $planningStart): void
+    {
+        $monthEnd = CarbonImmutable::create($roster->year, $roster->month, 1)->endOfMonth();
 
         $absences = AbsenceRequest::query()
             ->where('status', 'approved')
             ->whereDate('starts_on', '<=', $monthEnd->toDateString())
-            ->whereDate('ends_on', '>=', $monthStart->toDateString())
+            ->whereDate('ends_on', '>=', $planningStart->toDateString())
             ->get(['user_id', 'starts_on', 'ends_on']);
 
         foreach ($absences as $absence) {
+            $deleteFrom = $absence->starts_on->toDateString() >= $planningStart->toDateString()
+                ? $absence->starts_on->toDateString()
+                : $planningStart->toDateString();
+
             Shift::query()
                 ->where('roster_id', $roster->id)
                 ->where('user_id', $absence->user_id)
-                ->whereDate('date', '>=', $absence->starts_on->toDateString())
+                ->whereDate('date', '>=', $deleteFrom)
                 ->whereDate('date', '<=', $absence->ends_on->toDateString())
                 ->delete();
         }
@@ -124,12 +147,15 @@ class RosterGeneratorService
 
         $roster->load(['location']);
 
+        $planningStart = $this->planningStartDate($roster);
+
         $result->addDeletedAutoShifts(Shift::query()
             ->where('roster_id', $roster->id)
             ->where('source', ShiftSource::Auto->value)
+            ->whereDate('date', '>=', $planningStart->toDateString())
             ->count());
 
-        $context = new PlanningContext($roster, ignoreAutoShifts: true);
+        $context = new PlanningContext($roster, ignoreAutoShifts: true, planningStart: $planningStart);
         $assignments = $this->plan($roster, $context, $result);
 
         foreach ($assignments as $assignment) {
@@ -158,7 +184,7 @@ class RosterGeneratorService
             ];
         }
 
-        $previewShifts = $this->previewShiftModels($roster, $assignments);
+        $previewShifts = $this->previewShiftModels($roster, $assignments, $context->planningStart);
 
         return [$result, $previewShifts];
     }
@@ -417,6 +443,11 @@ class RosterGeneratorService
         $slots = [];
 
         foreach ($this->rosterDateService->datesForRosterMonth($roster) as $date) {
+            // Tage vor dem Planungsstart sind eingefroren – keine neuen Slots.
+            if ($date->lessThan($context->planningStart)) {
+                continue;
+            }
+
             foreach ($context->categoriesWithTemplates() as $category) {
                 $rule = $context->categoryStaffingFor($category, $date);
 
@@ -953,11 +984,15 @@ class RosterGeneratorService
      * @param  array<int, PlannedAssignment>  $assignments
      * @return Collection<int, Shift>
      */
-    private function previewShiftModels(Roster $roster, array $assignments): Collection
+    private function previewShiftModels(Roster $roster, array $assignments, CarbonImmutable $planningStart): Collection
     {
+        // Manuelle Dienste plus die eingefrorenen Auto-Dienste vor dem
+        // Planungsstart (die in der Vorschau erhalten bleiben).
         $manualShifts = $roster->shifts()
             ->with(['user.employeeProfile', 'shiftTemplate'])
-            ->where('source', '!=', ShiftSource::Auto->value)
+            ->where(fn ($query) => $query
+                ->where('source', '!=', ShiftSource::Auto->value)
+                ->orWhereDate('date', '<', $planningStart->toDateString()))
             ->get();
 
         $plannedShifts = collect($assignments)->map(function (PlannedAssignment $assignment) use ($roster): Shift {

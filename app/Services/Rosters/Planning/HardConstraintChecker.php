@@ -79,6 +79,11 @@ class HardConstraintChecker
             return 'consecutive_days';
         }
 
+        if ($shiftTemplate->category === 'night'
+            && $context->wouldExceedConsecutiveNightShifts($employee, $date)) {
+            return 'consecutive_nights';
+        }
+
         if (! $relaxWeekendLimit && $context->wouldExceedWeekendLoad($employee, $date)) {
             return 'weekend_limit';
         }

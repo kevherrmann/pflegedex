@@ -14,6 +14,7 @@ use App\Models\ShiftStaffingRule;
 use App\Models\ShiftTemplate;
 use App\Models\ShiftWish;
 use App\Models\User;
+use App\Services\Rosters\CategoryStaffingResolver;
 use App\Services\Rosters\HolidayService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -47,9 +48,18 @@ class PlanningContext
 
     public readonly CarbonImmutable $monthEnd;
 
+    /**
+     * Ab diesem Tag wird (neu) geplant. Dienste davor sind eingefroren: Sie
+     * zählen als feste Anker in alle Zähler hinein, werden aber nie ersetzt
+     * (auch nicht in der Vorschau). Standard: Monatsanfang.
+     */
+    public readonly CarbonImmutable $planningStart;
+
     private readonly int $requiredRestMinutes;
 
     private readonly int $maxConsecutiveWorkDays;
+
+    private readonly int $maxConsecutiveNightShifts;
 
     private readonly int $maxWeekendsPerMonth;
 
@@ -108,7 +118,7 @@ class PlanningContext
     /** @var array<string, array<int, ShiftCategoryStaffingRule>> category => Regeln (Wochentag-spezifisch + Standard) */
     private array $categoryStaffingRules = [];
 
-    /** @var array<string, \Illuminate\Support\Collection<int, ShiftTemplate>> category => aktive Vorlagen */
+    /** @var array<string, Collection<int, ShiftTemplate>> category => aktive Vorlagen */
     private array $templatesByCategory = [];
 
     /** @var array<string, true> Urlaubssperren-Tage des Standorts im Monat */
@@ -144,15 +154,20 @@ class PlanningContext
     public function __construct(
         private readonly Roster $roster,
         bool $ignoreAutoShifts = false,
+        ?CarbonImmutable $planningStart = null,
     ) {
         $this->requiredRestMinutes = (int) config('rostering.required_rest_minutes');
         $this->maxConsecutiveWorkDays = (int) config('rostering.max_consecutive_work_days');
+        $this->maxConsecutiveNightShifts = (int) config('rostering.max_consecutive_night_shifts');
         $this->maxWeekendsPerMonth = (int) config('rostering.max_weekends_per_month');
         $this->weeklyMaxMinutes = (int) config('rostering.weekly_max_minutes');
         $this->dailyMaxMinutes = (int) config('rostering.daily_max_minutes');
 
         $this->monthStart = CarbonImmutable::create($roster->year, $roster->month, 1)->startOfDay();
         $this->monthEnd = $this->monthStart->endOfMonth()->startOfDay();
+        $this->planningStart = ($planningStart !== null && $planningStart->greaterThan($this->monthStart))
+            ? $planningStart->startOfDay()
+            : $this->monthStart;
 
         $this->buildDateLookups();
         $this->loadTemplates();
@@ -281,7 +296,7 @@ class PlanningContext
 
     private function loadCategoryStaffing(): void
     {
-        $this->categoryStaffingRules = (new \App\Services\Rosters\CategoryStaffingResolver)
+        $this->categoryStaffingRules = (new CategoryStaffingResolver)
             ->forLocation($this->roster->location_id)
             ->groupBy('category')
             ->map(fn ($rules): array => $rules->all())
@@ -311,10 +326,15 @@ class PlanningContext
 
         // Alle Dienste dieses Dienstplans (auch von inzwischen nicht mehr
         // berechtigten Mitarbeitern), damit Besetzungszaehler vollstaendig sind.
+        // In der Vorschau werden Auto-Dienste ignoriert (als ob sie ersetzt
+        // würden) – aber nur ab dem Planungsstart. Auto-Dienste davor sind
+        // eingefroren und bleiben als feste Anker erhalten (wie in generate()).
         $rosterShifts = Shift::query()
             ->with(['user.employeeProfile', 'shiftTemplate:id,code,category'])
             ->where('roster_id', $this->roster->id)
-            ->when($ignoreAutoShifts, fn ($query) => $query->where('source', '!=', 'auto'))
+            ->when($ignoreAutoShifts, fn ($query) => $query->where(fn ($query) => $query
+                ->where('source', '!=', 'auto')
+                ->orWhereDate('date', '<', $this->planningStart->toDateString())))
             ->get();
 
         foreach ($rosterShifts as $shift) {
@@ -627,7 +647,7 @@ class PlanningContext
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, ShiftTemplate>
+     * @return Collection<int, ShiftTemplate>
      */
     public function templatesForCategory(string $category): Collection
     {
@@ -735,6 +755,41 @@ class PlanningContext
         }
 
         return $runLength > $maxConsecutive;
+    }
+
+    /**
+     * Würde eine zusätzliche Nachtschicht an diesem Tag die zulässige Anzahl
+     * aufeinanderfolgender Nachtdienste überschreiten? Es zählt der zusammen-
+     * hängende Block aus Nachtdiensten (auch über Dienstpläne/Monatsgrenzen
+     * hinweg, da Randfenster-Dienste mit Rotationsrang indiziert sind). Andere
+     * Schichtarten unterbrechen den Block. 0 = Regel deaktiviert.
+     */
+    public function wouldExceedConsecutiveNightShifts(User $employee, CarbonImmutable $date): bool
+    {
+        if ($this->maxConsecutiveNightShifts <= 0) {
+            return false;
+        }
+
+        $nightRank = self::ROTATION_RANKS['night'];
+        $ranks = $this->rotationRanks[$employee->id] ?? [];
+        $dateKey = $date->toDateString();
+
+        // Liegt an dem Tag bereits eine Nachtschicht, ändert eine weitere die Folge nicht.
+        if (isset($ranks[$dateKey][$nightRank])) {
+            return false;
+        }
+
+        $runLength = 1;
+
+        for ($day = $this->previousDayKeys[$dateKey] ?? null; $day !== null && isset($ranks[$day][$nightRank]); $day = $this->previousDayKeys[$day] ?? null) {
+            $runLength++;
+        }
+
+        for ($day = $this->nextDayKeys[$dateKey] ?? null; $day !== null && isset($ranks[$day][$nightRank]); $day = $this->nextDayKeys[$day] ?? null) {
+            $runLength++;
+        }
+
+        return $runLength > $this->maxConsecutiveNightShifts;
     }
 
     public function wouldExceedWeekendLoad(User $employee, CarbonImmutable $date): bool

@@ -14,6 +14,8 @@ use App\Models\Shift;
 use App\Models\ShiftStaffingRule;
 use App\Models\ShiftTemplate;
 use App\Models\User;
+use App\Services\Rosters\OvertimeBookingService;
+use App\Services\Rosters\ReplacementCandidateService;
 use App\Services\Rosters\RosterGeneratorService;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -1494,10 +1496,12 @@ it('plans multiple shifts of the same category, each with its own hours', functi
     $day = '2027-01-15';
 
     // Beide Früh-Schichten werden besetzt – Kategorie-Fähigkeit greift für beide.
+    // Hinweis: whereDate() statt where(), da SQLite Datumsspalten als
+    // "Y-m-d H:i:s" speichert und ein roher String-Vergleich sonst fehlschlägt.
     expect(Shift::query()->where('roster_id', $roster->id)
-        ->where('shift_template_id', $early1->id)->where('date', $day)->exists())->toBeTrue()
+        ->where('shift_template_id', $early1->id)->whereDate('date', $day)->exists())->toBeTrue()
         ->and(Shift::query()->where('roster_id', $roster->id)
-            ->where('shift_template_id', $early2->id)->where('date', $day)->exists())->toBeTrue();
+            ->where('shift_template_id', $early2->id)->whereDate('date', $day)->exists())->toBeTrue();
 
     // Die 6-h-Schicht zählt mit 360 Minuten in die geplanten Minuten.
     $early2Shift = Shift::query()->where('shift_template_id', $early2->id)->first();
@@ -1520,7 +1524,7 @@ it('books overtime onto the employee balance when a roster is published and reve
         createRosterGeneratorShift($roster, $employee, $template, sprintf('2027-01-%02d', $day));
     }
 
-    $service = app(App\Services\Rosters\OvertimeBookingService::class);
+    $service = app(OvertimeBookingService::class);
 
     $service->bookForRoster($roster->refresh());
     expect($employee->employeeProfile->refresh()->overtime_minutes_balance)->toBe(12000 - 10363);
@@ -1645,4 +1649,221 @@ it('respects an individual max consecutive days override', function (): void {
 
     expect($workDates)->not->toBeEmpty()
         ->and($longestRun)->toBeLessThanOrEqual(2);
+});
+
+it('never plans more than the allowed consecutive night shifts', function (): void {
+    config()->set('rostering.max_consecutive_night_shifts', 3);
+
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+
+    // Genau eine nachtfähige Pflegekraft: ohne Regel würde sie jede Nacht
+    // arbeiten (31 am Stück). Die harte Regel kappt das bei 3.
+    createRosterGeneratorEmployee($location, ['can_work_night' => true], ['name' => 'Nacht Eule']);
+
+    $night = createRosterGeneratorShiftTemplate($location, [
+        'code' => 'night',
+        'category' => 'night',
+        'name' => 'Nachtdienst',
+        'starts_at' => '22:00',
+        'ends_at' => '06:00',
+        'duration_minutes' => 480,
+    ]);
+    createRosterGeneratorStaffingRule($night, ['required_total_staff' => 1]);
+
+    $roster = createRosterGeneratorRoster($location, $pdl);
+    app(RosterGeneratorService::class)->generate($roster);
+
+    $nightDates = Shift::query()
+        ->where('roster_id', $roster->id)
+        ->orderBy('date')
+        ->pluck('date')
+        ->map(fn ($date): string => CarbonImmutable::parse($date)->toDateString())
+        ->all();
+
+    // Längsten Block aufeinanderfolgender Nächte bestimmen.
+    $longestRun = 0;
+    $currentRun = 0;
+    $previous = null;
+
+    foreach ($nightDates as $date) {
+        if ($previous !== null && CarbonImmutable::parse($previous)->addDay()->toDateString() === $date) {
+            $currentRun++;
+        } else {
+            $currentRun = 1;
+        }
+
+        $longestRun = max($longestRun, $currentRun);
+        $previous = $date;
+    }
+
+    expect($longestRun)->toBeLessThanOrEqual(3)
+        // Da pro Block höchstens 3 Nächte gehen, bleiben Nächte unbesetzt.
+        ->and(count($nightDates))->toBeLessThan(31);
+});
+
+it('does not replan or delete days before today when regenerating mid-month', function (): void {
+    // Heute ist der 15.01.2027 – der Plan ist für Januar 2027.
+    $this->travelTo(CarbonImmutable::create(2027, 1, 15, 9));
+
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $employee = createRosterGeneratorEmployee($location, [], ['name' => 'Anna Anker']);
+    foreach (range(1, 3) as $ignored) {
+        createRosterGeneratorEmployee($location);
+    }
+
+    $shiftTemplate = createRosterGeneratorShiftTemplate($location);
+    createRosterGeneratorStaffingRule($shiftTemplate, ['required_total_staff' => 1]);
+
+    $roster = createRosterGeneratorRoster($location, $pdl);
+
+    // Ein bereits gelaufener Auto-Dienst am 10.01. (vor dem Stichtag).
+    $pastShift = createRosterGeneratorShift($roster, $employee, $shiftTemplate, '2027-01-10', ShiftSource::Auto);
+
+    app(RosterGeneratorService::class)->generate($roster);
+
+    // Der vergangene Auto-Dienst bleibt unangetastet (gleiche ID, gleicher MA).
+    $stillThere = Shift::query()->find($pastShift->id);
+    expect($stillThere)->not->toBeNull()
+        ->and($stillThere->user_id)->toBe($employee->id);
+
+    // Keine neuen Dienste vor dem Stichtag außer dem eingefrorenen.
+    $autoBeforeCutoff = Shift::query()
+        ->where('roster_id', $roster->id)
+        ->whereDate('date', '<', '2027-01-15')
+        ->whereKeyNot($pastShift->id)
+        ->count();
+
+    // Dienste ab dem Stichtag wurden geplant.
+    $fromCutoff = Shift::query()
+        ->where('roster_id', $roster->id)
+        ->whereDate('date', '>=', '2027-01-15')
+        ->count();
+
+    expect($autoBeforeCutoff)->toBe(0)
+        ->and($fromCutoff)->toBeGreaterThan(0);
+
+    $this->travelBack();
+});
+
+it('plans the whole month when the roster month is entirely in the future', function (): void {
+    $this->travelTo(CarbonImmutable::create(2026, 12, 1, 9));
+
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    foreach (range(1, 3) as $ignored) {
+        createRosterGeneratorEmployee($location);
+    }
+
+    $shiftTemplate = createRosterGeneratorShiftTemplate($location);
+    createRosterGeneratorStaffingRule($shiftTemplate, ['required_total_staff' => 1]);
+
+    $roster = createRosterGeneratorRoster($location, $pdl);
+    app(RosterGeneratorService::class)->generate($roster);
+
+    // Der erste Tag des Monats ist besetzt – nichts wurde eingefroren.
+    expect(Shift::query()->where('roster_id', $roster->id)->whereDate('date', '2027-01-01')->exists())->toBeTrue()
+        ->and(Shift::query()->where('roster_id', $roster->id)->count())->toBe(31);
+
+    $this->travelBack();
+});
+
+it('lists open shifts from today with feasible replacement candidates and their remaining hours', function (): void {
+    $this->travelTo(CarbonImmutable::create(2027, 1, 10, 9));
+
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $anna = createRosterGeneratorEmployee($location, [], ['name' => 'Anna Pflege']);
+    $berta = createRosterGeneratorEmployee($location, [], ['name' => 'Berta Pflege']);
+
+    $template = createRosterGeneratorShiftTemplate($location);
+    createRosterGeneratorStaffingRule($template, ['required_total_staff' => 1]);
+
+    // Leerer Dienstplan → ab heute ist jeder Tag unterbesetzt.
+    $roster = createRosterGeneratorRoster($location, $pdl);
+
+    $slots = app(ReplacementCandidateService::class)->openSlots($roster);
+
+    $dates = collect($slots)->pluck('date');
+
+    // Keine Tage vor heute (eingefrorene Vergangenheit).
+    expect($dates->min())->toBe('2027-01-10')
+        ->and($dates)->not->toContain('2027-01-09');
+
+    $slot = collect($slots)->first(fn (array $s): bool => $s['date'] === '2027-01-20' && $s['category'] === 'early');
+
+    expect($slot)->not->toBeNull()
+        ->and($slot['missingTotal'])->toBe(1);
+
+    $candidateNames = collect($slot['candidates'])->pluck('name');
+    expect($candidateNames)->toContain('Anna Pflege')->toContain('Berta Pflege');
+
+    // Reststunden = volles Monats-Soll, da noch nichts geplant ist.
+    $annaCandidate = collect($slot['candidates'])->firstWhere('userId', $anna->id);
+    expect($annaCandidate['remainingMinutes'])->toBe($annaCandidate['targetMinutes'])
+        ->and($annaCandidate['remainingMinutes'])->toBeGreaterThan(0);
+
+    $this->travelBack();
+});
+
+it('excludes absent employees from replacement candidates', function (): void {
+    $this->travelTo(CarbonImmutable::create(2027, 1, 10, 9));
+
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+    $anna = createRosterGeneratorEmployee($location, [], ['name' => 'Anna Pflege']);
+    $berta = createRosterGeneratorEmployee($location, [], ['name' => 'Berta Pflege']);
+
+    $template = createRosterGeneratorShiftTemplate($location);
+    createRosterGeneratorStaffingRule($template, ['required_total_staff' => 1]);
+
+    $roster = createRosterGeneratorRoster($location, $pdl);
+
+    // Berta ist am 20.01. genehmigt abwesend → keine mögliche Vertretung.
+    createRosterGeneratorAbsenceRequest($berta, $pdl, [
+        'type' => AbsenceRequestType::Sick,
+        'starts_on' => '2027-01-20',
+        'ends_on' => '2027-01-20',
+    ]);
+
+    $slots = app(ReplacementCandidateService::class)->openSlots($roster);
+    $slot = collect($slots)->first(fn (array $s): bool => $s['date'] === '2027-01-20' && $s['category'] === 'early');
+
+    $candidateNames = collect($slot['candidates'])->pluck('name');
+    expect($candidateNames)->toContain('Anna Pflege')->not->toContain('Berta Pflege');
+
+    $this->travelBack();
+});
+
+it('offers only specialists when a slot is fully staffed but missing a specialist', function (): void {
+    $this->travelTo(CarbonImmutable::create(2027, 1, 10, 9));
+
+    $location = Location::factory()->create();
+    $pdl = User::factory()->for($location)->create();
+
+    $clara = createRosterGeneratorEmployee($location, ['is_nursing_specialist' => true], ['name' => 'Clara Fachkraft']);
+    $dora = createRosterGeneratorEmployee($location, ['is_nursing_specialist' => false], ['name' => 'Dora Hilfskraft']);
+    $emil = createRosterGeneratorEmployee($location, ['is_nursing_specialist' => false], ['name' => 'Emil Hilfskraft']);
+
+    $template = createRosterGeneratorShiftTemplate($location);
+    createRosterGeneratorStaffingRule($template, ['required_total_staff' => 1, 'required_specialists' => 1]);
+
+    $roster = createRosterGeneratorRoster($location, $pdl);
+
+    // Slot am 20.01. ist mit einer Hilfskraft besetzt: Gesamtzahl ok, Fachkraft fehlt.
+    createRosterGeneratorShift($roster, $dora, $template, '2027-01-20', ShiftSource::Manual);
+
+    $slots = app(ReplacementCandidateService::class)->openSlots($roster);
+    $slot = collect($slots)->first(fn (array $s): bool => $s['date'] === '2027-01-20' && $s['category'] === 'early');
+
+    expect($slot)->not->toBeNull()
+        ->and($slot['missingTotal'])->toBe(0)
+        ->and($slot['missingSpecialists'])->toBe(1);
+
+    $candidateNames = collect($slot['candidates'])->pluck('name');
+    expect($candidateNames)->toContain('Clara Fachkraft')
+        ->not->toContain('Emil Hilfskraft');
+
+    $this->travelBack();
 });

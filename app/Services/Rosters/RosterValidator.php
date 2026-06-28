@@ -4,13 +4,11 @@ namespace App\Services\Rosters;
 
 use App\Enums\AbsenceRequestStatus;
 use App\Enums\EmploymentArea;
+use App\Enums\ShiftCategory;
 use App\Models\AbsenceRequest;
 use App\Models\Roster;
 use App\Models\Shift;
-use App\Enums\ShiftCategory;
 use App\Models\ShiftCategoryStaffingRule;
-use App\Models\ShiftStaffingRule;
-use App\Services\Rosters\CategoryStaffingResolver;
 use App\Models\ShiftTemplate;
 use App\Models\User;
 use App\Services\Rosters\Planning\TargetMinutesCalculator;
@@ -24,6 +22,8 @@ class RosterValidator
     private readonly int $requiredRestMinutes;
 
     private readonly int $maxConsecutiveWorkDays;
+
+    private readonly int $maxConsecutiveNightShifts;
 
     private readonly int $maxWeekends;
 
@@ -43,6 +43,7 @@ class RosterValidator
     ) {
         $this->requiredRestMinutes = (int) config('rostering.required_rest_minutes');
         $this->maxConsecutiveWorkDays = (int) config('rostering.max_consecutive_work_days');
+        $this->maxConsecutiveNightShifts = (int) config('rostering.max_consecutive_night_shifts');
         $this->maxWeekends = (int) config('rostering.max_weekends_per_month');
         $this->defaultShiftMinutes = (int) config('rostering.default_shift_minutes');
         $this->plannedHoursToleranceMinutes = (int) config('rostering.planned_hours_tolerance_minutes');
@@ -88,6 +89,7 @@ class RosterValidator
         $this->validateAbsenceConflicts($roster, $shifts, $result);
         $this->validatePlannedWorkingHours($roster, $shifts, $shiftTemplates, $result);
         $this->validateConsecutiveWorkDays($roster, $shifts, $boundaryShiftsByUser, $result);
+        $this->validateConsecutiveNightShifts($roster, $shifts, $boundaryShiftsByUser, $result);
         $this->validateWeekendLoad($roster, $shifts, $boundaryShiftsByUser, $result);
         $this->validateMonthlyFreeDays($roster, $shifts, $boundaryShiftsByUser, $result);
         $this->validateSundayCompensationRestDays($roster, $shifts, $boundaryShiftsByUser, $result);
@@ -444,6 +446,103 @@ class RosterValidator
             ],
             'Zu viele Arbeitstage am Stück',
             'Der Mitarbeiter ist länger als empfohlen ohne freien Tag eingeplant.',
+        );
+    }
+
+    /**
+     * Zu viele Nachtdienste am Stück (arbeitsmedizinische Empfehlung). Es zählt
+     * der zusammenhängende Block aus Nachtdiensten, auch über Dienstpläne im
+     * Randfenster hinweg; gemeldet wird nur, wenn der Block einen Nachtdienst
+     * dieses Plans berührt. 0 = Regel deaktiviert.
+     *
+     * @param  Collection<string, Collection<int, Shift>>  $boundaryShiftsByUser
+     */
+    private function validateConsecutiveNightShifts(Roster $roster, Collection $shifts, Collection $boundaryShiftsByUser, RosterValidationResult $result): void
+    {
+        if ($this->maxConsecutiveNightShifts <= 0) {
+            return;
+        }
+
+        $isNight = fn (Shift $shift): bool => $shift->shiftTemplate?->category === 'night';
+
+        $shifts
+            ->groupBy('user_id')
+            ->each(function (Collection $shifts, string $userId) use ($roster, $boundaryShiftsByUser, $result, $isNight): void {
+                $rosterNightDates = $shifts
+                    ->filter($isNight)
+                    ->map(fn (Shift $shift): string => $shift->date->toDateString())
+                    ->unique();
+
+                if ($rosterNightDates->isEmpty()) {
+                    return;
+                }
+
+                $nightDates = $rosterNightDates
+                    ->concat($boundaryShiftsByUser->get($userId, collect())
+                        ->filter($isNight)
+                        ->map(fn (Shift $shift): string => $shift->date->toDateString()))
+                    ->unique()
+                    ->sort()
+                    ->values();
+
+                $sequenceStart = CarbonImmutable::parse($nightDates->first())->startOfDay();
+                $previousDate = $sequenceStart;
+                $consecutiveNights = 1;
+                $sequenceTouchesRoster = $rosterNightDates->contains($nightDates->first());
+
+                for ($index = 1; $index < $nightDates->count(); $index++) {
+                    $currentDate = CarbonImmutable::parse($nightDates[$index])->startOfDay();
+
+                    if ($currentDate->isSameDay($previousDate->addDay())) {
+                        $consecutiveNights++;
+                    } else {
+                        if ($sequenceTouchesRoster) {
+                            $this->addConsecutiveNightShiftsWarning($result, $userId, $shifts->first()?->user?->name, $roster, $sequenceStart, $previousDate, $consecutiveNights);
+                        }
+
+                        $sequenceStart = $currentDate;
+                        $consecutiveNights = 1;
+                        $sequenceTouchesRoster = false;
+                    }
+
+                    $sequenceTouchesRoster = $sequenceTouchesRoster || $rosterNightDates->contains($nightDates[$index]);
+                    $previousDate = $currentDate;
+                }
+
+                if ($sequenceTouchesRoster) {
+                    $this->addConsecutiveNightShiftsWarning($result, $userId, $shifts->first()?->user?->name, $roster, $sequenceStart, $previousDate, $consecutiveNights);
+                }
+            });
+    }
+
+    private function addConsecutiveNightShiftsWarning(
+        RosterValidationResult $result,
+        string $userId,
+        ?string $employeeName,
+        Roster $roster,
+        CarbonImmutable $startsOn,
+        CarbonImmutable $endsOn,
+        int $consecutiveNights,
+    ): void {
+        if ($consecutiveNights <= $this->maxConsecutiveNightShifts) {
+            return;
+        }
+
+        $result->addWarning(
+            'employee_too_many_consecutive_night_shifts',
+            'Der Mitarbeiter ist an zu vielen Nächten am Stück eingeplant.',
+            [
+                'userId' => $userId,
+                'employeeName' => $employeeName,
+                'consecutiveNights' => $consecutiveNights,
+                'maxAllowedConsecutiveNights' => $this->maxConsecutiveNightShifts,
+                'startsOn' => $startsOn->toDateString(),
+                'endsOn' => $endsOn->toDateString(),
+                'month' => $roster->month,
+                'year' => $roster->year,
+            ],
+            'Zu viele Nachtdienste am Stück',
+            'Der Mitarbeiter ist an mehr Nächten in Folge eingeplant als arbeitsmedizinisch empfohlen.',
         );
     }
 

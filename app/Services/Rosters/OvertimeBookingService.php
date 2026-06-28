@@ -7,6 +7,7 @@ use App\Models\Roster;
 use App\Models\Shift;
 use App\Models\ShiftTemplate;
 use App\Models\User;
+use App\Services\Rosters\Planning\PlanningContext;
 use App\Services\Rosters\Planning\TargetMinutesCalculator;
 use Illuminate\Support\Facades\DB;
 
@@ -14,7 +15,7 @@ use Illuminate\Support\Facades\DB;
  * Bucht beim Veröffentlichen eines Dienstplans die Differenz (geplante Minuten −
  * Monats-Soll) pro Mitarbeiter auf das Überstundenkonto und macht das beim
  * Wieder-Öffnen rückgängig. Der Saldo fließt im Folgemonat über
- * {@see \App\Services\Rosters\Planning\PlanningContext} ins reduzierte/erhöhte Soll ein.
+ * {@see PlanningContext} ins reduzierte/erhöhte Soll ein.
  */
 class OvertimeBookingService
 {

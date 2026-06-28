@@ -1037,7 +1037,14 @@ const generationRejectionLabels: Record<string, string> = {
     absence: 'Genehmigte Abwesenheit',
     rest_period: 'Ruhezeit zu kurz',
     consecutive_days: 'Zu viele Tage am Stück',
+    consecutive_nights: 'Zu viele Nächte am Stück',
     weekend_limit: 'Wochenend-Limit erreicht',
+    maternity_night: 'Mutterschutz: kein Nachtdienst',
+    maternity_sunday: 'Mutterschutz: kein Sonntag/Feiertag',
+    employee_no_weekend: 'Sonderregel: kein Wochenende',
+    employee_week_off: 'Sonderregel: Frei-Woche',
+    employee_fixed_free: 'Sonderregel: fester freier Tag',
+    daily_hours_cap: 'Tages-Höchstarbeitszeit erreicht',
     weekly_hours_cap: 'Wochenstunden-Limit erreicht',
 };
 
@@ -1876,12 +1883,20 @@ export default function RosterShow({
 
             <div className="py-6 sm:py-8 lg:py-12">
                 <div className="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
-                    <Link
-                        href={route('rosters.index')}
-                        className="inline-flex rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-                    >
-                        Zurück zur Übersicht
-                    </Link>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Link
+                            href={route('rosters.index')}
+                            className="inline-flex rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                        >
+                            Zurück zur Übersicht
+                        </Link>
+                        <Link
+                            href={route('rosters.replacements', roster.id)}
+                            className="inline-flex rounded-md border border-red-300 bg-white px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50"
+                        >
+                            Vertretung & Krankmeldung
+                        </Link>
+                    </div>
 
                     <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
                         <div className="border-b border-gray-200 p-6">

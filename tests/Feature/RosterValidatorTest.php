@@ -39,6 +39,7 @@ function createRosterValidatorShiftTemplate(Location $location, array $attribute
         'location_id' => $location->id,
         'name' => $attributes['name'] ?? 'Frühdienst',
         'code' => $attributes['code'] ?? 'early',
+        'category' => $attributes['category'] ?? ($attributes['code'] ?? 'early'),
         'starts_at' => $attributes['starts_at'] ?? '06:00',
         'ends_at' => $attributes['ends_at'] ?? '14:00',
         'duration_minutes' => $attributes['duration_minutes'] ?? 480,
@@ -1126,4 +1127,68 @@ it('counts weekend shifts from other rosters of the same month for the weekend l
 
     expect($warning)->not->toBeNull()
         ->and($warning['context']['workedWeekends'])->toBe(3);
+});
+
+it('warns when an employee works more than the allowed consecutive night shifts', function (): void {
+    config()->set('rostering.max_consecutive_night_shifts', 3);
+
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $roster = createRosterValidatorRoster($location, $createdBy);
+
+    $night = createRosterValidatorShiftTemplate($location, [
+        'name' => 'Nachtdienst',
+        'code' => 'night',
+        'category' => 'night',
+        'starts_at' => '22:00',
+        'ends_at' => '06:00',
+        'duration_minutes' => 480,
+    ]);
+    createRosterValidatorStaffingRule($night, ['required_total_staff' => 1]);
+
+    $employee = createRosterValidatorEmployee($location, ['can_work_night' => true]);
+
+    // Vier Nächte am Stück (10.–13.) – über dem Limit von 3.
+    foreach (['2027-01-10', '2027-01-11', '2027-01-12', '2027-01-13'] as $date) {
+        createRosterValidatorShift($roster, $employee, $night, $date);
+    }
+
+    $result = app(RosterValidator::class)->validate($roster);
+
+    $warning = collect($result->warnings)
+        ->first(fn (array $entry): bool => $entry['code'] === 'employee_too_many_consecutive_night_shifts');
+
+    expect($warning)->not->toBeNull()
+        ->and($warning['context']['consecutiveNights'])->toBe(4)
+        ->and($warning['context']['maxAllowedConsecutiveNights'])->toBe(3);
+});
+
+it('does not warn about consecutive nights when day shifts break the streak', function (): void {
+    config()->set('rostering.max_consecutive_night_shifts', 3);
+
+    $location = Location::factory()->create();
+    $createdBy = User::factory()->create();
+    $roster = createRosterValidatorRoster($location, $createdBy);
+
+    $night = createRosterValidatorShiftTemplate($location, [
+        'name' => 'Nachtdienst',
+        'code' => 'night',
+        'category' => 'night',
+        'starts_at' => '22:00',
+        'ends_at' => '06:00',
+        'duration_minutes' => 480,
+    ]);
+    createRosterValidatorStaffingRule($night, ['required_total_staff' => 1]);
+
+    $employee = createRosterValidatorEmployee($location, ['can_work_night' => true]);
+
+    // Nur drei Nächte am Stück – genau am Limit, keine Warnung.
+    foreach (['2027-01-10', '2027-01-11', '2027-01-12'] as $date) {
+        createRosterValidatorShift($roster, $employee, $night, $date);
+    }
+
+    $result = app(RosterValidator::class)->validate($roster);
+
+    expect(rosterValidatorCodes($result->warnings))
+        ->not->toContain('employee_too_many_consecutive_night_shifts');
 });

@@ -5,9 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\ShoppingItem;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 class ShoppingListController extends Controller
 {

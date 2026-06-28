@@ -329,6 +329,49 @@ class AbsenceRequestController extends Controller
         return back()->with('status', 'absence-request-approved');
     }
 
+    /**
+     * Krankmeldung durch die PDL: erfasst sofort eine genehmigte Krank-
+     * Abwesenheit für eine Pflegekraft und räumt deren Dienste frei. Die
+     * Vertretung wird anschließend manuell über die Vertretungssuche besetzt.
+     */
+    public function reportSick(
+        Request $request,
+        AbsenceRequestService $absenceRequestService,
+    ): RedirectResponse {
+        abort_unless(
+            $request->user()?->hasRole('PDL'),
+            HttpResponse::HTTP_FORBIDDEN,
+        );
+
+        $validated = $request->validate([
+            'user_id' => ['required', 'exists:users,id'],
+            'starts_on' => ['required', 'date'],
+            'ends_on' => ['required', 'date', 'after_or_equal:starts_on'],
+            'note' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $employee = User::query()->with('employeeProfile')->findOrFail($validated['user_id']);
+
+        // Standort-Scope: PDL darf nur eigene Wohnbereiche krankmelden.
+        abort_unless(
+            $request->user()->canAccessLocation($employee->location_id),
+            HttpResponse::HTTP_FORBIDDEN,
+        );
+
+        abort_unless(
+            $employee->employeeProfile?->employment_area === EmploymentArea::Nursing,
+            HttpResponse::HTTP_FORBIDDEN,
+        );
+
+        $absenceRequestService->reportSick(
+            employee: $employee,
+            reportedBy: $request->user(),
+            data: $validated,
+        );
+
+        return back()->with('status', 'absence-sick-reported');
+    }
+
     public function reject(
         Request $request,
         AbsenceRequest $absenceRequest,

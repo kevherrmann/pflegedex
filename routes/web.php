@@ -1,8 +1,8 @@
 <?php
 
 use App\Http\Controllers\AbsenceRequestController;
-use App\Http\Controllers\AssessmentController;
 use App\Http\Controllers\AiModelController;
+use App\Http\Controllers\AssessmentController;
 use App\Http\Controllers\AuditController;
 use App\Http\Controllers\CarePlanController;
 use App\Http\Controllers\CarePlanGenerationController;
@@ -18,6 +18,7 @@ use App\Http\Controllers\QualityAssessmentController;
 use App\Http\Controllers\ResidentController;
 use App\Http\Controllers\RosterBlackoutDayController;
 use App\Http\Controllers\RosterController;
+use App\Http\Controllers\RosterReplacementController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\ShiftTemplateController;
 use App\Http\Controllers\ShiftWishController;
@@ -166,6 +167,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/absence-requests/manage', [AbsenceRequestController::class, 'manage'])
         ->name('absence-requests.manage');
 
+    Route::post('/absence-requests/report-sick', [AbsenceRequestController::class, 'reportSick'])
+        ->name('absence-requests.report-sick');
+
     Route::patch('/absence-requests/{absenceRequest}/approve', [AbsenceRequestController::class, 'approve'])
         ->name('absence-requests.approve');
 
@@ -214,6 +218,9 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/rosters/{roster}', [RosterController::class, 'show'])
         ->name('rosters.show');
+
+    Route::get('/rosters/{roster}/replacements', [RosterReplacementController::class, 'index'])
+        ->name('rosters.replacements');
 
     Route::patch('/rosters/{roster}/publish', [RosterController::class, 'publish'])
         ->name('rosters.publish');
